@@ -67,6 +67,10 @@ build/TidyMac.app/Contents/MacOS/TidyMac --scan <module>   # smartCare, cleanup,
 build/TidyMac.app/Contents/MacOS/TidyMac --health-check    # current readings and active alerts
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 [MIT](LICENSE)
