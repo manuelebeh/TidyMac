@@ -66,3 +66,7 @@ These print results and quit. They never run a cleaning action.
 build/TidyMac.app/Contents/MacOS/TidyMac --scan <module>   # smartCare, cleanup, protection, performance, applications, clutter
 build/TidyMac.app/Contents/MacOS/TidyMac --health-check    # current readings and active alerts
 ```
+
+## License
+
+[MIT](LICENSE)
