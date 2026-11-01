@@ -60,6 +60,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        // `--snapshot-main <png> [module] [phase]` renders the main window (intro, or results with sample tiles, or done).
+        if let i = args.firstIndex(of: "--snapshot-main"), i + 1 < args.count {
+            MainActor.assumeIsolated {
+                let state = AppState()
+                if i + 2 < args.count, let m = Module(rawValue: args[i + 2]) { state.module = m }
+                if i + 3 < args.count, let c = state.controllers[state.module] {
+                    switch args[i + 3] {
+                    case "results":
+                        c.groups = [ResultGroup(id: "a", title: "System Junk", description: "", symbol: "archivebox.fill",
+                                                items: [ResultItem(title: "Caches", size: 2_400_000_000, action: .shell("true", admin: false))]),
+                                    ResultGroup(id: "b", title: "Trash Bins", description: "", symbol: "trash.fill", items: [])]
+                        c.selected = Set(c.groups.flatMap(\.items).map(\.id)); c.phase = .results
+                    case "scanning": c.current = "~/Library/Caches"; c.phase = .scanning
+                    case "done": c.report = ActionReport(); c.phase = .done
+                    default: break
+                    }
+                }
+                let renderer = ImageRenderer(content: RootView(app: state).frame(width: 1200, height: 720).environment(\.colorScheme, .dark))
+                renderer.scale = 1
+                if let tiff = renderer.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                    try? png.write(to: URL(fileURLWithPath: args[i + 1]))
+                }
+            }
+            exit(0)
+        }
         if let i = args.firstIndex(of: "--snapshot-tray") ?? args.firstIndex(of: "--snapshot-screen-clean"), i + 1 < args.count {
             MainActor.assumeIsolated {
                 // `--snapshot-tray <png> [card] [--light]` opens that card's details (storage, memory, cpu, drives, devices…).
@@ -163,7 +188,7 @@ struct RootView: View {
             ModuleBackground(module: app.module)
             HStack(spacing: 0) {
                 Sidebar(selection: $app.module)
-                    .frame(width: 230)
+                    .frame(width: 252)
                 Group {
                     switch app.module {
                     case .spaceLens: SpaceLensScreen(app: app)
@@ -173,7 +198,7 @@ struct RootView: View {
                     }
                 }
                 .id(app.module)
-                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 16)), removal: .opacity))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -191,40 +216,64 @@ struct RootView: View {
     }
 }
 
+/// Rows 50 pt tall every 60 pt, a plain glyph per module and a translucent pill under the selection, which slides
+/// to the new row. The selected glyph takes the module's colours.
 struct Sidebar: View {
     @Binding var selection: Module
+    @Namespace private var pill
+    @State private var hovered: Module?
     private let main: [Module] = [.smartCare, .cleanup, .protection, .performance, .applications, .clutter, .spaceLens]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Spacer().frame(height: 46)
+        VStack(alignment: .leading, spacing: 10) {
+            // The first row starts 67 pt from the top of the window, title bar included.
+            Spacer().frame(height: 29)
             ForEach(main) { row($0) }
-            Spacer()
+            Spacer(minLength: 20)
             row(.myTools)
             row(.activity)
-            Spacer().frame(height: 16)
+            Spacer().frame(height: 11)
         }
-        .padding(.horizontal, 12)
-        .background(Color.black.opacity(0.06))
+        .padding(.horizontal, 16)
+        .overlay(alignment: .trailing) {
+            LinearGradient(colors: [.white.opacity(0), .white.opacity(0.08), .white.opacity(0.08), .white.opacity(0)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(width: 1)
+                .padding(.vertical, 60)
+        }
+        .animation(Motion.animation(.spring(response: 0.38, dampingFraction: 0.82)), value: selection)
+        .animation(Motion.animation(.easeOut(duration: 0.15)), value: hovered)
     }
 
     func row(_ m: Module) -> some View {
-        Button { selection = m } label: {
-            HStack(spacing: 12) {
+        let active = selection == m
+        return Button { selection = m } label: {
+            HStack(spacing: 19) {
                 Image(systemName: m.symbol)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 22, height: 22)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(
-                        LinearGradient(colors: [m.accent, m.light], startPoint: .top, endPoint: .bottom)))
-                Text(m.name).font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(active ? AnyShapeStyle(LinearGradient(colors: [m.aurora[0], m.aurora[2], m.aurora[4]],
+                                                                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                                            : AnyShapeStyle(.white.opacity(0.85)))
+                    .shadow(color: active ? m.aurora[2].opacity(0.6) : .black.opacity(0.25), radius: active ? 5 : 1, y: 1)
+                    .frame(width: 24, height: 24)
+                Text(m.name).font(.system(size: 14)).foregroundStyle(.white)
                 Spacer()
             }
-            .padding(.horizontal, 10).padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(selection == m ? 0.14 : 0)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(.white.opacity(selection == m ? 0.12 : 0)))
+            .padding(.horizontal, 19)
+            .frame(height: 50)
+            .background {
+                if active {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.09))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(
+                            LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.05)], startPoint: .top, endPoint: .bottom)))
+                        .matchedGeometryEffect(id: "selection", in: pill)
+                } else if hovered == m {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.05))
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovered = $0 ? m : (hovered == m ? nil : hovered) }
     }
 }
