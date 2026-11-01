@@ -384,4 +384,75 @@ final class TidyCoreTests: XCTestCase {
                      ResultItem(title: "c", action: .shell("true", admin: false))]
         XCTAssertEqual(AppTerminator.removedURLs(items), [u])
     }
+
+    /// A minimal bundle with an Info.plist, enough for `Bundle(url:)`.
+    func bundle(_ path: String, id: String, executable: String? = nil) throws -> URL {
+        let u = tmp.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: u.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+        var info: [String: Any] = ["CFBundleIdentifier": id, "CFBundlePackageType": "APPL"]
+        if let executable { info["CFBundleExecutable"] = executable }
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+            .write(to: u.appendingPathComponent("Contents/Info.plist"))
+        return u
+    }
+
+    func testUninstallerFindsLeftoversByIDAndName() throws {
+        let home = tmp.appendingPathComponent("home"), sys = tmp.appendingPathComponent("sys")
+        _ = try bundle("home/Applications/Super Notes.app", id: "com.acme.SuperNotes", executable: "SuperNotes")
+        let app = Uninstaller.installedApps(home: home, system: sys).first { $0.name == "Super Notes" }!
+        for f in ["Library/Application Support/Super Notes/db.sqlite", "Library/Caches/com.acme.SuperNotes/c.bin",
+                  "Library/Preferences/com.acme.SuperNotes.plist", "Library/Preferences/com.acme.SuperNotes.helper.plist",
+                  "Library/Preferences/ByHost/com.acme.SuperNotes.1234-ABCD.plist",
+                  "Library/Group Containers/TEAM123.com.acme.SuperNotes.shared/g.bin",
+                  "Library/Logs/DiagnosticReports/SuperNotes-2026-10-01-120000.ips",
+                  "Library/Application Support/Supernote Lite/other.bin", "Library/Caches/com.acme.SuperNotesPro/x.bin",
+                  "Library/Caches/Notes/x.bin", "Library/Caches/acme/SuperNotes2026.1/x.bin", "Library/Caches/acme/Other/x.bin"] {
+            _ = try write("home/" + f, 10)
+        }
+        _ = try write("sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper", 10)
+        _ = try write("sys/var/db/receipts/com.acme.SuperNotes.pkg.plist", 10)
+        let agent = try write("home/Library/LaunchAgents/com.acme.updater.plist", 0)
+        try (["Label": "com.acme.updater", "Program": app.url.path + "/Contents/MacOS/Updater"] as NSDictionary).write(to: agent)
+
+        let found = Uninstaller.leftovers(for: app, home: home, system: sys)
+        // Listings resolve /var to /private/var, so paths are compared from the resolved temporary folder.
+        let base = tmp.resolvingSymlinksInPath().path + "/"
+        let rel = { (u: URL) in u.resolvingSymlinksInPath().path.replacingOccurrences(of: base, with: "") }
+        XCTAssertEqual(Set(found.map { rel($0.url) }), [
+            "home/Library/Application Support/Super Notes", "home/Library/Caches/com.acme.SuperNotes",
+            "home/Library/Caches/acme/SuperNotes2026.1", "home/Library/Preferences/com.acme.SuperNotes.plist", "home/Library/Preferences/com.acme.SuperNotes.helper.plist",
+            "home/Library/Preferences/ByHost/com.acme.SuperNotes.1234-ABCD.plist",
+            "home/Library/Group Containers/TEAM123.com.acme.SuperNotes.shared",
+            "home/Library/Logs/DiagnosticReports/SuperNotes-2026-10-01-120000.ips",
+            "home/Library/LaunchAgents/com.acme.updater.plist",
+            "sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper",
+            "sys/var/db/receipts/com.acme.SuperNotes.pkg.plist",
+        ])
+        let byURL = Dictionary(uniqueKeysWithValues: found.map { (rel($0.url), $0) })
+        if case .removeLaunchItem(_, admin: false) = byURL["home/Library/LaunchAgents/com.acme.updater.plist"]?.action {} else { XCTFail("user agent") }
+        XCTAssertEqual(byURL["sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper"]?.kind, .binaries)
+        if case .adminDelete = byURL["sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper"]?.action {} else { XCTFail("system file needs admin") }
+        XCTAssertEqual(byURL["sys/var/db/receipts/com.acme.SuperNotes.pkg.plist"]?.action,
+                       .shell("/usr/sbin/pkgutil --forget 'com.acme.SuperNotes.pkg'", admin: true))
+    }
+
+    func testInstalledAppsSourcesAndFilters() throws {
+        let home = tmp.appendingPathComponent("home"), sys = tmp.appendingPathComponent("sys")
+        _ = try bundle("sys/Applications/Shop.app", id: "com.acme.shop")
+        _ = try write("sys/Applications/Shop.app/Contents/_MASReceipt/receipt", 1)
+        _ = try bundle("sys/Applications/Setapp/Tool.app", id: "com.acme.tool")
+        _ = try bundle("home/Library/Application Support/Steam/steamapps/common/Game/Game.app", id: "com.acme.game")
+        _ = try bundle("home/Library/Audio/Plug-Ins/VST3/Synth.vst3", id: "com.acme.synth")
+        _ = try bundle("sys/Applications/Word.app", id: "com.microsoft.Word")
+        let apps = Dictionary(uniqueKeysWithValues: Uninstaller.installedApps(home: home, system: sys).map { ($0.name, $0) })
+        XCTAssertEqual(apps["Shop"]?.store, .appStore)
+        XCTAssertEqual(apps["Tool"]?.store, .setapp)
+        XCTAssertEqual(apps["Game"]?.store, .steam)
+        XCTAssertEqual(apps["Synth"]?.kind, .audioPlugin)
+        XCTAssertEqual(apps["Word"]?.vendor, .microsoft)
+        var old = apps["Shop"]!
+        old.lastUsed = Date(timeIntervalSinceNow: -200 * 86_400)
+        XCTAssertTrue(old.isUnused())
+        XCTAssertFalse(apps["Tool"]!.isUnused())
+    }
 }
