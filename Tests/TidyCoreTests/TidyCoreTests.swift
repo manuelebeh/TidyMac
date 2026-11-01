@@ -616,3 +616,42 @@ extension TidyCoreTests {
         XCTAssertNil(SystemMonitor.trashedApps(trash: root.appendingPathComponent("missing")))
     }
 }
+
+extension TidyCoreTests {
+    func testSpaceLensProtection() {
+        let home = URL(fileURLWithPath: "/Users/someone")
+        func p(_ path: String) -> SpaceLens.Protection { SpaceLens.protection(of: URL(fileURLWithPath: path), home: home) }
+        XCTAssertEqual(p("/System"), .essential)
+        XCTAssertEqual(p("/System/Library/Fonts"), .essential)
+        XCTAssertEqual(p("/usr/bin"), .essential)
+        XCTAssertEqual(p("/usr/local/lib"), .none)
+        XCTAssertEqual(p("/Users/someone/Documents"), .essential)
+        XCTAssertEqual(p("/Users/someone/Documents/Old Project"), .none)
+        XCTAssertEqual(p("/Users/someone/Library"), .essential)
+        XCTAssertEqual(p("/Users/someone/Library/Keychains"), .essential)
+        XCTAssertEqual(p("/Users/someone/Library/Caches"), .systemFolder)
+        XCTAssertEqual(p("/Users/someone/Library/Caches/com.example.app"), .none)
+        XCTAssertEqual(p("/Users/someone/Library/Application Support/Old App"), .none)
+        XCTAssertEqual(p("/Users/someone/Projects"), .none)
+        XCTAssertTrue(SpaceLens.isInCloud(URL(fileURLWithPath: "/Users/someone/Library/Mobile Documents/com~apple~CloudDocs/a.txt")))
+        XCTAssertGreaterThanOrEqual(SpaceLens.purgeableSpace() ?? 0, 0)
+    }
+
+    func testRemovalLogKeepsNewestFirst() throws {
+        let d = try XCTUnwrap(UserDefaults(suiteName: "TidyMacTests.removalLog"))
+        defer { d.removePersistentDomain(forName: "TidyMacTests.removalLog") }
+        let a = URL(fileURLWithPath: "/tmp/a"), b = URL(fileURLWithPath: "/tmp/b")
+        var first = ActionReport()
+        first.succeeded = [ResultItem(title: "a", size: 10, url: a, action: .trash(a))]
+        RemovalLog.record(first, date: Date(timeIntervalSince1970: 1), defaults: d)
+        var second = ActionReport()
+        second.failed = [(ResultItem(title: "b", size: 20, url: b, action: .trash(b)), "In use")]
+        RemovalLog.record(second, date: Date(timeIntervalSince1970: 2), defaults: d)
+        let log = RemovalLog.entries(defaults: d)
+        XCTAssertEqual(log.map(\.path), ["/tmp/b", "/tmp/a"])
+        XCTAssertEqual(log[0].error, "In use")
+        XCTAssertNil(log[1].error)
+        RemovalLog.clear(defaults: d)
+        XCTAssertTrue(RemovalLog.entries(defaults: d).isEmpty)
+    }
+}
