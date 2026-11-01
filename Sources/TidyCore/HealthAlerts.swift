@@ -6,7 +6,7 @@ import Foundation
 public enum HealthAlerts {
 
     public struct Alert: Equatable, Sendable {
-        public enum Kind: String, Sendable { case lowDisk, trashSize, memory, battery, threat, externalFull, bluetoothLow }
+        public enum Kind: String, Sendable { case lowDisk, trashSize, memory, battery, threat, externalFull, bluetoothLow, smartCare, hungApps, heavyChrome, trashedApp }
         public let kind: Kind
         /// One per condition; threats get one per launch item so a new one is reported even if another is ignored.
         public let key: String
@@ -28,7 +28,17 @@ public enum HealthAlerts {
         public var externalDrives = true
         public var bluetooth = true
         public var driveConnected = true
+        /// "Remind to run regular Smart Care", every `smartCareInterval` days.
+        public var smartCareReminder = true
+        public var smartCareInterval = 7
+        public var hungApps = true
+        public var heavyChrome = true
+        /// "Offer to uninstall applications correctly" when an app lands in the Trash.
+        public var trashedApps = true
         public init() {}
+
+        /// Reminder options: Once in 3 Days, Weekly, Every 2 Weeks, Monthly.
+        public static let smartCareIntervals: [(days: Int, title: String)] = [(3, "Once in 3 Days"), (7, "Weekly"), (14, "Every 2 Weeks"), (30, "Monthly")]
 
         public static let defaultsKey = "TidyMac.alerts"
         public static func load(_ d: UserDefaults = .standard) -> Settings {
@@ -39,6 +49,9 @@ public enum HealthAlerts {
             bool("trashSize", &s.trashSize); size("trashLimit", &s.trashLimit)
             bool("memory", &s.memory); bool("battery", &s.battery); bool("threats", &s.threats)
             bool("externalDrives", &s.externalDrives); bool("bluetooth", &s.bluetooth); bool("driveConnected", &s.driveConnected)
+            bool("smartCareReminder", &s.smartCareReminder); bool("hungApps", &s.hungApps)
+            bool("heavyChrome", &s.heavyChrome); bool("trashedApps", &s.trashedApps)
+            if let n = d.object(forKey: "\(defaultsKey).smartCareInterval") as? Int, n > 0 { s.smartCareInterval = n }
             return s
         }
     }
@@ -55,11 +68,21 @@ public enum HealthAlerts {
         public var topConsumer: (name: String, bytes: Int64)?
         public var externalDrives: [SystemMonitor.Drive] = []
         public var bluetooth: [SystemMonitor.BluetoothDevice] = []
+        /// Names of the apps the window server reports as not responding.
+        public var hungApps: [String] = []
+        /// Google Chrome and its helpers together; nil when Chrome is not running.
+        public var chromeMemory: Int64?
+        /// Apps in the Trash; nil without Full Disk Access, which leaves the known list as it was.
+        public var trashedApps: [String]?
+        /// The last run that freed space, for the Smart Care reminder.
+        public var lastCleanup: Date?
         public init(storage: SystemMonitor.Storage, memory: SystemMonitor.Memory, trashSize: Int64? = nil, batteryHealth: Int? = nil,
                     threats: [(key: String, name: String)]? = nil, topConsumer: (name: String, bytes: Int64)? = nil,
-                    externalDrives: [SystemMonitor.Drive] = [], bluetooth: [SystemMonitor.BluetoothDevice] = []) {
+                    externalDrives: [SystemMonitor.Drive] = [], bluetooth: [SystemMonitor.BluetoothDevice] = [],
+                    hungApps: [String] = [], chromeMemory: Int64? = nil, trashedApps: [String]? = nil, lastCleanup: Date? = nil) {
             self.storage = storage; self.memory = memory; self.trashSize = trashSize; self.batteryHealth = batteryHealth
             self.threats = threats; self.topConsumer = topConsumer; self.externalDrives = externalDrives; self.bluetooth = bluetooth
+            self.hungApps = hungApps; self.chromeMemory = chromeMemory; self.trashedApps = trashedApps; self.lastCleanup = lastCleanup
         }
     }
 
@@ -69,6 +92,8 @@ public enum HealthAlerts {
         public var snoozed: [String: Date] = [:]
         public var memoryHighSince: Date?
         public var threatKeys: [String] = []
+        /// Apps seen in the Trash at the last look; only newcomers are announced. Optional so older saved states still decode.
+        public var trashedApps: [String]?
         public init() {}
 
         public static let defaultsKey = "TidyMac.alertState"
@@ -89,9 +114,18 @@ public enum HealthAlerts {
     /// Bluetooth battery level that counts as low.
     public static let bluetoothLowLevel = 20
 
+    /// Chrome counts as heavy above a quarter of the RAM, and never below 2 GB (TidyMac's threshold).
+    public static func chromeLimit(totalMemory: Int64) -> Int64 { max(2_000_000_000, totalMemory / 4) }
+
+    /// Sums Google Chrome's processes (including Dev, Beta and Canary); nil when none is running.
+    public static func chromeMemory(_ consumers: [SystemMonitor.Consumer]) -> Int64? {
+        let chrome = consumers.filter { $0.name.hasPrefix("Google Chrome") }
+        return chrome.isEmpty ? nil : chrome.reduce(0) { $0 + $1.memory }
+    }
+
     /// How long a condition that is still true stays quiet after being reported. A condition that clears and comes back
     /// is reported again straight away. Threats are only reported once each.
-    static func repeatAfter(_ kind: Alert.Kind) -> TimeInterval? {
+    static func repeatAfter(_ kind: Alert.Kind, settings: Settings) -> TimeInterval? {
         switch kind {
         case .lowDisk: 86_400
         case .trashSize: 3 * 86_400
@@ -100,6 +134,9 @@ public enum HealthAlerts {
         case .threat: nil
         case .externalFull: 86_400
         case .bluetoothLow: 6 * 3_600
+        case .smartCare: Double(settings.smartCareInterval) * 86_400
+        case .hungApps, .heavyChrome: 6 * 3_600
+        case .trashedApp: nil
         }
     }
 
@@ -146,6 +183,35 @@ public enum HealthAlerts {
                              target: "smartCare"))
         }
 
+        if s.smartCareReminder, let last = r.lastCleanup, now.timeIntervalSince(last) >= Double(s.smartCareInterval) * 86_400 {
+            let days = Int(now.timeIntervalSince(last) / 86_400)
+            out.append(Alert(kind: .smartCare, key: "smartCare", title: "It’s time to care for your Mac!",
+                             body: "Your last cleanup was \(days) days ago. Run Smart Care to keep your Mac clean, safe and fast.",
+                             target: "smartCare"))
+        }
+        if s.hungApps, !r.hungApps.isEmpty {
+            let one = r.hungApps.count == 1
+            out.append(Alert(kind: .hungApps, key: "hungApps", title: "Non-responsive applications",
+                             body: "\(r.hungApps.joined(separator: ", ")) \(one ? "is" : "are") not responding. Force quit \(one ? "it" : "them") from TidyMac's menu, or wait until \(one ? "it responds" : "they respond").",
+                             target: "performance"))
+        }
+        if s.heavyChrome, let m = r.chromeMemory, m > chromeLimit(totalMemory: r.memory.total) {
+            out.append(Alert(kind: .heavyChrome, key: "heavyChrome", title: "Chrome memory usage is high",
+                             body: "Google Chrome is using \(FileSize.format(m)). High RAM usage may slow down your Mac. Managing your tabs can help free up memory.",
+                             target: "performance"))
+        }
+        if let trashed = r.trashedApps {
+            // The first look only learns what is already there.
+            if s.trashedApps, let known = state.trashedApps {
+                for name in trashed where !known.contains(name) {
+                    out.append(Alert(kind: .trashedApp, key: "trashedApp:\(name)", title: "Uninstall applications correctly",
+                                     body: "\(name) is in the Trash, but the files it created may still be on your Mac. Scan Applications to remove its leftovers.",
+                                     target: "applications"))
+                }
+            }
+            state.trashedApps = trashed
+        }
+
         if let threats = r.threats { state.threatKeys = threats.map(\.key) }
         if s.threats {
             for t in r.threats ?? [] {
@@ -169,7 +235,7 @@ public enum HealthAlerts {
         for a in current {
             if let until = state.snoozed[a.key], until > now { continue }
             if let last = state.notified[a.key] {
-                guard let wait = repeatAfter(a.kind), now.timeIntervalSince(last) >= wait else { continue }
+                guard let wait = repeatAfter(a.kind, settings: settings), now.timeIntervalSince(last) >= wait else { continue }
             }
             state.notified[a.key] = now
             due.append(a)
@@ -182,7 +248,8 @@ public enum HealthAlerts {
 extension HealthAlerts {
     /// Third-party launch items Protection would flag. Spawns `codesign` per item, so it runs on a slower timer.
     public static func currentThreats() -> [(key: String, name: String)] {
-        ProtectionEngine.suspiciousLaunchItems().items.map { ($0.id, $0.title) }
+        // Launch items on the Ignore List are not reported again.
+        IgnoreList.apply([ProtectionEngine.suspiciousLaunchItems()])[0].items.map { ($0.id, $0.title) }
     }
 
     /// The app (or process) holding the most memory, by resident size.

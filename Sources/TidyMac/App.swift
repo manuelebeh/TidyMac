@@ -12,16 +12,18 @@ struct TidyMacApp: App {
         WindowGroup("TidyMac", id: "main") {
             RootView(app: app)
                 .frame(minWidth: 1000, idealWidth: 1200, minHeight: 640, idealHeight: 720)
-                .environment(\.colorScheme, .dark)
+                // Sets the window's appearance, so sheets get a dark background to match their light text.
+                .preferredColorScheme(.dark)
                 // A notification opens tidymac://open/<module>; reuse the open window instead of adding one.
-                .handlesExternalEvents(preferring: ["open"], allowing: ["*"])
+                .handlesExternalEvents(preferring: ["open", "uninstall"], allowing: ["*"])
                 .onOpenURL { url in
                     if url.host == "open", let m = Module(rawValue: url.lastPathComponent) { app.module = m }
+                    if let target = Uninstaller.appURL(fromUninstallURL: url) { app.module = .applications; app.uninstallTarget = target }
                 }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
-        .handlesExternalEvents(matching: ["open"])
+        .handlesExternalEvents(matching: ["open", "uninstall"])
 
         Settings {
             SettingsView()
@@ -46,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let engine = module.engine(clutterRoot: Paths.home)
             Task.detached {
                 let start = Date()
-                let groups = await engine.scan { _ in }
+                let groups = IgnoreList.apply(await engine.scan { _ in })
                 for g in groups {
                     print("== \(g.title) — \(g.items.count) items, \(FileSize.format(g.totalSize)), \(g.items.filter(\.selectedByDefault).count) preselected")
                     for item in g.items.prefix(8) {
@@ -116,6 +118,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         MainActor.assumeIsolated { HealthMonitor.shared.start() }
+        // Finder › right-click an app › Services (or Quick Actions) › Uninstall with TidyMac.
+        NSApp.servicesProvider = FinderService.shared
+        NSUpdateDynamicServices()
+        DispatchQueue.main.async { MainActor.assumeIsolated { MoveOffer.offerIfNeeded() } }
+        let center = NotificationCenter.default
+        center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
+            MainActor.assumeIsolated { Self.updateDockIcon(closing: note.object as? NSWindow) }
+        }
+    }
+
+    /// "Keep icon in Dock when TidyMac is not open". Without it, closing the main window leaves only the menu bar item.
+    @MainActor static func updateDockIcon(closing: NSWindow? = nil) {
+        let mainOpen = NSApp.windows.contains { $0 !== closing && $0.isVisible && $0.identifier?.rawValue.hasPrefix("main") == true }
+        let policy: NSApplication.ActivationPolicy = mainOpen || GeneralSettings.keepsDockIcon() ? .regular : .accessory
+        if NSApp.activationPolicy() != policy { NSApp.setActivationPolicy(policy) }
+    }
+
+    /// The main window is opening: the Dock icon comes back, and an app without one has to be activated to show it in front.
+    @MainActor static func mainWindowOpened() {
+        guard NSApp.activationPolicy() != .regular else { return }
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
     }
     // The menu bar item keeps running after the main window is closed.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -125,6 +149,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 final class AppState: ObservableObject {
     @Published var module: Module = .smartCare
+    /// Set by a `tidymac://uninstall` link; shows the Uninstaller on that app.
+    @Published var uninstallTarget: URL?
     let screenCleaning = ScreenCleaningSession()
     let controllers: [Module: ModuleController] = Dictionary(uniqueKeysWithValues: Module.allCases.map { ($0, ModuleController(module: $0)) })
 }
@@ -140,7 +166,7 @@ struct RootView: View {
                     .frame(width: 230)
                 Group {
                     switch app.module {
-                    case .spaceLens: SpaceLensScreen()
+                    case .spaceLens: SpaceLensScreen(app: app)
                     case .activity: ActivityScreen(app: app)
                     case .myTools: MyToolsScreen(screenCleaning: app.screenCleaning)
                     default: ModuleScreen(controller: app.controllers[app.module]!)
@@ -151,7 +177,14 @@ struct RootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .animation(.easeInOut(duration: 0.35), value: app.module)
+        .animation(Motion.animation(.easeInOut(duration: 0.35)), value: app.module)
+        .onAppear { AppDelegate.mainWindowOpened() }
+        .background {
+            // Its own view, so it does not compete with the Screen Cleaning sheet attached below.
+            Color.clear.sheet(isPresented: Binding(get: { app.uninstallTarget != nil }, set: { if !$0 { app.uninstallTarget = nil } })) {
+                UninstallerSheet(module: .applications, select: app.uninstallTarget)
+            }
+        }
         .sheet(isPresented: Binding(get: { app.screenCleaning.showSuccess }, set: { app.screenCleaning.showSuccess = $0 })) {
             ScreenCleaningSuccess(session: app.screenCleaning)
         }

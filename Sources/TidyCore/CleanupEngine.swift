@@ -2,14 +2,34 @@ import Foundation
 
 /// Cleanup module: System Junk, AI Clutter, Mail Attachments, Trash Bins.
 public struct CleanupEngine: ScanEngine {
-    public init() {}
+    let settings: ScanSettings
+    public init(settings: ScanSettings = .load()) { self.settings = settings }
+
+    /// One per result group; Settings › Scanning lists them by title.
+    public struct Category: Sendable {
+        public let id: String
+        public let title: String
+        let build: @Sendable () -> ResultGroup
+    }
+
+    public static let categories: [Category] = [
+        Category(id: "user-cache", title: "User Cache Files", build: userCache),
+        Category(id: "system-cache", title: "System Cache Files", build: systemCache),
+        Category(id: "user-logs", title: "User Log Files", build: userLogs),
+        Category(id: "system-logs", title: "System Log Files", build: systemLogs),
+        Category(id: "xcode", title: "Xcode Junk", build: xcodeJunk),
+        Category(id: "ios-backups", title: "iOS Device Backups", build: iosBackups),
+        Category(id: "broken-prefs", title: "Broken Preferences", build: brokenPreferences),
+        Category(id: "broken-login", title: "Broken Login Items", build: brokenLoginItems),
+        Category(id: "deleted-users", title: "Deleted Users", build: deletedUsers),
+        Category(id: "ai-junk", title: "AI Junk Files", build: aiClutter),
+        Category(id: "local-models", title: "Local Models", build: localModels),
+        Category(id: "mail", title: "Mail Attachments", build: mailAttachments),
+        Category(id: "trash", title: "Trash Bins", build: trashBins),
+    ]
 
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {
-        let builders: [@Sendable () -> ResultGroup] = [
-            Self.userCache, Self.systemCache, Self.userLogs, Self.systemLogs, Self.xcodeJunk,
-            Self.iosBackups, Self.brokenPreferences, Self.brokenLoginItems, Self.deletedUsers,
-            Self.aiClutter, Self.localModels, Self.mailAttachments, Self.trashBins,
-        ]
+        let builders = Self.categories.filter { settings.scansCleanup($0.id) }.map(\.build)
         return await withTaskGroup(of: (Int, ResultGroup?).self) { tg in
             for (i, b) in builders.enumerated() {
                 // A group stuck behind a privacy prompt is dropped instead of freezing the scan.

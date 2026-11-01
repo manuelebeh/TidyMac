@@ -97,15 +97,15 @@ final class MonitorModel: ObservableObject {
         guard !slowRunning else { return }
         slowRunning = true
         hungApps = HungApps.current()
-        let wantsDriveHealth = driveHealth == nil
+        let known = driveHealth
         let fda = Permissions.hasFullDiskAccess, screenDue = ScreenCleaningSession.reminderDue
         Task {
             let r = await Task.detached {
-                (SystemMonitor.trash(), SystemMonitor.externalDrives(), SystemMonitor.bluetoothDevices(),
-                 wantsDriveHealth ? SystemMonitor.driveHealth() : nil, MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: screenDue))
+                let drive = known ?? SystemMonitor.driveHealth()
+                return (SystemMonitor.trash(), SystemMonitor.externalDrives(), SystemMonitor.bluetoothDevices(), drive,
+                        MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: screenDue, driveHealth: drive))
             }.value
-            trash = r.0; drives = r.1; bluetooth = r.2; health = r.4
-            if let h = r.3 { driveHealth = h }
+            trash = r.0; drives = r.1; bluetooth = r.2; driveHealth = r.3; health = r.4
             if fastTimer == nil { storage = SystemMonitor.storage(); memory = SystemMonitor.memory() }
             slowRunning = false
             updateIssues()
@@ -130,7 +130,8 @@ final class MonitorModel: ObservableObject {
         consumers = SystemMonitor.consumers(); bluetooth = SystemMonitor.bluetoothDevices(); driveHealth = SystemMonitor.driveHealth()
         drives = SystemMonitor.externalDrives(); networkInfo = SystemMonitor.networkInfo(); trash = SystemMonitor.trash()
         hungApps = HungApps.current()
-        health = MacHealth.current(hasFullDiskAccess: Permissions.hasFullDiskAccess, screenCleaningDue: ScreenCleaningSession.reminderDue)
+        health = MacHealth.current(hasFullDiskAccess: Permissions.hasFullDiskAccess, screenCleaningDue: ScreenCleaningSession.reminderDue,
+                                   driveHealth: driveHealth)
         updateIssues()
     }
 
@@ -160,14 +161,22 @@ final class MonitorModel: ObservableObject {
     func eject(_ list: [SystemMonitor.Drive]) {
         ejectMessage = nil
         ejecting.formUnion(list.map(\.id))
+        let clean = GeneralSettings.cleansOnEject()
         Task {
             var failed: [String] = []
+            var cleaned: Int64 = 0
             for d in list {
+                // "Clean up junk automatically on ejection": the drive's own Trash, which would otherwise stay on it.
+                if clean, !d.isDiskImage {
+                    let junk = await Task.detached { SystemMonitor.driveTrash(d) }.value
+                    if !junk.isEmpty { cleaned += await Task.detached { await Executor.run(junk) }.value.freed }
+                }
                 let ok = await Task.detached { (try? NSWorkspace.shared.unmountAndEjectDevice(at: d.url)) != nil }.value
                 if !ok { failed.append(d.name) }
                 ejecting.remove(d.id)
             }
             ejectMessage = failed.isEmpty ? "Successfully ejected!" : "\(failed.joined(separator: ", ")) could not be ejected."
+            if cleaned > 0 { ejectMessage! += " \(FileSize.format(cleaned)) of junk cleaned." }
             drives = await Task.detached { SystemMonitor.externalDrives() }.value
             updateIssues()
         }
@@ -309,7 +318,7 @@ struct TrayView: View {
         .background(TrayBackground())
         .onAppear { monitor.start() }
         .onDisappear { monitor.stop() }
-        .animation(.easeInOut(duration: 0.2), value: detail)
+        .animation(Motion.animation(.easeInOut(duration: 0.2)), value: detail)
     }
 
     var content: some View {

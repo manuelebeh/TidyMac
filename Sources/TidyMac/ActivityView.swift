@@ -9,6 +9,9 @@ struct ActivityScreen: View {
     @State private var health: MacHealth?
     @State private var machine = "Mac"
     @State private var showAll = false
+    @State private var showUnused = false
+    @State private var confirmRestart = false
+    @AppStorage(GeneralSettings.assistantKey) private var showsAssistant = true
     private let module = Module.activity
 
     var body: some View {
@@ -22,7 +25,7 @@ struct ActivityScreen: View {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 14) {
                     HealthCard(health: health, machine: machine)
-                    recommendations
+                    if showsAssistant { recommendations }
                 }
                 .frame(width: 300)
                 Grid(horizontalSpacing: 16, verticalSpacing: 16) {
@@ -35,14 +38,40 @@ struct ActivityScreen: View {
         .padding(.horizontal, 40).padding(.top, 40)
         .task {
             summary = ActivitySummary()
-            let due = ScreenCleaningSession.reminderDue
-            let fda = Permissions.hasFullDiskAccess
-            let (h, m) = await Task.detached {
-                (MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: due), SystemMonitor.machineName())
-            }.value
-            health = h; machine = m
+            await loadHealth()
+            machine = await Task.detached { SystemMonitor.machineName() }.value
+            // The update check behind "Install application updates" runs at most once a day.
+            await AppFacts.refreshIfStale()
+            await loadHealth()
         }
-        .sheet(isPresented: $showAll) { RecommendationsSheet(health: health, go: { showAll = false; go($0) }) }
+        .sheet(isPresented: $showAll) {
+            RecommendationsSheet(health: health, go: { showAll = false; go($0) }, skip: skip)
+        }
+        .sheet(isPresented: $showUnused) { UninstallerSheet(module: .applications, filter: .unused) }
+        .alert("Restart your Mac now?", isPresented: $confirmRestart) {
+            Button("Cancel", role: .cancel) {}
+            Button("Restart") { Shell.osascript("tell application \"System Events\" to restart") }
+        } message: {
+            Text("Save your work first. Apps with unsaved changes may ask before they quit.")
+        }
+    }
+
+    func loadHealth() async {
+        let due = ScreenCleaningSession.reminderDue
+        let fda = Permissions.hasFullDiskAccess
+        health = await Task.detached {
+            MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: due, driveHealth: SystemMonitor.driveHealth())
+        }.value
+    }
+
+    /// "Skip for now" and "Hide All": gone until tomorrow, and no longer counted in Mac Health.
+    func skip(_ ids: [String]) {
+        var skipped = SkippedRecommendations.load()
+        skipped.skip(ids)
+        skipped.save()
+        let left = (health?.recommendations ?? []).filter { !ids.contains($0.id) }
+        health = MacHealth(recommendations: left)
+        if left.isEmpty { showAll = false }
     }
 
     // MARK: Recommendations
@@ -60,7 +89,7 @@ struct ActivityScreen: View {
                 // The cards behind hint that more recommendations are waiting.
                 if recs.count > 2 { card.padding(.horizontal, 24).offset(y: 16).opacity(0.4) }
                 if recs.count > 1 { card.padding(.horizontal, 12).offset(y: 8).opacity(0.6) }
-                RecommendationRow(rec: r) { go(r.target) }
+                RecommendationRow(rec: r, go: { go(r.target) }, skip: { skip([r.id]) })
                     .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: 0x2B2541)))
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.12)))
@@ -154,7 +183,10 @@ struct ActivityScreen: View {
         case .protection: app.module = .protection
         case .performance: app.module = .performance
         case .applications: app.module = .applications
+        case .uninstaller: showUnused = true
         case .clutter: app.module = .clutter
+        case .restart: confirmRestart = true
+        case .backup: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Time-Machine-Settings.extension")!)
         }
     }
 
@@ -210,6 +242,7 @@ struct HealthCard: View {
 struct RecommendationRow: View {
     let rec: MacHealth.Recommendation
     let go: () -> Void
+    var skip: (() -> Void)?
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: rec.severe ? "exclamationmark.triangle.fill" : "sparkles")
@@ -218,6 +251,10 @@ struct RecommendationRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(rec.title).font(.callout.weight(.semibold)).foregroundStyle(.white).fixedSize(horizontal: false, vertical: true)
                 Text(rec.detail).font(.caption).foregroundStyle(.white.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
+                if let skip {
+                    Button("Skip for now", action: skip).buttonStyle(.plain).font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85)).padding(.top, 2)
+                }
             }
             Spacer(minLength: 0)
             Button("Go", action: go).buttonStyle(PillButtonStyle())
@@ -228,18 +265,21 @@ struct RecommendationRow: View {
 struct RecommendationsSheet: View {
     let health: MacHealth?
     let go: (MacHealth.Recommendation.Target) -> Void
+    let skip: ([String]) -> Void
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Recommendations").font(.title2.weight(.semibold))
                 Spacer()
+                Button("Hide All") { skip(health?.recommendations.map(\.id) ?? []) }
+                    .help("Hide every recommendation until tomorrow")
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
             ScrollView {
                 VStack(spacing: 10) {
                     ForEach(health?.recommendations ?? []) { r in
-                        RecommendationRow(rec: r) { go(r.target) }
+                        RecommendationRow(rec: r, go: { go(r.target) }, skip: { skip([r.id]) })
                             .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: 0x2B2541)))
                     }
                 }

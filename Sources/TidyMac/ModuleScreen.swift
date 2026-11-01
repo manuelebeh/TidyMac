@@ -14,6 +14,8 @@ final class ModuleController: ObservableObject {
     @Published var selected: Set<String> = []
     @Published var report: ActionReport?
     @Published var reviewing = false
+    /// Running apps that hold files about to be removed; non-empty shows the quit sheet.
+    @Published var appsToQuit: [NSRunningApplication] = []
     @Published var clutterRoot = Paths.home
     private var task: Task<Void, Never>?
 
@@ -34,10 +36,11 @@ final class ModuleController: ObservableObject {
                 await engine.scan { p in Task { @MainActor in self.current = p } }
             }.value
             guard !Task.isCancelled else { return }
-            groups = result
-            selected = Set(result.flatMap(\.items).filter(\.selectedByDefault).map(\.id))
-            recordMalwareScan(result)
+            groups = IgnoreList.apply(result)
+            selected = Set(groups.flatMap(\.items).filter(\.selectedByDefault).map(\.id))
+            recordMalwareScan(groups)
             phase = .results
+            Sounds.scanFinished()
         }
     }
 
@@ -54,17 +57,36 @@ final class ModuleController: ObservableObject {
     func run() {
         let items = selectedItems
         guard !items.isEmpty else { return }
+        let apps = RunningApps.related(to: AppTerminator.removedURLs(items))
+        if apps.isEmpty { execute(items) } else { appsToQuit = apps }
+    }
+
+    /// Called by the quit sheet once the apps have quit, or when the user continues anyway.
+    func continueAfterQuitting() {
+        appsToQuit = []
+        if phase == .results { execute(selectedItems) }
+    }
+
+    private func execute(_ items: [ResultItem]) {
         phase = .running
         Task {
             let r = await Task.detached { await Executor.run(items) }.value
             PerformanceEngine.markRun(r.succeeded)
             report = r
             phase = .done
+            Sounds.cleanupFinished()
         }
     }
 
     func toggle(_ item: ResultItem) {
         if selected.contains(item.id) { selected.remove(item.id) } else { selected.insert(item.id) }
+    }
+
+    /// Adds the item to the Ignore List and hides it from these results.
+    func ignore(_ item: ResultItem) {
+        IgnoreList.add([item])
+        selected.remove(item.id)
+        for i in groups.indices { groups[i].items.removeAll { $0.id == item.id } }
     }
 
     func toggle(_ group: ResultGroup) {
@@ -98,6 +120,10 @@ struct ModuleScreen: View {
             bottomButton.padding(.bottom, 22)
         }
         .sheet(isPresented: $controller.reviewing) { ReviewSheet(controller: controller) }
+        .sheet(isPresented: Binding(get: { !controller.appsToQuit.isEmpty }, set: { if !$0 { controller.appsToQuit = [] } })) {
+            QuitAppsSheet(apps: controller.appsToQuit, onContinue: controller.continueAfterQuitting,
+                          onCancel: { controller.appsToQuit = [] })
+        }
     }
 
     @ViewBuilder var bottomButton: some View {
@@ -302,8 +328,11 @@ struct ReviewSheet: View {
                             }
                             .contextMenu {
                                 if let u = item.url { Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([u]) } }
+                                Button("Add to Ignore List") { controller.ignore(item) }
                             }
                         }
+                        Text("Right-click an item to add it to the Ignore List. Manage the list in Settings (⌘,).")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .padding()
