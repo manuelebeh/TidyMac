@@ -169,20 +169,6 @@ enum Sounds {
     private static func play(_ name: String) { if GeneralSettings.playsSounds() { NSSound(named: name)?.play() } }
 }
 
-/// Full-window gradient with two soft light blobs, like the module backgrounds.
-struct ModuleBackground: View {
-    let module: Module
-    var body: some View {
-        ZStack {
-            LinearGradient(colors: [module.dark, module.light], startPoint: .topLeading, endPoint: .bottomTrailing)
-            RadialGradient(colors: [module.light.opacity(0.75), .clear], center: .init(x: 0.85, y: 0.15), startRadius: 10, endRadius: 520)
-            RadialGradient(colors: [module.dark.opacity(0.9), .clear], center: .init(x: 0.1, y: 0.95), startRadius: 10, endRadius: 600)
-        }
-        .ignoresSafeArea()
-        .animation(Motion.animation(.easeInOut(duration: 0.6)), value: module)
-    }
-}
-
 struct GlassShape: Shape {
     enum Kind { case circle, squircle, polygon(Int), clover }
     let kind: Kind
@@ -228,16 +214,47 @@ struct GlassShape: Shape {
     }
 }
 
+/// A loop driven by the clock instead of a repeating `withAnimation`. A repeating animation started in `onAppear`
+/// also animates every layout change in the same transaction, forever: the sidebar rows then drift up and down.
+/// `content` receives a wave that goes 0 → 1 → 0 once per `period`, and the raw phase (0..<1).
+struct Cycle<Content: View>: View {
+    var period: Double
+    var paused = false
+    @ViewBuilder let content: (_ wave: Double, _ phase: Double) -> Content
+
+    var body: some View {
+        TimelineView(.animation(paused: paused || Motion.reduced)) { timeline in
+            let phase = Motion.reduced ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
+            content((1 - cos(2 * .pi * phase)) / 2, phase)
+        }
+    }
+}
+
 /// The large translucent "glass" emblem shown on module screens.
 struct GlassIcon: View {
     let module: Module
-    var size: CGFloat = 250
+    var size: CGFloat = 290
     var pulsing = false
-    @State private var phase = false
 
     var body: some View {
+        // At rest the emblem floats; while scanning it breathes.
+        Cycle(period: pulsing ? 2 : 6) { wave, _ in
+            emblem
+                .background(
+                    // A halo in the module's button colours, brighter while scanning.
+                    AuroraDisc(colors: module.aurora, speed: pulsing ? 1 : 0.3)
+                        .frame(width: size * 1.25, height: size * 1.25)
+                        .blur(radius: size * 0.16)
+                        .opacity(pulsing ? 0.4 + 0.35 * wave : 0.35)
+                )
+                .scaleEffect(pulsing ? 1 + 0.04 * wave : 1)
+                .offset(y: pulsing ? 0 : -6 * wave)
+        }
+    }
+
+    var emblem: some View {
         let shape = GlassShape(kind: module.iconShape)
-        ZStack {
+        return ZStack {
             shape.fill(LinearGradient(colors: [module.accent.opacity(0.95), module.light.opacity(0.85), module.dark.opacity(0.9)],
                                       startPoint: .top, endPoint: .bottom))
                 .offset(y: size * 0.05)
@@ -256,50 +273,103 @@ struct GlassIcon: View {
         .frame(width: size, height: size)
         .rotation3DEffect(.degrees(12), axis: (x: 1, y: 0, z: 0), perspective: 0.6)
         .shadow(color: module.dark.opacity(0.7), radius: 30, y: 25)
-        .scaleEffect(pulsing && phase ? 1.04 : 1)
-        .onAppear { if pulsing, !Motion.reduced { withAnimation(.easeInOut(duration: 1).repeatForever()) { phase = true } } }
     }
 }
 
-/// The round button pinned to the bottom centre (Scan / Stop / Run / Clean).
+/// The round button pinned to the bottom centre (Scan / Stop / Run / Clean): a colour disc with a white rim and a glow
+/// that rises above it. While `busy`, a ring turns around it and the disc breathes.
 struct ScanButton: View {
     let title: String
     let module: Module
     var subtitle: String? = nil
+    var busy = false
+    var dimmed = false
     let action: () -> Void
     @State private var hover = false
+    private let size: CGFloat = 96
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             Button(action: action) {
-                Text(title)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 84, height: 84)
-                    .background(
-                        Circle().fill(LinearGradient(colors: [module.accent.opacity(0.9), module.light], startPoint: .top, endPoint: .bottom))
-                    )
-                    .overlay(Circle().stroke(.white.opacity(hover ? 0.9 : 0.6), lineWidth: 2))
-                    .shadow(color: module.accent.opacity(0.8), radius: hover ? 28 : 18)
+                Cycle(period: busy ? 1.1 : 2.4, paused: !busy) { wave, phase in
+                    ZStack {
+                        // A soft halo all around the button, a little brighter above it.
+                        AuroraDisc(colors: module.aurora, speed: busy ? 1.2 : 0.5)
+                            .frame(width: size * 1.7, height: size * 1.7)
+                            .blur(radius: 28)
+                            .padding(size * 0.5)
+                            .offset(y: -size * 0.06)
+                            .opacity(dimmed ? 0.15 : hover ? 0.9 : 0.65)
+                            .allowsHitTesting(false)
+                        AuroraDisc(colors: module.aurora, speed: busy ? 1.2 : 0.5)
+                            .frame(width: size, height: size)
+                            .overlay(Circle().fill(LinearGradient(colors: [.white.opacity(0.18), .clear], startPoint: .top, endPoint: .center)))
+                            .scaleEffect(busy ? 1 + 0.04 * wave : 1)
+                        Circle().strokeBorder(.white.opacity(hover ? 1 : 0.9), lineWidth: 2.5)
+                            .frame(width: size, height: size)
+                        if busy {
+                            Circle().trim(from: 0, to: 0.28)
+                                .stroke(AngularGradient(colors: [.white.opacity(0), .white], center: .center,
+                                                        startAngle: .degrees(0), endAngle: .degrees(100)),
+                                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                                .frame(width: size + 14, height: size + 14)
+                                .rotationEffect(.degrees(phase * 360))
+                                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                        }
+                        // The size to free sits in the disc, under the title: below it would hang outside the window.
+                        VStack(spacing: 1) {
+                            Text(title)
+                                .font(.system(size: 17, weight: .regular))
+                                .id(title)
+                                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                            if let subtitle {
+                                Text(subtitle).font(.system(size: 11, weight: .medium)).opacity(0.85)
+                                    .lineLimit(1).minimumScaleFactor(0.7).frame(maxWidth: size - 16)
+                                    .contentTransition(.numericText())
+                                    .transition(.opacity)
+                            }
+                        }
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                    }
+                }
+                .frame(width: size + 20, height: size + 20)
+                .contentShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AuroraPressStyle(hover: hover))
             .onHover { hover = $0 }
-            if let subtitle { Text(subtitle).font(.callout).foregroundStyle(.white.opacity(0.8)) }
+            .opacity(dimmed ? 0.55 : 1)
         }
-        .animation(Motion.animation(.easeOut(duration: 0.15)), value: hover)
+        .animation(Motion.animation(.spring(response: 0.35, dampingFraction: 0.75)), value: hover)
+        .animation(Motion.animation(.spring(response: 0.45, dampingFraction: 0.8)), value: title)
+        .animation(Motion.animation(.easeInOut(duration: 0.3)), value: busy)
+        .animation(Motion.animation(.easeOut(duration: 0.2)), value: subtitle)
+    }
+}
+
+/// Grows a little under the pointer and sinks when pressed.
+struct AuroraPressStyle: ButtonStyle {
+    let hover: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : hover ? 1.04 : 1)
+            .animation(Motion.animation(.spring(response: 0.25, dampingFraction: 0.7)), value: configuration.isPressed)
     }
 }
 
 struct FeatureRow: View {
     let symbol: String, title: String, module: Module
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 20) {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 26, height: 26)
-                .background(RoundedRectangle(cornerRadius: 7).fill(module.accent.opacity(0.55)))
-            Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(LinearGradient(colors: [module.aurora[1], module.aurora[3]], startPoint: .top, endPoint: .bottom)))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+            Text(title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
         }
     }
 }
@@ -307,15 +377,43 @@ struct FeatureRow: View {
 /// White on the dark module backgrounds; follows the appearance where it is not forced (the menu bar tray).
 struct PillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 14).padding(.vertical, 7)
-            .background(Capsule().fill(.primary.opacity(configuration.isPressed ? 0.3 : 0.16)))
+        Pill(label: configuration.label, pressed: configuration.isPressed)
+    }
+
+    private struct Pill<Label: View>: View {
+        let label: Label
+        let pressed: Bool
+        @State private var hover = false
+        @Environment(\.isEnabled) private var enabled
+
+        var body: some View {
+            label
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 14).padding(.vertical, 7)
+                .background(Capsule().fill(.primary.opacity(pressed ? 0.3 : hover ? 0.22 : 0.16)))
+                .overlay(Capsule().strokeBorder(LinearGradient(colors: [.primary.opacity(0.18), .clear], startPoint: .top, endPoint: .bottom)))
+                .scaleEffect(pressed ? 0.96 : 1)
+                .opacity(enabled ? 1 : 0.5)
+                .onHover { hover = $0 && enabled }
+                .animation(Motion.animation(.easeOut(duration: 0.12)), value: hover)
+                .animation(Motion.animation(.spring(response: 0.2, dampingFraction: 0.7)), value: pressed)
+        }
     }
 }
 
 extension MacHealth.State {
+    /// The glow behind the Mac in the menu header.
+    var glow: Color {
+        switch self {
+        case .excellent: Color(hex: 0x85E3F3)
+        case .good: Color(hex: 0xA2F6F2)
+        case .normal: Color(hex: 0x82FFB4)
+        case .requiresAttention: Color(hex: 0xFFEF62)
+        case .critical: Color(hex: 0xFFB662)
+        }
+    }
+
     /// On the dark module backgrounds; the light-mode tray needs a darker green to stay readable.
     func color(_ scheme: ColorScheme = .dark) -> Color {
         switch self {

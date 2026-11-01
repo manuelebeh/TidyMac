@@ -5,8 +5,7 @@ import UserNotifications
 @main
 struct TidyMacApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-    @StateObject private var app = AppState()
-    @StateObject private var monitor = MonitorModel()
+    private var app: AppState { delegate.app }
 
     var body: some Scene {
         WindowGroup("TidyMac", id: "main") {
@@ -28,18 +27,14 @@ struct TidyMacApp: App {
         Settings {
             SettingsView()
         }
-
-        // The menu bar item, which keeps running after the main window closes.
-        MenuBarExtra {
-            TrayView(app: app, monitor: monitor)
-        } label: {
-            Image(nsImage: MenuBarIcon.image(attention: monitor.needsAttention))
-        }
-        .menuBarExtraStyle(.window)
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    @MainActor lazy var app = AppState()
+    /// The menu bar item (`TrayController`), which keeps running after the main window closes.
+    @MainActor private var tray: TrayController?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // `--snapshot-tray <png>` renders the menu bar panel to an image and quits (for visual checks).
         let args = ProcessInfo.processInfo.arguments
@@ -60,14 +55,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        // `--snapshot-main <png> [module] [phase]` renders the main window (intro, or results with sample tiles, or done).
+        if let i = args.firstIndex(of: "--snapshot-main"), i + 1 < args.count {
+            MainActor.assumeIsolated {
+                let state = AppState()
+                if i + 2 < args.count, let m = Module(rawValue: args[i + 2]) { state.module = m }
+                if i + 3 < args.count, let c = state.controllers[state.module] {
+                    switch args[i + 3] {
+                    case "results":
+                        c.groups = [ResultGroup(id: "a", title: "System Junk", description: "", symbol: "archivebox.fill",
+                                                items: [ResultItem(title: "Caches", size: 2_400_000_000, action: .shell("true", admin: false))]),
+                                    ResultGroup(id: "b", title: "Trash Bins", description: "", symbol: "trash.fill", items: [])]
+                        c.selected = Set(c.groups.flatMap(\.items).map(\.id)); c.phase = .results
+                    case "scanning": c.current = "~/Library/Caches"; c.phase = .scanning
+                    case "done": c.report = ActionReport(); c.phase = .done
+                    default: break
+                    }
+                }
+                let renderer = ImageRenderer(content: RootView(app: state).frame(width: 1200, height: 720).environment(\.colorScheme, .dark))
+                renderer.scale = 1
+                if let tiff = renderer.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                    try? png.write(to: URL(fileURLWithPath: args[i + 1]))
+                }
+            }
+            exit(0)
+        }
         if let i = args.firstIndex(of: "--snapshot-tray") ?? args.firstIndex(of: "--snapshot-screen-clean"), i + 1 < args.count {
             MainActor.assumeIsolated {
                 // `--snapshot-tray <png> [card] [--light]` opens that card's details (storage, memory, cpu, drives, devices…).
                 let monitor = MonitorModel(background: false)
                 if args[i] == "--snapshot-tray" { monitor.loadAllNow() }
                 let card = i + 2 < args.count ? TrayView.Card(rawValue: args[i + 2]) : nil
-                let content: AnyView = args[i] == "--snapshot-tray" ? AnyView(TrayView(app: AppState(), monitor: monitor, detail: card, scrolls: false)
-                    .environment(\.colorScheme, args.contains("--light") ? .light : .dark))
+                let state = AppState()
+                // The detail panel sits on the left of the menu, as it does on screen.
+                let content: AnyView = args[i] == "--snapshot-tray" ? AnyView(HStack(alignment: .top, spacing: TrayDetailPanel.gap) {
+                    if let card { TrayDetail(card: card, app: state, monitor: monitor, open: { _ in }) }
+                    TrayView(app: state, monitor: monitor, detail: card, scrolls: false)
+                }
+                .background(card == nil ? Color.clear : Color.black)
+                .environment(\.colorScheme, args.contains("--light") ? .light : .dark))
                     : AnyView(ScreenCleaningOverlay(session: ScreenCleaningSession(), main: true).frame(width: 1280, height: 800))
                 let renderer = ImageRenderer(content: content)
                 renderer.scale = 2
@@ -117,7 +143,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Running from `swift run` has no bundle; make it a regular foreground app anyway.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        MainActor.assumeIsolated { HealthMonitor.shared.start() }
+        MainActor.assumeIsolated {
+            HealthMonitor.shared.start()
+            tray = TrayController(app: app, monitor: MonitorModel())
+        }
+        // `--open-tray` opens the menu bar panel at launch (for checks; other apps may cover the menu bar).
+        if args.contains("--open-tray") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { MainActor.assumeIsolated { self.tray?.open() } }
+        }
         // Finder › right-click an app › Services (or Quick Actions) › Uninstall with TidyMac.
         NSApp.servicesProvider = FinderService.shared
         NSUpdateDynamicServices()
@@ -152,18 +185,21 @@ final class AppState: ObservableObject {
     /// Set by a `tidymac://uninstall` link; shows the Uninstaller on that app.
     @Published var uninstallTarget: URL?
     let screenCleaning = ScreenCleaningSession()
+    /// Opens (or brings back) the main window; set once it has appeared.
+    var openMain: (() -> Void)?
     let controllers: [Module: ModuleController] = Dictionary(uniqueKeysWithValues: Module.allCases.map { ($0, ModuleController(module: $0)) })
 }
 
 struct RootView: View {
     @ObservedObject var app: AppState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         ZStack {
             ModuleBackground(module: app.module)
             HStack(spacing: 0) {
                 Sidebar(selection: $app.module)
-                    .frame(width: 230)
+                    .frame(width: 252)
                 Group {
                     switch app.module {
                     case .spaceLens: SpaceLensScreen(app: app)
@@ -173,12 +209,16 @@ struct RootView: View {
                     }
                 }
                 .id(app.module)
-                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 16)), removal: .opacity))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .animation(Motion.animation(.easeInOut(duration: 0.35)), value: app.module)
-        .onAppear { AppDelegate.mainWindowOpened() }
+        .onAppear {
+            AppDelegate.mainWindowOpened()
+            // The menu bar panel lives outside SwiftUI's scenes and reopens the main window through this.
+            app.openMain = { [openWindow] in openWindow(id: "main") }
+        }
         .background {
             // Its own view, so it does not compete with the Screen Cleaning sheet attached below.
             Color.clear.sheet(isPresented: Binding(get: { app.uninstallTarget != nil }, set: { if !$0 { app.uninstallTarget = nil } })) {
@@ -191,40 +231,64 @@ struct RootView: View {
     }
 }
 
+/// Rows 50 pt tall every 60 pt, a plain glyph per module and a translucent pill under the selection, which slides
+/// to the new row. The selected glyph takes the module's colours.
 struct Sidebar: View {
     @Binding var selection: Module
+    @Namespace private var pill
+    @State private var hovered: Module?
     private let main: [Module] = [.smartCare, .cleanup, .protection, .performance, .applications, .clutter, .spaceLens]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Spacer().frame(height: 46)
+        VStack(alignment: .leading, spacing: 10) {
+            // The first row starts 67 pt from the top of the window, title bar included.
+            Spacer().frame(height: 29)
             ForEach(main) { row($0) }
-            Spacer()
+            Spacer(minLength: 20)
             row(.myTools)
             row(.activity)
-            Spacer().frame(height: 16)
+            Spacer().frame(height: 11)
         }
-        .padding(.horizontal, 12)
-        .background(Color.black.opacity(0.06))
+        .padding(.horizontal, 16)
+        .overlay(alignment: .trailing) {
+            LinearGradient(colors: [.white.opacity(0), .white.opacity(0.08), .white.opacity(0.08), .white.opacity(0)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(width: 1)
+                .padding(.vertical, 60)
+        }
+        .animation(Motion.animation(.spring(response: 0.38, dampingFraction: 0.82)), value: selection)
+        .animation(Motion.animation(.easeOut(duration: 0.15)), value: hovered)
     }
 
     func row(_ m: Module) -> some View {
-        Button { selection = m } label: {
-            HStack(spacing: 12) {
+        let active = selection == m
+        return Button { selection = m } label: {
+            HStack(spacing: 19) {
                 Image(systemName: m.symbol)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 22, height: 22)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(
-                        LinearGradient(colors: [m.accent, m.light], startPoint: .top, endPoint: .bottom)))
-                Text(m.name).font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(active ? AnyShapeStyle(LinearGradient(colors: [m.aurora[0], m.aurora[2], m.aurora[4]],
+                                                                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                                            : AnyShapeStyle(.white.opacity(0.85)))
+                    .shadow(color: active ? m.aurora[2].opacity(0.6) : .black.opacity(0.25), radius: active ? 5 : 1, y: 1)
+                    .frame(width: 24, height: 24)
+                Text(m.name).font(.system(size: 14)).foregroundStyle(.white)
                 Spacer()
             }
-            .padding(.horizontal, 10).padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(selection == m ? 0.14 : 0)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(.white.opacity(selection == m ? 0.12 : 0)))
+            .padding(.horizontal, 19)
+            .frame(height: 50)
+            .background {
+                if active {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.09))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(
+                            LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.05)], startPoint: .top, endPoint: .bottom)))
+                        .matchedGeometryEffect(id: "selection", in: pill)
+                } else if hovered == m {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.05))
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovered = $0 ? m : (hovered == m ? nil : hovered) }
     }
 }
