@@ -119,7 +119,7 @@ struct SpaceLensScreen: View {
                         .help("\(n.name) — \(formatSize(n.size))")
                 }
             }
-            .animation(.spring(duration: 0.5), value: nodes.map(\.url))
+            .animation(Motion.animation(.spring(duration: 0.5)), value: nodes.map(\.url))
         }
     }
 

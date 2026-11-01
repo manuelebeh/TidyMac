@@ -117,6 +117,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         MainActor.assumeIsolated { HealthMonitor.shared.start() }
+        let center = NotificationCenter.default
+        center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
+            MainActor.assumeIsolated { Self.updateDockIcon(closing: note.object as? NSWindow) }
+        }
+    }
+
+    /// "Keep icon in Dock when TidyMac is not open". Without it, closing the main window leaves only the menu bar item.
+    @MainActor static func updateDockIcon(closing: NSWindow? = nil) {
+        let mainOpen = NSApp.windows.contains { $0 !== closing && $0.isVisible && $0.identifier?.rawValue.hasPrefix("main") == true }
+        let policy: NSApplication.ActivationPolicy = mainOpen || GeneralSettings.keepsDockIcon() ? .regular : .accessory
+        if NSApp.activationPolicy() != policy { NSApp.setActivationPolicy(policy) }
+    }
+
+    /// The main window is opening: the Dock icon comes back, and an app without one has to be activated to show it in front.
+    @MainActor static func mainWindowOpened() {
+        guard NSApp.activationPolicy() != .regular else { return }
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
     }
     // The menu bar item keeps running after the main window is closed.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -152,7 +170,8 @@ struct RootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .animation(.easeInOut(duration: 0.35), value: app.module)
+        .animation(Motion.animation(.easeInOut(duration: 0.35)), value: app.module)
+        .onAppear { AppDelegate.mainWindowOpened() }
         .sheet(isPresented: Binding(get: { app.screenCleaning.showSuccess }, set: { app.screenCleaning.showSuccess = $0 })) {
             ScreenCleaningSuccess(session: app.screenCleaning)
         }

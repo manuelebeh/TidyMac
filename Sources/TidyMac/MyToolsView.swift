@@ -20,7 +20,7 @@ struct MyToolsScreen: View {
                 grid.transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: running == nil)
+        .animation(Motion.animation(.easeInOut(duration: 0.3)), value: running == nil)
         .alert("Go back to My Tools?", isPresented: $confirmBack) {
             Button("Cancel", role: .cancel) {}
             Button("OK") { running?.stop(); running = nil }

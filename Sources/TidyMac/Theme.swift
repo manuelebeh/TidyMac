@@ -155,6 +155,20 @@ enum Module: String, CaseIterable, Identifiable {
     }
 }
 
+/// Settings › General › Reduce Motion. Read on every use, so a change applies at the next redraw.
+enum Motion {
+    static var reduced: Bool { GeneralSettings.reducesMotion(system: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) }
+    /// The animation, or none when motion is reduced.
+    static func animation(_ a: Animation) -> Animation? { reduced ? nil : a }
+}
+
+/// "Play sounds for main TidyMac actions": a system sound when a scan or a cleanup finishes.
+enum Sounds {
+    static func scanFinished() { play("Tink") }
+    static func cleanupFinished() { play("Glass") }
+    private static func play(_ name: String) { if GeneralSettings.playsSounds() { NSSound(named: name)?.play() } }
+}
+
 /// Full-window gradient with two soft light blobs, like the module backgrounds.
 struct ModuleBackground: View {
     let module: Module
@@ -165,7 +179,7 @@ struct ModuleBackground: View {
             RadialGradient(colors: [module.dark.opacity(0.9), .clear], center: .init(x: 0.1, y: 0.95), startRadius: 10, endRadius: 600)
         }
         .ignoresSafeArea()
-        .animation(.easeInOut(duration: 0.6), value: module)
+        .animation(Motion.animation(.easeInOut(duration: 0.6)), value: module)
     }
 }
 
@@ -243,7 +257,7 @@ struct GlassIcon: View {
         .rotation3DEffect(.degrees(12), axis: (x: 1, y: 0, z: 0), perspective: 0.6)
         .shadow(color: module.dark.opacity(0.7), radius: 30, y: 25)
         .scaleEffect(pulsing && phase ? 1.04 : 1)
-        .onAppear { if pulsing { withAnimation(.easeInOut(duration: 1).repeatForever()) { phase = true } } }
+        .onAppear { if pulsing, !Motion.reduced { withAnimation(.easeInOut(duration: 1).repeatForever()) { phase = true } } }
     }
 }
 
@@ -272,7 +286,7 @@ struct ScanButton: View {
             .onHover { hover = $0 }
             if let subtitle { Text(subtitle).font(.callout).foregroundStyle(.white.opacity(0.8)) }
         }
-        .animation(.easeOut(duration: 0.15), value: hover)
+        .animation(Motion.animation(.easeOut(duration: 0.15)), value: hover)
     }
 }
 

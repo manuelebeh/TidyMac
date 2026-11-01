@@ -138,8 +138,12 @@ struct ScreenCleaningOverlay: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.6)) { sweep = true }
-            withAnimation(.easeOut(duration: 1).delay(3)) { introVisible = false }
+            withAnimation(Motion.animation(.easeInOut(duration: 1.6))) { sweep = true }
+            if Motion.reduced {
+                Task { try? await Task.sleep(for: .seconds(3)); introVisible = false }
+            } else {
+                withAnimation(.easeOut(duration: 1).delay(3)) { introVisible = false }
+            }
         }
     }
 }
