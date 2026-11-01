@@ -40,7 +40,8 @@ public enum Executor {
                     let r = Shell.osascript("tell application \"System Events\" to delete login item \"\(appleScriptEscape(name))\"")
                     if r.status != 0 { throw Failure(r.output) }
                 case .open(let url):
-                    _ = Shell.run("/usr/bin/open", [url.path])
+                    // Store pages are macappstore:// links, which `open` takes whole.
+                    _ = Shell.run("/usr/bin/open", [url.isFileURL ? url.path : url.absoluteString])
                 }
                 report.succeeded.append(item)
             } catch {
@@ -91,6 +92,7 @@ public enum Shell {
         return Result(status: p.terminationStatus, output: String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
+    @discardableResult
     public static func osascript(_ source: String) -> Result { run("/usr/bin/osascript", ["-e", source]) }
 }
 

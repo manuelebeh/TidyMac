@@ -1,7 +1,6 @@
 import Foundation
 
 /// My Tools: single-purpose scans that run one part of a module on its own.
-/// Titles, descriptions and search keywords are CleanMyMac's `custom_flow_*` strings (see REVERSE.md).
 public struct Tool: Identifiable, Sendable {
     public enum Kind: Sendable { case scan(@Sendable () async -> [ResultGroup]), uninstaller, screenCleaning }
 

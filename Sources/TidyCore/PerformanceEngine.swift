@@ -35,7 +35,6 @@ public enum LaunchItems {
 }
 
 /// Performance module: maintenance tasks, login items, background items.
-/// Task list = PerformanceScanning `TaskIdentifier` cases (see REVERSE.md).
 public struct PerformanceEngine: ScanEngine {
     public init() {}
 
@@ -72,7 +71,7 @@ public struct PerformanceEngine: ScanEngine {
         let lastRun = UserDefaults.standard.dictionary(forKey: "TidyMac.taskRuns") as? [String: Date] ?? [:]
         let tasks = Self.tasks.map { t -> ResultItem in
             let last = lastRun[t.id]
-            // Recommend tasks not run in the last week, like CleanMyMac's "recommended" set.
+            // Recommend tasks not run in the last week.
             let due = last.map { Date().timeIntervalSince($0) > 7 * 86_400 } ?? true
             return ResultItem(id: "task:\(t.id)", title: t.title,
                               subtitle: t.detail + (last.map { " Last run \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date()))." } ?? ""),

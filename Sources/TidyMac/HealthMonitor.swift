@@ -3,7 +3,7 @@ import ServiceManagement
 import TidyCore
 import UserNotifications
 
-/// TidyMac's take on CleanMyMac's HealthMonitor login item: checks the Mac in the background while TidyMac runs
+/// Checks the Mac in the background while TidyMac runs
 /// (the menu bar item keeps it alive after the window closes) and posts macOS notifications.
 @MainActor
 final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
@@ -30,6 +30,8 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
             center.setNotificationCategories([
                 UNNotificationCategory(identifier: "issue", actions: [review, ignoreDay], intentIdentifiers: []),
                 UNNotificationCategory(identifier: "threat", actions: [review, ignore], intentIdentifiers: []),
+                UNNotificationCategory(identifier: "hung", actions: [UNNotificationAction(identifier: "forceQuit", title: "Force Quit All"),
+                                                                     UNNotificationAction(identifier: "ignoreDay", title: "Wait")], intentIdentifiers: []),
                 UNNotificationCategory(identifier: "drive", actions: [UNNotificationAction(identifier: "show", title: "Show")], intentIdentifiers: []),
             ])
             center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -51,6 +53,8 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         if wantThreats { lastThreatCheck = now }
         if wantTrash { lastTrashCheck = now }
         let previousTrash = trashSize
+        let hung = settings.hungApps ? HungApps.current().compactMap(\.localizedName) : []
+        let lastCleanup = History.entries.last { $0.freed > 0 }?.date
         let readings = await Task.detached { () -> HealthAlerts.Readings in
             let memory = SystemMonitor.memory()
             return HealthAlerts.Readings(
@@ -60,7 +64,11 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
                 threats: wantThreats ? HealthAlerts.currentThreats() : nil,
                 topConsumer: memory.pressureLevel >= 2 ? HealthAlerts.topMemoryConsumer() : nil,
                 externalDrives: settings.externalDrives ? SystemMonitor.externalDrives() : [],
-                bluetooth: settings.bluetooth ? SystemMonitor.bluetoothDevices() : [])
+                bluetooth: settings.bluetooth ? SystemMonitor.bluetoothDevices() : [],
+                hungApps: hung,
+                chromeMemory: settings.heavyChrome ? HealthAlerts.chromeMemory(SystemMonitor.consumers()) : nil,
+                // Listed even with the setting off, so turning it on does not announce every app already there.
+                trashedApps: SystemMonitor.trashedApps(), lastCleanup: lastCleanup)
         }.value
         trashSize = readings.trashSize
 
@@ -91,12 +99,12 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         content.title = a.title
         content.body = a.body
         content.sound = .default
-        content.categoryIdentifier = a.kind == .threat ? "threat" : "issue"
+        content.categoryIdentifier = a.kind == .threat ? "threat" : a.kind == .hungApps ? "hung" : "issue"
         content.userInfo = ["key": a.key, "target": a.target]
         center.add(UNNotificationRequest(identifier: a.key, content: content, trigger: nil))
     }
 
-    // Shown even while TidyMac is in front, like CleanMyMac's.
+    // Shown even while TidyMac is in front.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .sound, .list]
     }
@@ -112,6 +120,8 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         let action = response.actionIdentifier
         await MainActor.run {
             switch action {
+            case "forceQuit":
+                for app in HungApps.current() { app.forceTerminate() }
             case "ignoreDay", "ignore":
                 var state = HealthAlerts.State.load()
                 state.ignore(key, for: action == "ignore" ? nil : 86_400)
@@ -124,7 +134,7 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    // MARK: Open at Login (CleanMyMac Menu's setting of the same name)
+    // MARK: Open at Login
 
     static var opensAtLogin: Bool { SMAppService.mainApp.status == .enabled }
 

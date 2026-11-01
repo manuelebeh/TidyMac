@@ -1,6 +1,7 @@
+import CoreServices
 import Foundation
 
-/// Applications module: Updater (Sparkle appcasts), File Leftovers, Unused DMG files.
+/// Applications module: Updater (Sparkle appcasts and the App Store), File Leftovers, Unused DMG files.
 /// The Uninstaller itself is interactive and lives in `Uninstaller`.
 public struct ApplicationsEngine: ScanEngine {
     public init() {}
@@ -18,17 +19,47 @@ public struct ApplicationsEngine: ScanEngine {
 
     // MARK: Updater
 
-    public struct Update: Sendable { public let app: InstalledApp; public let current: String; public let latest: String; public let download: URL? }
+    /// Where an update comes from: the developer's Sparkle feed or the App Store.
+    public enum UpdateSource: String, Sendable { case developer = "Developer", appStore = "App Store" }
+
+    public struct Update: Sendable {
+        public let app: InstalledApp
+        public let current: String
+        public let latest: String
+        public let download: URL?
+        public var source: UpdateSource = .developer
+        /// App Store only: the update's size in bytes.
+        public var size: Int64?
+    }
+
+    /// Sparkle feeds and the App Store, checked side by side.
+    static func updates(for apps: [InstalledApp]) async -> ResultGroup {
+        async let sparkle = sparkleUpdates(for: apps)
+        async let store = appStoreUpdates(for: apps)
+        let found = await sparkle + store
+        AppFacts.record(apps: apps, updates: found)
+        let items = found.sorted { $0.app.name < $1.app.name }.map { u in
+            // Sparkle apps install their own updates when opened; App Store updates open the app's store page.
+            let target = u.source == .appStore ? u.download ?? u.app.url : u.app.url
+            let size = u.size.map { " · " + FileSize.format($0) } ?? ""
+            return ResultItem(id: "update:\(u.app.url.path)", title: u.app.name,
+                              subtitle: "\(u.current) → \(u.latest) · \(u.source.rawValue)\(size)",
+                              url: u.app.url, action: .open(target), selectedByDefault: false, badge: u.latest)
+        }
+        return ResultGroup(id: "updates", title: "App Updater",
+                           description: "Apps with a newer version from their developer or the App Store.",
+                           symbol: "arrow.down.app", items: items, verb: "to update")
+    }
 
     /// Apps embedding Sparkle publish an appcast feed URL in Info.plist (`SUFeedURL`).
-    static func updates(for apps: [InstalledApp]) async -> ResultGroup {
+    static func sparkleUpdates(for apps: [InstalledApp]) async -> [Update] {
         let candidates = apps.compactMap { app -> (InstalledApp, URL, String, String?)? in
             guard let info = Bundle(url: app.url)?.infoDictionary,
                   let feed = (info["SUFeedURL"] as? String).flatMap(URL.init(string:)), feed.scheme == "https" else { return nil }
             let v = info["CFBundleShortVersionString"] as? String ?? info["CFBundleVersion"] as? String ?? "0"
             return (app, feed, v, info["CFBundleVersion"] as? String)
         }
-        let found = await withTaskGroup(of: Update?.self) { tg in
+        return await withTaskGroup(of: Update?.self) { tg in
             for (app, feed, current, build) in candidates {
                 tg.addTask {
                     guard let (data, _) = try? await URLSession.shared.data(from: feed),
@@ -44,14 +75,35 @@ public struct ApplicationsEngine: ScanEngine {
             for await u in tg { if let u { out.append(u) } }
             return out
         }
-        let items = found.sorted { $0.app.name < $1.app.name }.map {
-            // Sparkle apps install their own updates; opening the app triggers its updater.
-            ResultItem(id: "update:\($0.app.url.path)", title: $0.app.name, subtitle: "\($0.current) → \($0.latest)",
-                       url: $0.app.url, action: .open($0.app.url), selectedByDefault: false, badge: $0.latest)
+    }
+
+    /// App Store apps are looked up by their store ID (Spotlight's `kMDItemAppStoreAdamID`), or by bundle ID when
+    /// Spotlight has none, in Apple's public lookup API for the user's region.
+    static func appStoreUpdates(for apps: [InstalledApp]) async -> [Update] {
+        let mas = apps.filter { $0.store == .appStore && $0.kind == .app }
+        guard !mas.isEmpty else { return [] }
+        let ids = mas.map { ($0, AppStoreLookup.adamID($0.url)) }
+        var queries = stride(from: 0, to: ids.count, by: 100).compactMap { i -> [URLQueryItem]? in
+            let chunk = ids[i..<min(i + 100, ids.count)].compactMap(\.1)
+            return chunk.isEmpty ? nil : [URLQueryItem(name: "id", value: chunk.map(String.init).joined(separator: ","))]
         }
-        return ResultGroup(id: "updates", title: "App Updater",
-                           description: "Apps with a newer version available from their developer.",
-                           symbol: "arrow.down.app", items: items, verb: "to update")
+        let byBundle = ids.filter { $0.1 == nil }.compactMap(\.0.bundleID)
+        if !byBundle.isEmpty {
+            queries.append([URLQueryItem(name: "bundleId", value: byBundle.joined(separator: ",")),
+                            URLQueryItem(name: "entity", value: "desktopSoftware")])
+        }
+        var entries: [AppStoreLookup.Entry] = []
+        for q in queries {
+            var c = URLComponents(string: "https://itunes.apple.com/lookup")!
+            c.queryItems = q + [URLQueryItem(name: "country", value: AppStoreLookup.country)]
+            if let url = c.url, let (data, _) = try? await URLSession.shared.data(from: url) { entries += AppStoreLookup.parse(data) }
+        }
+        return ids.compactMap { app, adam in
+            guard let e = entries.first(where: { adam != nil ? $0.id == adam : $0.bundleID == app.bundleID }),
+                  let current = Bundle(url: app.url)?.infoDictionary?["CFBundleShortVersionString"] as? String,
+                  Version(e.version) > Version(current) else { return nil }
+            return Update(app: app, current: current, latest: e.version, download: e.storePage, source: .appStore, size: e.size)
+        }
     }
 
     // MARK: Leftovers
@@ -159,4 +211,37 @@ public struct Version: Comparable {
         return false
     }
     public static func == (a: Version, b: Version) -> Bool { !(a < b) && !(b < a) }
+}
+
+/// Apple's public iTunes lookup API, as used for App Store update checks.
+public enum AppStoreLookup {
+    public struct Entry: Sendable, Equatable {
+        public let id: Int
+        public let bundleID: String?
+        public let version: String
+        public let size: Int64?
+        /// The app's page, opened with the App Store app (`macappstore://`).
+        public let storePage: URL?
+    }
+
+    /// The store region; App Store versions and availability differ between countries.
+    static var country: String { (Locale.current.region?.identifier ?? "US").lowercased() }
+
+    static func adamID(_ url: URL) -> Int? {
+        guard let item = MDItemCreateWithURL(nil, url as CFURL) else { return nil }
+        // The attribute has no exported constant; `mdls` lists it under this name.
+        return (MDItemCopyAttribute(item, "kMDItemAppStoreAdamID" as CFString) as? NSNumber)?.intValue
+    }
+
+    public static func parse(_ data: Data) -> [Entry] {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = root["results"] as? [[String: Any]] else { return [] }
+        return results.compactMap { r in
+            guard let id = r["trackId"] as? Int, let version = r["version"] as? String else { return nil }
+            // fileSizeBytes is a string in the API's responses.
+            let size = (r["fileSizeBytes"] as? String).flatMap { Int64($0) } ?? (r["fileSizeBytes"] as? NSNumber)?.int64Value
+            let page = URL(string: "macappstore://apps.apple.com/app/id\(id)")
+            return Entry(id: id, bundleID: r["bundleId"] as? String, version: version, size: size, storePage: page)
+        }
+    }
 }

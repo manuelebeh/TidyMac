@@ -3,7 +3,7 @@ import Foundation
 import IOKit
 import IOKit.ps
 
-/// Live readings for the menu bar, mirroring CleanMyMac Menu's monitors
+/// Live readings for the menu bar's monitors
 /// (Storage, Memory, Battery, CPU, Network) and its "Today's Recommendation" issues.
 public enum SystemMonitor {
 
@@ -82,10 +82,13 @@ public enum SystemMonitor {
         let du = Double(t.user &- prev.user + t.nice &- prev.nice), ds = Double(t.system &- prev.system), di = Double(t.idle &- prev.idle)
         let sum = max(du + ds + di, 1)
 
+        return CPU(user: du / sum, system: ds / sum, idle: di / sum, uptime: uptime())
+    }
+
+    public static func uptime() -> TimeInterval {
         var boot = timeval(); var size = MemoryLayout<timeval>.size
         sysctlbyname("kern.boottime", &boot, &size, nil, 0)
-        return CPU(user: du / sum, system: ds / sum, idle: di / sum,
-                   uptime: Date().timeIntervalSince1970 - TimeInterval(boot.tv_sec))
+        return Date().timeIntervalSince1970 - TimeInterval(boot.tv_sec)
     }
 
     // MARK: Battery
@@ -107,7 +110,7 @@ public enum SystemMonitor {
             return "\(m / 60):\(String(format: "%02d", m % 60)) remaining"
         }
 
-        /// The battery chart's heading and subtitle (`Monitor_Battery_Chart_*`).
+        /// The battery chart's heading and subtitle.
         public var chartStatus: (title: String, detail: String?) {
             func time(_ m: Int) -> String { m >= 60 ? "\(m / 60) h \(m % 60) min" : "\(m) min" }
             if isCharged { return ("Fully Charged", "You're running from a power adapter") }
@@ -207,7 +210,7 @@ public enum SystemMonitor {
         return out
     }
 
-    /// The Ignore menu on CleanMyMac Menu's issues (`Issue_Alert_Ignore_Option_*`).
+    /// The Ignore menu on the menu's issues.
     public enum IgnoreOption: String, CaseIterable, Sendable {
         case untilTomorrow, day, threeDays, week, forever
 
@@ -263,6 +266,20 @@ public enum SystemMonitor {
 }
 
 extension SystemMonitor {
+    /// Names of the apps in the Trash, without walking them; nil without Full Disk Access.
+    public static func trashedApps(trash: URL = Paths.home(".Trash")) -> [String]? {
+        guard let kids = try? FileManager.default.contentsOfDirectory(atPath: trash.path) else { return nil }
+        return kids.filter { $0.hasSuffix(".app") }.map { String($0.dropLast(4)) }.sorted()
+    }
+
+    /// The user's Trash on an external drive (`.Trashes/<uid>`), as items to delete for good.
+    public static func driveTrash(_ drive: Drive, uid: uid_t = getuid()) -> [ResultItem] {
+        let dir = drive.url.appendingPathComponent(".Trashes/\(uid)")
+        let kids = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        return kids.map { ResultItem(title: $0.lastPathComponent, subtitle: drive.name, size: FileSize.allocated($0), url: $0, action: .delete($0)) }
+            .map { var i = $0; i.category = "trash"; return i }
+    }
+
     /// Marketing name such as "MacBook Pro"; `hw.model` only gives the identifier ("Mac16,8").
     public static func machineName() -> String {
         let out = Shell.run("/usr/sbin/system_profiler", ["SPHardwareDataType", "-json"]).output

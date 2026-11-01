@@ -332,4 +332,372 @@ final class TidyCoreTests: XCTestCase {
         } }
         XCTAssertLessThanOrEqual(b.map { hypot($0.x, $0.y) + $0.r }.max()!, 200.001)
     }
+
+    func testIgnoreListHidesItemsAcrossGroups() {
+        let d = UserDefaults(suiteName: UUID().uuidString)!
+        let a = ResultItem(id: "/a", title: "a", action: .open(URL(fileURLWithPath: "/a")))
+        let b = ResultItem(id: "/b", title: "b", action: .open(URL(fileURLWithPath: "/b")))
+        let cache = ResultGroup(id: "user-cache", title: "Cache", description: "", symbol: "", items: [a, b])
+        IgnoreList.add([cache.items[0]], defaults: d)
+        IgnoreList.add([cache.items[0]], defaults: d)
+        XCTAssertEqual(IgnoreList.entries(defaults: d).count, 1)
+        XCTAssertEqual(IgnoreList.entries(defaults: d)[0].section, .systemJunk)
+        // Smart Care regroups the same item under another group: it is still hidden, and emptied groups stay.
+        let smartCare = ResultGroup(id: "cleanup", title: "Cleanup", description: "", symbol: "", items: [cache.items[0]])
+        let out = IgnoreList.apply([cache, smartCare], defaults: d)
+        XCTAssertEqual(out.map { $0.items.map(\.id) }, [["/b"], []])
+    }
+
+    func testIgnoreListResetBySection() {
+        let d = UserDefaults(suiteName: UUID().uuidString)!
+        let dup = ResultGroup(id: "duplicates", title: "", description: "", symbol: "",
+                              items: [ResultItem(id: "/d", title: "d", action: .open(URL(fileURLWithPath: "/d")))])
+        let upd = ResultGroup(id: "updates", title: "", description: "", symbol: "",
+                              items: [ResultItem(id: "update:/u", title: "u", action: .open(URL(fileURLWithPath: "/u")))])
+        IgnoreList.add(dup.items + upd.items, defaults: d)
+        IgnoreList.reset(.duplicates, defaults: d)
+        XCTAssertEqual(IgnoreList.entries(defaults: d).map(\.id), ["update:/u"])
+        IgnoreList.remove(["update:/u"], defaults: d)
+        XCTAssertTrue(IgnoreList.entries(defaults: d).isEmpty)
+        IgnoreList.add(dup.items, defaults: d)
+        IgnoreList.reset(defaults: d)
+        XCTAssertFalse(IgnoreList.contains("/d", defaults: d))
+    }
+
+    func testAppTerminatorMatchesBundleIDAndNameLocations() {
+        let slack = AppTerminator.App(pid: 1, name: "Slack", bundleID: "com.tinyspeck.slackmacgap",
+                                      bundleURL: URL(fileURLWithPath: "/Applications/Slack.app"))
+        let notes = AppTerminator.App(pid: 2, name: "Notes", bundleID: "com.apple.Notes", bundleURL: nil)
+        let related = { (paths: [String]) in AppTerminator.related(to: paths.map { URL(fileURLWithPath: $0) }, among: [slack, notes]).map(\.pid) }
+        XCTAssertEqual(related(["/Applications/Slack.app"]), [1])
+        XCTAssertEqual(related(["/Users/me/Library/Caches/com.tinyspeck.slackmacgap"]), [1])
+        XCTAssertEqual(related(["/Users/me/Library/Preferences/com.tinyspeck.slackmacgap.plist"]), [1])
+        XCTAssertEqual(related(["/Users/me/Library/Group Containers/ABCD1234.com.tinyspeck.slackmacgap"]), [1])
+        XCTAssertEqual(related(["/Users/me/Library/Application Support/Slack"]), [1])
+        // A name outside Library, or a longer ID that only starts the same, is not a match.
+        XCTAssertEqual(related(["/Users/me/Documents/Slack", "/Users/me/Library/Caches/com.tinyspeck.slackmacgapx"]), [])
+    }
+
+    func testAppTerminatorOnlyConsidersRemovals() {
+        let u = URL(fileURLWithPath: "/Applications/Slack.app")
+        let items = [ResultItem(title: "a", url: u, action: .open(u)), ResultItem(title: "b", url: u, action: .trash(u)),
+                     ResultItem(title: "c", action: .shell("true", admin: false))]
+        XCTAssertEqual(AppTerminator.removedURLs(items), [u])
+    }
+
+    /// A minimal bundle with an Info.plist, enough for `Bundle(url:)`.
+    func bundle(_ path: String, id: String, executable: String? = nil) throws -> URL {
+        let u = tmp.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: u.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+        var info: [String: Any] = ["CFBundleIdentifier": id, "CFBundlePackageType": "APPL"]
+        if let executable { info["CFBundleExecutable"] = executable }
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+            .write(to: u.appendingPathComponent("Contents/Info.plist"))
+        return u
+    }
+
+    func testUninstallerFindsLeftoversByIDAndName() throws {
+        let home = tmp.appendingPathComponent("home"), sys = tmp.appendingPathComponent("sys")
+        _ = try bundle("home/Applications/Super Notes.app", id: "com.acme.SuperNotes", executable: "SuperNotes")
+        let app = Uninstaller.installedApps(home: home, system: sys).first { $0.name == "Super Notes" }!
+        for f in ["Library/Application Support/Super Notes/db.sqlite", "Library/Caches/com.acme.SuperNotes/c.bin",
+                  "Library/Preferences/com.acme.SuperNotes.plist", "Library/Preferences/com.acme.SuperNotes.helper.plist",
+                  "Library/Preferences/ByHost/com.acme.SuperNotes.1234-ABCD.plist",
+                  "Library/Group Containers/TEAM123.com.acme.SuperNotes.shared/g.bin",
+                  "Library/Logs/DiagnosticReports/SuperNotes-2026-10-01-120000.ips",
+                  "Library/Application Support/Supernote Lite/other.bin", "Library/Caches/com.acme.SuperNotesPro/x.bin",
+                  "Library/Caches/Notes/x.bin", "Library/Caches/acme/SuperNotes2026.1/x.bin", "Library/Caches/acme/Other/x.bin"] {
+            _ = try write("home/" + f, 10)
+        }
+        _ = try write("sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper", 10)
+        _ = try write("sys/var/db/receipts/com.acme.SuperNotes.pkg.plist", 10)
+        let agent = try write("home/Library/LaunchAgents/com.acme.updater.plist", 0)
+        try (["Label": "com.acme.updater", "Program": app.url.path + "/Contents/MacOS/Updater"] as NSDictionary).write(to: agent)
+
+        let found = Uninstaller.leftovers(for: app, home: home, system: sys)
+        // Listings resolve /var to /private/var, so paths are compared from the resolved temporary folder.
+        let base = tmp.resolvingSymlinksInPath().path + "/"
+        let rel = { (u: URL) in u.resolvingSymlinksInPath().path.replacingOccurrences(of: base, with: "") }
+        XCTAssertEqual(Set(found.map { rel($0.url) }), [
+            "home/Library/Application Support/Super Notes", "home/Library/Caches/com.acme.SuperNotes",
+            "home/Library/Caches/acme/SuperNotes2026.1", "home/Library/Preferences/com.acme.SuperNotes.plist", "home/Library/Preferences/com.acme.SuperNotes.helper.plist",
+            "home/Library/Preferences/ByHost/com.acme.SuperNotes.1234-ABCD.plist",
+            "home/Library/Group Containers/TEAM123.com.acme.SuperNotes.shared",
+            "home/Library/Logs/DiagnosticReports/SuperNotes-2026-10-01-120000.ips",
+            "home/Library/LaunchAgents/com.acme.updater.plist",
+            "sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper",
+            "sys/var/db/receipts/com.acme.SuperNotes.pkg.plist",
+        ])
+        let byURL = Dictionary(uniqueKeysWithValues: found.map { (rel($0.url), $0) })
+        if case .removeLaunchItem(_, admin: false) = byURL["home/Library/LaunchAgents/com.acme.updater.plist"]?.action {} else { XCTFail("user agent") }
+        XCTAssertEqual(byURL["sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper"]?.kind, .binaries)
+        if case .adminDelete = byURL["sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper"]?.action {} else { XCTFail("system file needs admin") }
+        XCTAssertEqual(byURL["sys/var/db/receipts/com.acme.SuperNotes.pkg.plist"]?.action,
+                       .shell("/usr/sbin/pkgutil --forget 'com.acme.SuperNotes.pkg'", admin: true))
+    }
+
+    func testInstalledAppsSourcesAndFilters() throws {
+        let home = tmp.appendingPathComponent("home"), sys = tmp.appendingPathComponent("sys")
+        _ = try bundle("sys/Applications/Shop.app", id: "com.acme.shop")
+        _ = try write("sys/Applications/Shop.app/Contents/_MASReceipt/receipt", 1)
+        _ = try bundle("sys/Applications/Setapp/Tool.app", id: "com.acme.tool")
+        _ = try bundle("home/Library/Application Support/Steam/steamapps/common/Game/Game.app", id: "com.acme.game")
+        _ = try bundle("home/Library/Audio/Plug-Ins/VST3/Synth.vst3", id: "com.acme.synth")
+        _ = try bundle("sys/Applications/Word.app", id: "com.microsoft.Word")
+        let apps = Dictionary(uniqueKeysWithValues: Uninstaller.installedApps(home: home, system: sys).map { ($0.name, $0) })
+        XCTAssertEqual(apps["Shop"]?.store, .appStore)
+        XCTAssertEqual(apps["Tool"]?.store, .setapp)
+        XCTAssertEqual(apps["Game"]?.store, .steam)
+        XCTAssertEqual(apps["Synth"]?.kind, .audioPlugin)
+        XCTAssertEqual(apps["Word"]?.vendor, .microsoft)
+        var old = apps["Shop"]!
+        old.lastUsed = Date(timeIntervalSinceNow: -200 * 86_400)
+        XCTAssertTrue(old.isUnused())
+        XCTAssertFalse(apps["Tool"]!.isUnused())
+    }
+
+    func testAppStoreLookupParsing() {
+        let json = """
+        {"resultCount": 3, "results": [
+          {"trackId": 1402042596, "bundleId": "com.betafish.adblock-mac", "version": "4.0.7", "fileSizeBytes": "28982746"},
+          {"trackId": 497799835, "bundleId": "com.apple.dt.Xcode", "version": "27.2"},
+          {"bundleId": "broken.entry"}]}
+        """
+        let entries = AppStoreLookup.parse(Data(json.utf8))
+        XCTAssertEqual(entries.map(\.id), [1402042596, 497799835])
+        XCTAssertEqual(entries[0].size, 28_982_746)
+        XCTAssertNil(entries[1].size)
+        XCTAssertEqual(entries[0].storePage?.absoluteString, "macappstore://apps.apple.com/app/id1402042596")
+        XCTAssertTrue(AppStoreLookup.parse(Data("not json".utf8)).isEmpty)
+    }
+
+    func testScanSettingsRoundTripAndDefaults() {
+        let d = UserDefaults(suiteName: UUID().uuidString)!
+        XCTAssertEqual(ScanSettings.load(defaults: d), ScanSettings())
+        var s = ScanSettings()
+        s.disabledSmartCare = ["clutter"]; s.disabledCleanup = ["trash"]
+        s.save(defaults: d)
+        XCTAssertEqual(ScanSettings.load(defaults: d), s)
+        XCTAssertFalse(s.scansSmartCare("clutter")); XCTAssertTrue(s.scansCleanup("mail"))
+        // A stored value from an older build without one of the keys still loads.
+        d.set(Data(#"{"disabledCleanup":["mail"]}"#.utf8), forKey: ScanSettings.key)
+        XCTAssertEqual(ScanSettings.load(defaults: d).disabledCleanup, ["mail"])
+    }
+
+    func testEnginesSkipDisabledModulesAndCategories() async {
+        var s = ScanSettings()
+        s.disabledSmartCare = Set(ScanSettings.smartCareModules.map(\.id))
+        let smartCare = await SmartCareEngine(settings: s).scan { _ in }
+        XCTAssertTrue(smartCare.isEmpty)
+        s.disabledCleanup = Set(CleanupEngine.categories.map(\.id)).subtracting(["deleted-users"])
+        let cleanup = await CleanupEngine(settings: s).scan { _ in }
+        XCTAssertTrue(cleanup.allSatisfy { $0.id == "deleted-users" })
+    }
+}
+
+extension TidyCoreTests {
+    func testAssistantRecommendations() throws {
+        let gone = "/nonexistent/Old.app"
+        let here = FileManager.default.temporaryDirectory.path
+        let facts = AppFacts(updates: ["Notes Plus"], unused: [here, gone])
+        XCTAssertEqual(facts.unusedCount, 1)
+
+        let recs = MacHealth.assistant(uptime: 9 * 86_400, driveHealth: .failing, apps: facts)
+        XCTAssertEqual(recs.map(\.id), ["drive", "updates", "unused-apps", "restart"])
+        XCTAssertTrue(recs[0].severe)
+        XCTAssertTrue(recs[1].detail.hasPrefix("Notes Plus is ready"))
+        XCTAssertTrue(recs[3].detail.contains("9 days"))
+
+        let two = AppFacts(updates: ["A", "B"], unused: [gone])
+        let fewer = MacHealth.assistant(uptime: 2 * 86_400, driveHealth: .good, apps: two)
+        XCTAssertEqual(fewer.map(\.id), ["updates"])
+        XCTAssertTrue(fewer[0].detail.hasPrefix("2 apps are"))
+        XCTAssertTrue(MacHealth.assistant(uptime: 0, driveHealth: nil, apps: nil).isEmpty)
+    }
+
+    func testSkippedRecommendationsComeBackTomorrow() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "TidyMacTests.skips"))
+        defer { defaults.removePersistentDomain(forName: "TidyMacTests.skips") }
+        let recs = MacHealth.assistant(uptime: 9 * 86_400, driveHealth: .failing, apps: nil)
+        let now = Date()
+        var skipped = SkippedRecommendations()
+        skipped.skip(["restart"], now: now)
+        skipped.save(defaults: defaults)
+
+        let loaded = SkippedRecommendations.load(defaults: defaults)
+        XCTAssertEqual(loaded.visible(recs, now: now).map(\.id), ["drive"])
+        XCTAssertEqual(loaded.visible(recs, now: now.addingTimeInterval(86_400)).map(\.id), ["drive", "restart"])
+        // A skipped severe item no longer drags the state down.
+        XCTAssertEqual(MacHealth(recommendations: loaded.visible(recs, now: now)).state, .requiresAttention)
+        skipped.skip(["drive"], now: now)
+        XCTAssertEqual(MacHealth(recommendations: skipped.visible(recs, now: now)).state, .excellent)
+    }
+}
+
+extension TidyCoreTests {
+    private var roomyDisk: SystemMonitor.Storage { .init(name: "HD", total: 500_000_000_000, available: 200_000_000_000) }
+    private var calmMemory: SystemMonitor.Memory {
+        .init(total: 16_000_000_000, active: 0, wired: 0, compressed: 0, available: 8_000_000_000, swapUsed: 0, pressureLevel: 1)
+    }
+
+    func testTrashedAppsAreAnnouncedOnceAfterTheFirstLook() {
+        var state = HealthAlerts.State()
+        let t0 = Date()
+        func look(_ apps: [String]?, at t: TimeInterval, settings: HealthAlerts.Settings = .init()) -> [String] {
+            HealthAlerts.evaluate(.init(storage: roomyDisk, memory: calmMemory, trashedApps: apps), settings: settings, state: &state, now: t0 + t).map(\.key)
+        }
+        XCTAssertTrue(look(["Old"], at: 0).isEmpty, "the first look only learns what is there")
+        XCTAssertEqual(look(["New", "Old"], at: 60), ["trashedApp:New"])
+        XCTAssertTrue(look(["New", "Old"], at: 120).isEmpty)
+        XCTAssertTrue(look(nil, at: 180).isEmpty, "no access keeps the known list")
+        var off = HealthAlerts.Settings(); off.trashedApps = false
+        XCTAssertTrue(look(["Another", "New", "Old"], at: 240, settings: off).isEmpty)
+        XCTAssertTrue(look(["Another", "New", "Old"], at: 300).isEmpty, "apps trashed while off are not announced later")
+    }
+
+    func testSmartCareReminderHungAppsAndChrome() {
+        var state = HealthAlerts.State()
+        let now = Date()
+        var s = HealthAlerts.Settings(); s.smartCareInterval = 3
+        let r = HealthAlerts.Readings(storage: roomyDisk, memory: calmMemory, hungApps: ["Pages"], chromeMemory: 5_000_000_000,
+                                      lastCleanup: now.addingTimeInterval(-4 * 86_400))
+        let alerts = HealthAlerts.evaluate(r, settings: s, state: &state, now: now)
+        XCTAssertEqual(alerts.map(\.kind), [.smartCare, .hungApps, .heavyChrome])
+        XCTAssertTrue(alerts[0].body.contains("4 days"))
+        XCTAssertTrue(alerts[1].body.hasPrefix("Pages is not responding"))
+        // The reminder comes back after another interval; hung apps and Chrome after six hours.
+        XCTAssertTrue(HealthAlerts.evaluate(r, settings: s, state: &state, now: now + 3_600).isEmpty)
+        XCTAssertEqual(HealthAlerts.evaluate(r, settings: s, state: &state, now: now + 7 * 3_600).map(\.kind), [.hungApps, .heavyChrome])
+        XCTAssertEqual(HealthAlerts.evaluate(r, settings: s, state: &state, now: now + 3 * 86_400).map(\.kind), [.smartCare, .hungApps, .heavyChrome])
+
+        state = HealthAlerts.State(); s.smartCareInterval = 7
+        let light = HealthAlerts.Readings(storage: roomyDisk, memory: calmMemory, chromeMemory: 3_000_000_000,
+                                          lastCleanup: now.addingTimeInterval(-4 * 86_400))
+        XCTAssertTrue(HealthAlerts.evaluate(light, settings: s, state: &state, now: now).isEmpty, "4 GB limit on 16 GB, weekly reminder")
+        XCTAssertEqual(HealthAlerts.chromeLimit(totalMemory: 4_000_000_000), 2_000_000_000)
+        let consumers = SystemMonitor.parseConsumers("""
+          1 1000000 1.0 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+          2 2000000 1.0 /Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev
+          3 500000 1.0 /Applications/Safari.app/Contents/MacOS/Safari
+        """)
+        XCTAssertEqual(HealthAlerts.chromeMemory(consumers), 3_000_000 * 1024)
+        XCTAssertNil(HealthAlerts.chromeMemory([]))
+    }
+
+    func testGeneralSettingsDefaultsAndReduceMotion() throws {
+        let d = try XCTUnwrap(UserDefaults(suiteName: "TidyMacTests.general"))
+        defer { d.removePersistentDomain(forName: "TidyMacTests.general") }
+        XCTAssertTrue(GeneralSettings.playsSounds(d))
+        XCTAssertTrue(GeneralSettings.keepsDockIcon(d))
+        XCTAssertTrue(GeneralSettings.showsAssistant(d))
+        XCTAssertFalse(GeneralSettings.cleansOnEject(d))
+        XCTAssertTrue(GeneralSettings.reducesMotion(system: true, d))
+        XCTAssertFalse(GeneralSettings.reducesMotion(system: false, d))
+        d.set("Enabled", forKey: GeneralSettings.reduceMotionKey)
+        XCTAssertTrue(GeneralSettings.reducesMotion(system: false, d))
+        d.set("Disabled", forKey: GeneralSettings.reduceMotionKey)
+        XCTAssertFalse(GeneralSettings.reducesMotion(system: true, d))
+        d.set(false, forKey: GeneralSettings.soundsKey)
+        XCTAssertFalse(GeneralSettings.playsSounds(d))
+    }
+
+    func testDriveTrashAndTrashedAppsListing() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let trash = root.appendingPathComponent(".Trashes/\(getuid())")
+        try FileManager.default.createDirectory(at: trash.appendingPathComponent("Old.app"), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: trash.appendingPathComponent("notes.txt"))
+        let drive = SystemMonitor.Drive(url: root, name: "USB", total: 1, available: 1, format: nil, isDiskImage: false)
+        let items = SystemMonitor.driveTrash(drive)
+        XCTAssertEqual(Set(items.map(\.title)), ["Old.app", "notes.txt"])
+        XCTAssertTrue(items.allSatisfy { $0.category == "trash" && $0.subtitle == "USB" })
+        if case .delete = items[0].action {} else { XCTFail("drive trash items are deleted for good") }
+        XCTAssertEqual(SystemMonitor.trashedApps(trash: trash), ["Old"])
+        XCTAssertNil(SystemMonitor.trashedApps(trash: root.appendingPathComponent("missing")))
+    }
+}
+
+extension TidyCoreTests {
+    func testSpaceLensProtection() {
+        let home = URL(fileURLWithPath: "/Users/someone")
+        func p(_ path: String) -> SpaceLens.Protection { SpaceLens.protection(of: URL(fileURLWithPath: path), home: home) }
+        XCTAssertEqual(p("/System"), .essential)
+        XCTAssertEqual(p("/System/Library/Fonts"), .essential)
+        XCTAssertEqual(p("/usr/bin"), .essential)
+        XCTAssertEqual(p("/usr/local/lib"), .none)
+        XCTAssertEqual(p("/Users/someone/Documents"), .essential)
+        XCTAssertEqual(p("/Users/someone/Documents/Old Project"), .none)
+        XCTAssertEqual(p("/Users/someone/Library"), .essential)
+        XCTAssertEqual(p("/Users/someone/Library/Keychains"), .essential)
+        XCTAssertEqual(p("/Users/someone/Library/Caches"), .systemFolder)
+        XCTAssertEqual(p("/Users/someone/Library/Caches/com.example.app"), .none)
+        XCTAssertEqual(p("/Users/someone/Library/Application Support/Old App"), .none)
+        XCTAssertEqual(p("/Users/someone/Projects"), .none)
+        XCTAssertTrue(SpaceLens.isInCloud(URL(fileURLWithPath: "/Users/someone/Library/Mobile Documents/com~apple~CloudDocs/a.txt")))
+        XCTAssertGreaterThanOrEqual(SpaceLens.purgeableSpace() ?? 0, 0)
+    }
+
+    func testRemovalLogKeepsNewestFirst() throws {
+        let d = try XCTUnwrap(UserDefaults(suiteName: "TidyMacTests.removalLog"))
+        defer { d.removePersistentDomain(forName: "TidyMacTests.removalLog") }
+        let a = URL(fileURLWithPath: "/tmp/a"), b = URL(fileURLWithPath: "/tmp/b")
+        var first = ActionReport()
+        first.succeeded = [ResultItem(title: "a", size: 10, url: a, action: .trash(a))]
+        RemovalLog.record(first, date: Date(timeIntervalSince1970: 1), defaults: d)
+        var second = ActionReport()
+        second.failed = [(ResultItem(title: "b", size: 20, url: b, action: .trash(b)), "In use")]
+        RemovalLog.record(second, date: Date(timeIntervalSince1970: 2), defaults: d)
+        let log = RemovalLog.entries(defaults: d)
+        XCTAssertEqual(log.map(\.path), ["/tmp/b", "/tmp/a"])
+        XCTAssertEqual(log[0].error, "In use")
+        XCTAssertNil(log[1].error)
+        RemovalLog.clear(defaults: d)
+        XCTAssertTrue(RemovalLog.entries(defaults: d).isEmpty)
+    }
+}
+
+extension TidyCoreTests {
+    func testUninstallLinkRoundTrip() {
+        let app = URL(fileURLWithPath: "/Applications/Super Notes.app")
+        let link = Uninstaller.uninstallURL(for: app)
+        XCTAssertEqual(link.scheme, "tidymac")
+        XCTAssertEqual(link.host, "uninstall")
+        XCTAssertEqual(Uninstaller.appURL(fromUninstallURL: link)?.path, app.path)
+        XCTAssertNil(Uninstaller.appURL(fromUninstallURL: URL(string: "tidymac://open/applications")!))
+        XCTAssertNil(Uninstaller.appURL(fromUninstallURL: URL(string: "tidymac://uninstall?path=/etc/passwd")!))
+        XCTAssertNil(Uninstaller.appURL(fromUninstallURL: URL(string: "tidymac://uninstall?path=relative/App.app")!))
+        XCTAssertNil(Uninstaller.appURL(fromUninstallURL: URL(string: "other://uninstall?path=/Applications/A.app")!))
+    }
+
+    func testAppAtAnyLocationAndMoveToApplications() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let downloads = root.appendingPathComponent("Downloads"), apps = root.appendingPathComponent("Applications")
+        try FileManager.default.createDirectory(at: apps, withIntermediateDirectories: true)
+        let bundle = downloads.appendingPathComponent("Tidy Test.app")
+        try FileManager.default.createDirectory(at: bundle.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+        try PropertyListSerialization.data(fromPropertyList: ["CFBundleIdentifier": "dev.test.tidy"], format: .xml, options: 0)
+            .write(to: bundle.appendingPathComponent("Contents/Info.plist"))
+        XCTAssertEqual(Uninstaller.app(at: bundle)?.bundleID, "dev.test.tidy")
+        XCTAssertNil(Uninstaller.app(at: downloads))
+
+        let d = try XCTUnwrap(UserDefaults(suiteName: "TidyMacTests.move"))
+        defer { d.removePersistentDomain(forName: "TidyMacTests.move") }
+        XCTAssertTrue(MoveToApplications.shouldOffer(bundle: bundle, home: root, defaults: d))
+        XCTAssertFalse(MoveToApplications.shouldOffer(bundle: URL(fileURLWithPath: "/Applications/TidyMac.app"), home: root, defaults: d))
+        XCTAssertFalse(MoveToApplications.shouldOffer(bundle: apps.appendingPathComponent("TidyMac.app"), home: root, defaults: d))
+        XCTAssertFalse(MoveToApplications.shouldOffer(bundle: downloads.appendingPathComponent("tidymac"), home: root, defaults: d))
+        d.set(true, forKey: MoveToApplications.declinedKey)
+        XCTAssertFalse(MoveToApplications.shouldOffer(bundle: bundle, home: root, defaults: d))
+
+        // An older copy is replaced and the original leaves Downloads.
+        try FileManager.default.createDirectory(at: apps.appendingPathComponent("Tidy Test.app"), withIntermediateDirectories: true)
+        var trashed: [String] = []
+        let moved = try MoveToApplications.move(bundle, to: apps) { u in trashed.append(u.lastPathComponent + "@" + u.deletingLastPathComponent().lastPathComponent)
+            try FileManager.default.removeItem(at: u) }
+        XCTAssertEqual(moved, apps.appendingPathComponent("Tidy Test.app"))
+        XCTAssertEqual(Bundle(url: moved)?.bundleIdentifier, "dev.test.tidy")
+        XCTAssertEqual(trashed, ["Tidy Test.app@Applications", "Tidy Test.app@Downloads"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: bundle.path))
+    }
 }

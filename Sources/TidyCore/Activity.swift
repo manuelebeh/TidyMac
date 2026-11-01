@@ -1,6 +1,6 @@
 import Foundation
 
-/// What My Activity counts, named after CleanMyMac's `StatisticsDashboard_TimeSaved_Category_*` strings.
+/// What My Activity counts, one category per kind of work TidyMac does.
 public enum ActivityCategory: String, CaseIterable, Codable, Sendable {
     case systemJunk, mailAttachments, trashBin, privacyItems, appPermissions, backgroundItems, loginItems,
          maintenanceTasks, leftovers, installers, applicationsUpdated, applicationsUninstalled,
@@ -67,7 +67,7 @@ public enum ActivityCategory: String, CaseIterable, Codable, Sendable {
     }
 
     /// Minutes a person would spend doing this by hand: finding where it lives, deciding, removing it.
-    /// CleanMyMac's own figures are not in its resources; these are TidyMac's estimates.
+    /// These are TidyMac's estimates.
     var minutes: (perRun: Double, perItem: Double) {
         switch self {
         case .systemJunk: (10, 0.2)
@@ -187,7 +187,7 @@ public struct ActivitySummary: Sendable {
     }
     public typealias Entry = History.Entry
 
-    /// `StatisticsDashboard_TimeSaved_Hint_*`, chosen by this month's total.
+    /// A line of encouragement, chosen by this month's total.
     public var timeSavedHint: String {
         switch minutesThisMonth {
         case 0: "Time savings dipped. Easy to improve!"
@@ -203,12 +203,12 @@ public struct ActivitySummary: Sendable {
     }
 }
 
-/// "Mac Health" with the recommendations that make it up (`MacStatePopover_*` / `MacState_*` strings).
+/// "Mac Health" with the recommendations that make it up .
 public struct MacHealth: Sendable {
     public enum State: String, Sendable { case excellent = "Excellent", good = "Good", normal = "Fair", requiresAttention = "Requires Attention", critical = "Critical" }
 
     public struct Recommendation: Identifiable, Sendable {
-        public enum Target: Sendable { case smartCare, cleanup, protection, performance, applications, clutter, fullDiskAccess, screenCleaning }
+        public enum Target: Sendable { case smartCare, cleanup, protection, performance, applications, uninstaller, clutter, fullDiskAccess, screenCleaning, restart, backup }
         public let id: String
         public let title: String
         public let detail: String
@@ -230,7 +230,7 @@ public struct MacHealth: Sendable {
         }
     }
 
-    /// CleanMyMac does not ship its scoring; TidyMac grades by the number of open recommendations.
+    /// Graded by the number of open recommendations; severe ones weigh more.
     public init(recommendations: [Recommendation]) {
         self.recommendations = recommendations
         let severe = recommendations.filter(\.severe).count
@@ -244,9 +244,15 @@ public struct MacHealth: Sendable {
         }
     }
 
+    /// - Parameters:
+    ///   - driveHealth: nil while it has not been read; reading it runs `diskutil`.
+    ///   - apps: the last update check's findings (`AppFacts`).
+    ///   - skipped: recommendations put aside for today; they do not count towards the state either.
     public static func current(entries: [History.Entry] = History.entries, now: Date = Date(),
-                               hasFullDiskAccess: Bool, screenCleaningDue: Bool) -> MacHealth {
-        var out: [Recommendation] = []
+                               hasFullDiskAccess: Bool, screenCleaningDue: Bool,
+                               uptime: TimeInterval = SystemMonitor.uptime(), driveHealth: SystemMonitor.DriveHealth? = nil,
+                               apps: AppFacts? = AppFacts.load(), skipped: SkippedRecommendations = .load()) -> MacHealth {
+        var out = assistant(uptime: uptime, driveHealth: driveHealth, apps: apps)
         let week: TimeInterval = 7 * 86_400
         let storage = SystemMonitor.storage()
         if storage.total > 0, storage.available < max(storage.total / 10, 15_000_000_000) {
@@ -293,6 +299,34 @@ public struct MacHealth: Sendable {
             out.append(Recommendation(id: "screen", title: "Your screen deserves some care",
                                       detail: "Keep your Mac clean inside and out with Screen Cleaning Mode.", target: .screenCleaning, severe: false))
         }
-        return MacHealth(recommendations: out)
+        return MacHealth(recommendations: skipped.visible(out, now: now))
+    }
+
+    /// The Assistant's recommendations about apps, restarts and the drive.
+    public static func assistant(uptime: TimeInterval, driveHealth: SystemMonitor.DriveHealth?, apps: AppFacts?) -> [Recommendation] {
+        var out: [Recommendation] = []
+        if driveHealth == .failing {
+            out.append(Recommendation(id: "drive", title: "Critical drive health",
+                                      detail: "Avoid data loss by backing up your storage. This drive is in bad condition and should be replaced.",
+                                      target: .backup, severe: true))
+        }
+        if let updates = apps?.updates, !updates.isEmpty {
+            let what = updates.count == 1 ? updates[0] + " is" : "\(updates.count) apps are"
+            out.append(Recommendation(id: "updates", title: "Install application updates",
+                                      detail: "\(what) ready to be updated. Get the latest features and security fixes.",
+                                      target: .applications, severe: false))
+        }
+        if let n = apps?.unusedCount, n > 0 {
+            out.append(Recommendation(id: "unused-apps", title: "Uninstall unused apps",
+                                      detail: "You haven't used \(n) of your applications for a very long time. Remove them to free up space.",
+                                      target: .uninstaller, severe: false))
+        }
+        // Same week-long cut-off as the menu's Uptime reading.
+        if uptime > 7 * 86_400 {
+            out.append(Recommendation(id: "restart", title: "Restart your Mac once in a while",
+                                      detail: "It's been \(Int(uptime / 86_400)) days since your last restart. A restart clears memory and finishes pending updates.",
+                                      target: .restart, severe: false))
+        }
+        return out
     }
 }
