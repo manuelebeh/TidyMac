@@ -37,6 +37,7 @@ public struct ApplicationsEngine: ScanEngine {
         async let sparkle = sparkleUpdates(for: apps)
         async let store = appStoreUpdates(for: apps)
         let found = await sparkle + store
+        AppFacts.record(apps: apps, updates: found)
         let items = found.sorted { $0.app.name < $1.app.name }.map { u in
             // Sparkle apps install their own updates when opened; App Store updates open the app's store page.
             let target = u.source == .appStore ? u.download ?? u.app.url : u.app.url
