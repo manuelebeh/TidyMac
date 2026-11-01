@@ -159,7 +159,7 @@ struct RootView: View {
                     .frame(width: 230)
                 Group {
                     switch app.module {
-                    case .spaceLens: SpaceLensScreen()
+                    case .spaceLens: SpaceLensScreen(app: app)
                     case .activity: ActivityScreen(app: app)
                     case .myTools: MyToolsScreen(screenCleaning: app.screenCleaning)
                     default: ModuleScreen(controller: app.controllers[app.module]!)

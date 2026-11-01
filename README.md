@@ -12,7 +12,7 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 - **Performance**: maintenance tasks, login items, background items, Time Machine snapshots.
 - **Applications**: uninstaller with leftovers, updates from Sparkle feeds and the App Store, unused installers. The update check sends the IDs of your App Store apps to Apple's public lookup API.
 - **My Clutter**: large and old files, duplicates, similar images, downloads.
-- **Space Lens**: a bubble map of what takes up space on your disk.
+- **Space Lens**: a bubble map of what takes up space on your disk. Selections carry across folders and are reviewed together before they go to the Trash; essential folders are locked, system folders come with a warning, purgeable space is shown, and every removal lands in a log.
 - **My Tools**: single-purpose tools with search, favorites and last-scan dates.
 - **My Activity**: Mac health with recommendations, space cleaned, time saved, malware scan history. Recommendations also cover pending app updates, apps unused for six months, a restart after a week of uptime and a failing drive; skip one for the day or hide them all. Opening My Activity runs the update check at most once a day.
 - **Screen Cleaning Mode**: locks the keyboard and trackpad and blanks the screen so you can wipe it.

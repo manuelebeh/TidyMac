@@ -78,3 +78,71 @@ public enum SpaceLens {
         return placed.map { Bubble(x: $0.x * f, y: $0.y * f, r: $0.r * f) }
     }
 }
+
+extension SpaceLens {
+    /// How much an item is protected from removal (`space_lens_list_info_essential_item` / `space_lens_tooltip_system_folder`).
+    public enum Protection: Sendable { case none, systemFolder, essential }
+
+    /// Essential items cannot be selected: the system's own folders, the home folder's standard folders and the parts of
+    /// ~/Library that hold keychains, settings and app data. Other folders directly in ~/Library are system folders:
+    /// they can be removed, with a warning.
+    public static func protection(of url: URL, home: URL = Paths.home) -> Protection {
+        let path = url.standardizedFileURL.path, h = home.standardizedFileURL.path
+        let system = ["/System", "/Library", "/usr", "/bin", "/sbin", "/private", "/etc", "/var", "/cores", "/opt", "/Applications", "/Users", "/Volumes"]
+        if path == "/" || system.contains(path) || path.hasPrefix("/System/") || path.hasPrefix("/usr/") && !path.hasPrefix("/usr/local/") {
+            return .essential
+        }
+        guard path.hasPrefix(h + "/") else { return .none }
+        let rel = String(path.dropFirst(h.count + 1))
+        let homeFolders: Set = ["Library", "Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures", "Public", "Applications", ".Trash"]
+        let libraryEssentials: Set = ["Keychains", "Preferences", "Containers", "Group Containers", "Mobile Documents", "Accounts",
+                                      "Application Support", "CloudStorage", "Mail", "Messages", "Photos", "Calendars", "Sharing"]
+        if homeFolders.contains(rel) { return .essential }
+        if rel.hasPrefix("Library/") {
+            let rest = rel.dropFirst("Library/".count)
+            if !rest.contains("/") { return libraryEssentials.contains(String(rest)) ? .essential : .systemFolder }
+        }
+        return .none
+    }
+
+    /// Space macOS can free on its own when storage runs low (caches, local snapshots, iCloud content it can download again).
+    public static func purgeableSpace(volume: URL = URL(fileURLWithPath: "/")) -> Int64? {
+        guard let v = try? volume.resourceValues(forKeys: [.volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey]),
+              let free = v.volumeAvailableCapacity, let important = v.volumeAvailableCapacityForImportantUsage else { return nil }
+        return max(0, important - Int64(free))
+    }
+
+    /// Items kept in iCloud Drive: trashing them also removes them from the cloud and other devices.
+    public static func isInCloud(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isUbiquitousItemKey]))?.isUbiquitousItem == true
+            || url.path.contains("/Library/Mobile Documents/")
+    }
+}
+
+/// Space Lens's "Removal Log": what was removed or failed, newest first.
+public enum RemovalLog {
+    static let key = "TidyMac.removalLog"
+    static let limit = 500
+
+    public struct Entry: Codable, Sendable, Identifiable {
+        public var id: String { "\(date.timeIntervalSince1970):\(path)" }
+        public let date: Date
+        public let path: String
+        public let size: Int64
+        /// nil when the item was removed.
+        public let error: String?
+    }
+
+    public static func entries(defaults: UserDefaults = .standard) -> [Entry] {
+        defaults.data(forKey: key).flatMap { try? JSONDecoder().decode([Entry].self, from: $0) } ?? []
+    }
+
+    public static func record(_ report: ActionReport, date: Date = Date(), defaults: UserDefaults = .standard) {
+        let new = report.succeeded.map { Entry(date: date, path: $0.url?.path ?? $0.title, size: $0.size ?? 0, error: nil) }
+            + report.failed.map { Entry(date: date, path: $0.0.url?.path ?? $0.0.title, size: $0.0.size ?? 0, error: $0.1) }
+        let all = Array((new + entries(defaults: defaults)).prefix(limit))
+        if let d = try? JSONEncoder().encode(all) { defaults.set(d, forKey: key) }
+    }
+
+    public static func clear(defaults: UserDefaults = .standard) { defaults.removeObject(forKey: key) }
+}
