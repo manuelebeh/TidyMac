@@ -455,4 +455,19 @@ final class TidyCoreTests: XCTestCase {
         XCTAssertTrue(old.isUnused())
         XCTAssertFalse(apps["Tool"]!.isUnused())
     }
+
+    func testAppStoreLookupParsing() {
+        let json = """
+        {"resultCount": 3, "results": [
+          {"trackId": 1402042596, "bundleId": "com.betafish.adblock-mac", "version": "4.0.7", "fileSizeBytes": "28982746"},
+          {"trackId": 497799835, "bundleId": "com.apple.dt.Xcode", "version": "27.2"},
+          {"bundleId": "broken.entry"}]}
+        """
+        let entries = AppStoreLookup.parse(Data(json.utf8))
+        XCTAssertEqual(entries.map(\.id), [1402042596, 497799835])
+        XCTAssertEqual(entries[0].size, 28_982_746)
+        XCTAssertNil(entries[1].size)
+        XCTAssertEqual(entries[0].storePage?.absoluteString, "macappstore://apps.apple.com/app/id1402042596")
+        XCTAssertTrue(AppStoreLookup.parse(Data("not json".utf8)).isEmpty)
+    }
 }

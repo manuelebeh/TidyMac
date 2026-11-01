@@ -10,7 +10,7 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 - **Cleanup**: system junk, AI tool caches and logs, mail attachments, Trash bins.
 - **Protection**: suspicious launch agents and daemons, browser privacy data, application permissions.
 - **Performance**: maintenance tasks, login items, background items, Time Machine snapshots.
-- **Applications**: uninstaller with leftovers, updates, unused installers.
+- **Applications**: uninstaller with leftovers, updates from Sparkle feeds and the App Store, unused installers. The update check sends the IDs of your App Store apps to Apple's public lookup API.
 - **My Clutter**: large and old files, duplicates, similar images, downloads.
 - **Space Lens**: a bubble map of what takes up space on your disk.
 - **My Tools**: single-purpose tools with search, favorites and last-scan dates.
