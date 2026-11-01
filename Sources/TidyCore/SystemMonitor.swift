@@ -94,6 +94,7 @@ public enum SystemMonitor {
         public let percent: Int
         public let isCharging, isPluggedIn, isCharged: Bool
         public let minutesRemaining: Int?
+        public let minutesToFull: Int?
         public let cycleCount: Int?
         public let healthPercent: Int?
         public let temperature: Double?
@@ -105,6 +106,15 @@ public enum SystemMonitor {
             guard let m = minutesRemaining else { return "Calculating…" }
             return "\(m / 60):\(String(format: "%02d", m % 60)) remaining"
         }
+
+        /// The battery chart's heading and subtitle.
+        public var chartStatus: (title: String, detail: String?) {
+            func time(_ m: Int) -> String { m >= 60 ? "\(m / 60) h \(m % 60) min" : "\(m) min" }
+            if isCharged { return ("Fully Charged", "You're running from a power adapter") }
+            if isCharging { return ("Charging", minutesToFull.map { "\(time($0)) until full" }) }
+            if isPluggedIn { return ("Not Charging", "You're running from a power adapter") }
+            return ("Discharging", minutesRemaining.map { "About \(time($0)) until empty" })
+        }
     }
 
     /// nil on Macs without a battery.
@@ -115,7 +125,7 @@ public enum SystemMonitor {
             guard let d = IOPSGetPowerSourceDescription(blob, ps)?.takeUnretainedValue() as? [String: Any],
                   d[kIOPSTypeKey] as? String == kIOPSInternalBatteryType else { continue }
             let cur = d[kIOPSCurrentCapacityKey] as? Int ?? 0, max = d[kIOPSMaxCapacityKey] as? Int ?? 100
-            let tte = d[kIOPSTimeToEmptyKey] as? Int
+            let tte = d[kIOPSTimeToEmptyKey] as? Int, ttf = d[kIOPSTimeToFullChargeKey] as? Int
             let smart = smartBattery()
             // Recent Apple silicon Macs only publish the capacities inside the "BatteryData" dictionary.
             let data = smart["BatteryData"] as? [String: Any] ?? [:]
@@ -127,7 +137,7 @@ public enum SystemMonitor {
                            isCharging: d[kIOPSIsChargingKey] as? Bool ?? false,
                            isPluggedIn: d[kIOPSPowerSourceStateKey] as? String == kIOPSACPowerValue,
                            isCharged: d[kIOPSIsChargedKey] as? Bool ?? false,
-                           minutesRemaining: (tte ?? -1) > 0 ? tte : nil,
+                           minutesRemaining: (tte ?? -1) > 0 ? tte : nil, minutesToFull: (ttf ?? -1) > 0 ? ttf : nil,
                            cycleCount: smart["CycleCount"] as? Int, healthPercent: health,
                            temperature: (smart["Temperature"] as? Int).map { Double($0) / 100 })
         }
@@ -143,62 +153,22 @@ public enum SystemMonitor {
         return props?.takeRetainedValue() as? [String: Any] ?? [:]
     }
 
-    // MARK: Network
-
-    public struct Network: Sendable { public let download, upload: Double; public let interface: String?; public let connected: Bool }
-
-    nonisolated(unsafe) private static var lastBytes: (rx: UInt64, tx: UInt64, at: Date)?
-
-    /// Bytes per second across physical interfaces since the previous call.
-    public static func network() -> Network {
-        var ifaddr: UnsafeMutablePointer<ifaddrs>?
-        var rx: UInt64 = 0, tx: UInt64 = 0
-        var primary: String?
-        if getifaddrs(&ifaddr) == 0, let first = ifaddr {
-            var p: UnsafeMutablePointer<ifaddrs>? = first
-            while let cur = p {
-                let name = String(cString: cur.pointee.ifa_name)
-                let flags = Int32(cur.pointee.ifa_flags)
-                if name.hasPrefix("en"), flags & IFF_UP != 0, flags & IFF_RUNNING != 0,
-                   let addr = cur.pointee.ifa_addr, addr.pointee.sa_family == UInt8(AF_LINK),
-                   let data = cur.pointee.ifa_data?.assumingMemoryBound(to: if_data.self) {
-                    rx += UInt64(data.pointee.ifi_ibytes); tx += UInt64(data.pointee.ifi_obytes)
-                    if data.pointee.ifi_ibytes > 0, primary == nil { primary = name }
-                }
-                p = cur.pointee.ifa_next
-            }
-            freeifaddrs(ifaddr)
-        }
-        tickLock.lock()
-        let prev = lastBytes
-        lastBytes = (rx, tx, Date())
-        tickLock.unlock()
-        guard let prev else { return Network(download: 0, upload: 0, interface: primary, connected: primary != nil) }
-        let dt = max(Date().timeIntervalSince(prev.at), 0.1)
-        return Network(download: Double(rx &- prev.rx) / dt, upload: Double(tx &- prev.tx) / dt,
-                       interface: primary, connected: primary != nil)
-    }
-
-    /// Uses macOS's built-in `networkQuality` (12+). Returns bytes per second.
-    public static func speedTest() -> (download: Double, upload: Double)? {
-        let r = Shell.run("/usr/bin/networkQuality", ["-c", "-s"])
-        guard r.status == 0, let json = try? JSONSerialization.jsonObject(with: Data(r.output.utf8)) as? [String: Any],
-              let dl = json["dl_throughput"] as? Double, let ul = json["ul_throughput"] as? Double else { return nil }
-        return (dl / 8, ul / 8)
-    }
-
     // MARK: Recommendations
 
     public struct Issue: Identifiable, Sendable {
-        public enum Kind: String, Sendable { case lowDiskSpace, trashSize, trashedApps, heavyMemory, screenCleaning }
+        public enum Kind: String, Sendable, CaseIterable {
+            case lowDiskSpace, trashSize, trashedApps, heavyMemory, hungApps, bluetoothLow, externalFull, screenCleaning
+        }
         public var id: String { kind.rawValue }
         public let kind: Kind
         public let title: String
         public let detail: String
     }
 
+    /// - Parameter hungApps: names of the apps the window server reports as not responding.
     public static func issues(storage: Storage, memory: Memory, trashSize: Int64?, trashedApps: Int, screenCleaningDue: Bool = false,
-                              trashLimit: Int64 = 1_000_000_000) -> [Issue] {
+                              trashLimit: Int64 = 1_000_000_000, hungApps: [String] = [], bluetooth: [BluetoothDevice] = [],
+                              drives: [Drive] = []) -> [Issue] {
         var out: [Issue] = []
         if storage.total > 0, storage.available < max(storage.total / 10, 15_000_000_000) {
             out.append(Issue(kind: .lowDiskSpace, title: "You are running out of disk space!",
@@ -216,11 +186,72 @@ public enum SystemMonitor {
             out.append(Issue(kind: .heavyMemory, title: "Heavy memory usage",
                              detail: "Memory pressure is \(memory.pressure.lowercased()). Quitting unused apps can help."))
         }
+        if !hungApps.isEmpty {
+            out.append(Issue(kind: .hungApps, title: "Non-responsive applications",
+                             detail: "\(hungApps.joined(separator: ", ")) \(hungApps.count == 1 ? "is" : "are") not responding. Force quit or wait until \(hungApps.count == 1 ? "it responds" : "they respond")."))
+        }
+        let low = bluetooth.filter { ($0.lowest ?? 100) <= HealthAlerts.bluetoothLowLevel }
+        if !low.isEmpty {
+            out.append(Issue(kind: .bluetoothLow, title: "Time to juice up!",
+                             detail: "Low on battery: \(low.map { "\($0.name) (\($0.lowest ?? 0)%)" }.joined(separator: ", ")). Connect to a charger before they shut down."))
+        }
+        let full = drives.filter(\.almostFull)
+        if !full.isEmpty {
+            out.append(Issue(kind: .externalFull, title: "Connected disk is almost full",
+                             detail: full.map { "\($0.name): \(FileSize.format($0.available)) available" }.joined(separator: ", ") + "."))
+        }
         if screenCleaningDue {
             out.append(Issue(kind: .screenCleaning, title: "Your screen deserves some care",
                              detail: "Keep your Mac clean inside and out with Screen Cleaning Mode."))
         }
         return out
+    }
+
+    /// The Ignore menu on the menu's issues.
+    public enum IgnoreOption: String, CaseIterable, Sendable {
+        case untilTomorrow, day, threeDays, week, forever
+
+        public var title: String {
+            switch self {
+            case .untilTomorrow: "Until tomorrow"
+            case .day: "For a day"
+            case .threeDays: "For 3 days"
+            case .week: "For a week"
+            case .forever: "Forever"
+            }
+        }
+
+        public func until(from now: Date, calendar: Calendar = .current) -> Date {
+            switch self {
+            case .untilTomorrow: calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now) ?? now)
+            case .day: now.addingTimeInterval(86_400)
+            case .threeDays: now.addingTimeInterval(3 * 86_400)
+            case .week: now.addingTimeInterval(7 * 86_400)
+            case .forever: .distantFuture
+            }
+        }
+    }
+
+    /// Issues the user chose to ignore, by kind, with the date they come back.
+    public struct IgnoredIssues: Codable, Equatable, Sendable {
+        public var until: [String: Date] = [:]
+        public init() {}
+
+        public static let defaultsKey = "TidyMac.ignoredIssues"
+        public static func load(_ d: UserDefaults = .standard) -> IgnoredIssues {
+            d.data(forKey: defaultsKey).flatMap { try? JSONDecoder().decode(IgnoredIssues.self, from: $0) } ?? IgnoredIssues()
+        }
+        public func save(_ d: UserDefaults = .standard) {
+            if let data = try? JSONEncoder().encode(self) { d.set(data, forKey: Self.defaultsKey) }
+        }
+
+        public mutating func ignore(_ kind: Issue.Kind, _ option: IgnoreOption, now: Date = Date()) {
+            until[kind.rawValue] = option.until(from: now)
+        }
+
+        public func visible(_ issues: [Issue], now: Date = Date()) -> [Issue] {
+            issues.filter { (until[$0.kind.rawValue] ?? .distantPast) <= now }
+        }
     }
 
     /// Trash contents need Full Disk Access; without it this returns nil rather than prompting.

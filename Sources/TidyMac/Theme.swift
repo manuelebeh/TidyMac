@@ -290,13 +290,26 @@ struct FeatureRow: View {
     }
 }
 
+/// White on the dark module backgrounds; follows the appearance where it is not forced (the menu bar tray).
 struct PillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
             .padding(.horizontal, 14).padding(.vertical, 7)
-            .background(Capsule().fill(.white.opacity(configuration.isPressed ? 0.3 : 0.16)))
+            .background(Capsule().fill(.primary.opacity(configuration.isPressed ? 0.3 : 0.16)))
+    }
+}
+
+extension MacHealth.State {
+    /// On the dark module backgrounds; the light-mode tray needs a darker green to stay readable.
+    func color(_ scheme: ColorScheme = .dark) -> Color {
+        switch self {
+        case .excellent, .good: scheme == .dark ? Color(hex: 0x7EE8C8) : Color(hex: 0x1E9E77)
+        case .normal: scheme == .dark ? .yellow : Color(hex: 0xB07D00)
+        case .requiresAttention: .orange
+        case .critical: .red
+        }
     }
 }
 

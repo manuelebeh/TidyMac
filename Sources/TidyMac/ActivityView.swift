@@ -166,15 +166,7 @@ struct HealthCard: View {
     let machine: String
     @State private var info = false
 
-    var stateColor: Color {
-        switch health?.state {
-        case .excellent, .good: Color(hex: 0x7EE8C8)
-        case .normal: .yellow
-        case .requiresAttention: .orange
-        case .critical: .red
-        case nil: .white
-        }
-    }
+    var stateColor: Color { health?.state.color() ?? .white }
 
     var body: some View {
         let s = SystemMonitor.storage()

@@ -16,7 +16,7 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 - **My Tools**: single-purpose tools with search, favorites and last-scan dates.
 - **My Activity**: Mac health with recommendations, space cleaned, time saved, malware scan history.
 - **Screen Cleaning Mode**: locks the keyboard and trackpad and blanks the screen so you can wipe it.
-- **Menu bar**: live storage, memory, battery, CPU and network, top consumers, external drives with eject, connected Bluetooth devices, drive health.
+- **Menu bar**: Mac Health at a glance, live storage, memory, battery, CPU and network with charts, Wi-Fi security, a speed test, top consumers, external drives with eject, connected Bluetooth devices, drive health, and recommendations you can act on or ignore for a while. The icon gets a dot when something needs attention.
 - **Background alerts**: notifications for low disk space, a full Trash, heavy memory use, critical battery health, new threats, overfilled external drives and low device batteries. Thresholds are configurable in Settings (⌘,).
 
 ## Requirements
