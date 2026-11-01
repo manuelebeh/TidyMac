@@ -363,4 +363,25 @@ final class TidyCoreTests: XCTestCase {
         IgnoreList.reset(defaults: d)
         XCTAssertFalse(IgnoreList.contains("/d", defaults: d))
     }
+
+    func testAppTerminatorMatchesBundleIDAndNameLocations() {
+        let slack = AppTerminator.App(pid: 1, name: "Slack", bundleID: "com.tinyspeck.slackmacgap",
+                                      bundleURL: URL(fileURLWithPath: "/Applications/Slack.app"))
+        let notes = AppTerminator.App(pid: 2, name: "Notes", bundleID: "com.apple.Notes", bundleURL: nil)
+        let related = { (paths: [String]) in AppTerminator.related(to: paths.map { URL(fileURLWithPath: $0) }, among: [slack, notes]).map(\.pid) }
+        XCTAssertEqual(related(["/Applications/Slack.app"]), [1])
+        XCTAssertEqual(related(["/Users/me/Library/Caches/com.tinyspeck.slackmacgap"]), [1])
+        XCTAssertEqual(related(["/Users/me/Library/Preferences/com.tinyspeck.slackmacgap.plist"]), [1])
+        XCTAssertEqual(related(["/Users/me/Library/Group Containers/ABCD1234.com.tinyspeck.slackmacgap"]), [1])
+        XCTAssertEqual(related(["/Users/me/Library/Application Support/Slack"]), [1])
+        // A name outside Library, or a longer ID that only starts the same, is not a match.
+        XCTAssertEqual(related(["/Users/me/Documents/Slack", "/Users/me/Library/Caches/com.tinyspeck.slackmacgapx"]), [])
+    }
+
+    func testAppTerminatorOnlyConsidersRemovals() {
+        let u = URL(fileURLWithPath: "/Applications/Slack.app")
+        let items = [ResultItem(title: "a", url: u, action: .open(u)), ResultItem(title: "b", url: u, action: .trash(u)),
+                     ResultItem(title: "c", action: .shell("true", admin: false))]
+        XCTAssertEqual(AppTerminator.removedURLs(items), [u])
+    }
 }

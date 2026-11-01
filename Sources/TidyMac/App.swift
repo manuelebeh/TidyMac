@@ -12,7 +12,8 @@ struct TidyMacApp: App {
         WindowGroup("TidyMac", id: "main") {
             RootView(app: app)
                 .frame(minWidth: 1000, idealWidth: 1200, minHeight: 640, idealHeight: 720)
-                .environment(\.colorScheme, .dark)
+                // Sets the window's appearance, so sheets get a dark background to match their light text.
+                .preferredColorScheme(.dark)
                 // A notification opens tidymac://open/<module>; reuse the open window instead of adding one.
                 .handlesExternalEvents(preferring: ["open"], allowing: ["*"])
                 .onOpenURL { url in
