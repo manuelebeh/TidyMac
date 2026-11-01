@@ -16,7 +16,7 @@ public struct ProtectionEngine: ScanEngine {
 
     /// Not a signature engine: flags third-party launch items whose executable is missing,
     /// unsigned, or lives in a temporary/hidden location — the usual adware persistence pattern.
-    static func suspiciousLaunchItems() -> ResultGroup {
+    @Sendable static func suspiciousLaunchItems() -> ResultGroup {
         var items: [ResultItem] = []
         for li in LaunchItems.all() where !li.label.hasPrefix("com.apple.") {
             guard let exe = li.executable else { continue }
@@ -44,7 +44,7 @@ public struct ProtectionEngine: ScanEngine {
                            symbol: "ladybug", items: items, verb: "to remove")
     }
 
-    static func privacyItems() -> ResultGroup {
+    @Sendable static func privacyItems() -> ResultGroup {
         var items: [ResultItem] = []
         let lib = Paths.library
         func add(_ rel: String, _ title: String, _ app: String) {
@@ -87,7 +87,7 @@ public struct ProtectionEngine: ScanEngine {
         "kTCCServiceScreenCapture": "Screen Recording", "kTCCServiceSpeechRecognition": "Speech Recognition",
     ]
 
-    static func permissions() -> ResultGroup {
+    @Sendable static func permissions() -> ResultGroup {
         // Per-user grants live in the user database; Accessibility, Full Disk Access and
         // Screen Recording live in the system one. Both need Full Disk Access to read.
         let dbs = [Paths.library.appendingPathComponent("Application Support/com.apple.TCC/TCC.db"),
