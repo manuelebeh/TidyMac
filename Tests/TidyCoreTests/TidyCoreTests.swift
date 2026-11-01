@@ -470,4 +470,27 @@ final class TidyCoreTests: XCTestCase {
         XCTAssertEqual(entries[0].storePage?.absoluteString, "macappstore://apps.apple.com/app/id1402042596")
         XCTAssertTrue(AppStoreLookup.parse(Data("not json".utf8)).isEmpty)
     }
+
+    func testScanSettingsRoundTripAndDefaults() {
+        let d = UserDefaults(suiteName: UUID().uuidString)!
+        XCTAssertEqual(ScanSettings.load(defaults: d), ScanSettings())
+        var s = ScanSettings()
+        s.disabledSmartCare = ["clutter"]; s.disabledCleanup = ["trash"]
+        s.save(defaults: d)
+        XCTAssertEqual(ScanSettings.load(defaults: d), s)
+        XCTAssertFalse(s.scansSmartCare("clutter")); XCTAssertTrue(s.scansCleanup("mail"))
+        // A stored value from an older build without one of the keys still loads.
+        d.set(Data(#"{"disabledCleanup":["mail"]}"#.utf8), forKey: ScanSettings.key)
+        XCTAssertEqual(ScanSettings.load(defaults: d).disabledCleanup, ["mail"])
+    }
+
+    func testEnginesSkipDisabledModulesAndCategories() async {
+        var s = ScanSettings()
+        s.disabledSmartCare = Set(ScanSettings.smartCareModules.map(\.id))
+        let smartCare = await SmartCareEngine(settings: s).scan { _ in }
+        XCTAssertTrue(smartCare.isEmpty)
+        s.disabledCleanup = Set(CleanupEngine.categories.map(\.id)).subtracting(["deleted-users"])
+        let cleanup = await CleanupEngine(settings: s).scan { _ in }
+        XCTAssertTrue(cleanup.allSatisfy { $0.id == "deleted-users" })
+    }
 }
