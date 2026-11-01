@@ -115,10 +115,13 @@ struct ModuleScreen: View {
                 case .done: DoneView(controller: controller)
                 }
             }
+            .id(controller.phase == .running ? .scanning : controller.phase)
+            .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.97)), removal: .opacity))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.bottom, 110)
-            bottomButton.padding(.bottom, 22)
+            .padding(.bottom, 130)
+            bottomButton.padding(.bottom, 8)
         }
+        .animation(Motion.animation(.easeInOut(duration: 0.35)), value: controller.phase)
         .sheet(isPresented: $controller.reviewing) { ReviewSheet(controller: controller) }
         .sheet(isPresented: Binding(get: { !controller.appsToQuit.isEmpty }, set: { if !$0 { controller.appsToQuit = [] } })) {
             QuitAppsSheet(apps: controller.appsToQuit, onContinue: controller.continueAfterQuitting,
@@ -129,8 +132,8 @@ struct ModuleScreen: View {
     @ViewBuilder var bottomButton: some View {
         switch controller.phase {
         case .intro: ScanButton(title: "Scan", module: module) { controller.scan() }
-        case .scanning: ScanButton(title: "Stop", module: module) { controller.stop() }
-        case .running: ScanButton(title: "...", module: module) {}
+        case .scanning: ScanButton(title: "Stop", module: module, busy: true) { controller.stop() }
+        case .running: ScanButton(title: "", module: module, busy: true, dimmed: true) {}
         case .results:
             ScanButton(title: controller.selected.isEmpty ? "Scan" : module.actionTitle, module: module,
                        subtitle: controller.selected.isEmpty ? "Nothing selected" :
@@ -164,15 +167,20 @@ struct IntroView: View {
 
     var body: some View {
         HStack(spacing: 70) {
-            GlassIcon(module: module)
+            GlassIcon(module: module).appear(offset: CGSize(width: -30, height: 0), scale: 0.88)
             VStack(alignment: .leading, spacing: 14) {
-                Text(module.headline).font(.system(size: 38, weight: .light)).foregroundStyle(.white)
-                Text(module.tagline).font(.system(size: 15)).foregroundStyle(.white.opacity(0.75))
-                    .frame(maxWidth: 360, alignment: .leading).fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(module.features, id: \.1) { FeatureRow(symbol: $0.0, title: $0.1, module: module) }
+                Text(module.headline).font(.system(size: 42, weight: .light)).foregroundStyle(.white)
+                    .appear(delay: 0.08, offset: CGSize(width: 24, height: 0))
+                Text(module.tagline).font(.system(size: 17)).foregroundStyle(.white.opacity(0.72))
+                    .frame(maxWidth: 380, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                    .appear(delay: 0.14, offset: CGSize(width: 24, height: 0))
+                VStack(alignment: .leading, spacing: 24) {
+                    ForEach(Array(module.features.enumerated()), id: \.element.1) { i, f in
+                        FeatureRow(symbol: f.0, title: f.1, module: module)
+                            .appear(delay: 0.2 + 0.06 * Double(i), offset: CGSize(width: 24, height: 0))
+                    }
                 }
-                .padding(.top, 12)
+                .padding(.top, 30)
                 if module == .clutter {
                     Button { pickFolder() } label: {
                         Label(controller.clutterRoot.lastPathComponent, systemImage: "folder.fill")
@@ -201,8 +209,11 @@ struct ProgressScreen: View {
             GlassIcon(module: controller.module, size: 200, pulsing: true)
             Text(controller.phase == .running ? "Working on it..." : controller.progressTitle)
                 .font(.system(size: 26, weight: .light)).foregroundStyle(.white)
+                .id(controller.phase)
+                .transition(.opacity)
             Text(controller.current).font(.callout).foregroundStyle(.white.opacity(0.65)).lineLimit(1)
-            ProgressView().progressViewStyle(.linear).tint(.white).frame(width: 260)
+                .truncationMode(.middle).frame(maxWidth: 520)
+                .animation(nil, value: controller.current)
         }
     }
 }
@@ -224,14 +235,18 @@ struct ResultsView: View {
         VStack(alignment: .leading, spacing: 22) {
             HStack {
                 Text(header).font(.system(size: 26, weight: .light)).foregroundStyle(.white)
+                    .appear(offset: CGSize(width: 0, height: -10))
                 Spacer()
                 Button("Review All") { controller.reviewing = true }.buttonStyle(PillButtonStyle())
                 Button("Start Over") { controller.phase = .intro }.buttonStyle(PillButtonStyle())
             }
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 16)], spacing: 16) {
-                    ForEach(controller.groups) { g in Tile(group: g, controller: controller) }
+                    ForEach(Array(controller.groups.enumerated()), id: \.element.id) { i, g in
+                        Tile(group: g, controller: controller).appear(delay: 0.05 * Double(min(i, 10)), offset: CGSize(width: 0, height: 22), scale: 0.96)
+                    }
                 }
+                .padding(4)
             }
         }
         .padding(.horizontal, 40).padding(.top, 50)
@@ -241,6 +256,7 @@ struct ResultsView: View {
 struct Tile: View {
     let group: ResultGroup
     @ObservedObject var controller: ModuleController
+    @State private var hover = false
 
     var value: String {
         if group.isEmpty { return "Nothing found" }
@@ -254,7 +270,9 @@ struct Tile: View {
             HStack {
                 Image(systemName: group.symbol).font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
                     .frame(width: 38, height: 38)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(controller.module.accent.opacity(0.5)))
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(LinearGradient(colors: controller.module.aurora, startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .opacity(group.isEmpty ? 0.35 : 0.9))
                 Spacer()
                 if !group.isEmpty {
                     Toggle("", isOn: Binding(get: { controller.selectedCount(of: group) > 0 }, set: { _ in controller.toggle(group) }))
@@ -263,6 +281,8 @@ struct Tile: View {
             }
             Text(group.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
             Text(value).font(.system(size: 22, weight: .light)).foregroundStyle(.white)
+                .contentTransition(.numericText())
+                .animation(Motion.animation(.easeOut(duration: 0.25)), value: value)
             Text(group.isEmpty ? "" : group.verb).font(.caption).foregroundStyle(.white.opacity(0.65))
             Spacer(minLength: 0)
             if !group.isEmpty {
@@ -271,8 +291,11 @@ struct Tile: View {
         }
         .padding(16)
         .frame(height: 210, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(.white.opacity(0.08)))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.12)))
+        .glassTile(highlighted: hover)
+        .scaleEffect(hover ? 1.015 : 1)
+        .shadow(color: .black.opacity(hover ? 0.25 : 0), radius: 14, y: 8)
+        .onHover { hover = $0 }
+        .animation(Motion.animation(.spring(response: 0.3, dampingFraction: 0.8)), value: hover)
     }
 }
 
@@ -349,10 +372,22 @@ struct DoneView: View {
         let r = controller.report ?? ActionReport()
         VStack(spacing: 18) {
             GlassIcon(module: controller.module, size: 180)
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: r.failed.isEmpty ? "checkmark" : "exclamationmark")
+                        .font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
+                        .frame(width: 52, height: 52)
+                        .background(Circle().fill(r.failed.isEmpty ? Color(hex: 0x2FC96D) : .orange))
+                        .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 2))
+                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                        .appear(delay: 0.35, offset: .zero, scale: 0.2)
+                }
+                .appear(scale: 0.85)
             Text(r.failed.isEmpty ? "Well done!" : "Some items were not processed")
                 .font(.system(size: 30, weight: .light)).foregroundStyle(.white)
+                .appear(delay: 0.15)
             Text(r.freed > 0 ? "\(formatSize(r.freed)) freed · \(r.succeeded.count) items" : "\(r.succeeded.count) items done")
                 .font(.title3).foregroundStyle(.white.opacity(0.8))
+                .appear(delay: 0.22)
             if !r.failed.isEmpty {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
