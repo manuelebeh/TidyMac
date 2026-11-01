@@ -52,7 +52,7 @@ public struct CleanupEngine: ScanEngine {
         "com.apple.Safari.SafeBrowsing", "com.apple.akd", "com.apple.ap.adprivacyd", "GeoServices",
     ]
 
-    static func userCache() -> ResultGroup {
+    @Sendable static func userCache() -> ResultGroup {
         let ownID = Bundle.main.bundleIdentifier ?? "dev.local.TidyMac"
         let items = Paths.children(Paths.library.appendingPathComponent("Caches"))
             .filter { !protectedCaches.contains($0.lastPathComponent) && $0.lastPathComponent != ownID }
@@ -61,7 +61,7 @@ public struct CleanupEngine: ScanEngine {
                      "Temporary data apps keep to load faster. It is rebuilt automatically.", "archivebox", items)
     }
 
-    static func systemCache() -> ResultGroup {
+    @Sendable static func systemCache() -> ResultGroup {
         let items = Paths.children(URL(fileURLWithPath: "/Library/Caches"))
             .filter { !$0.lastPathComponent.hasPrefix("com.apple.") }
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
@@ -70,12 +70,12 @@ public struct CleanupEngine: ScanEngine {
                      "gearshape.2", items)
     }
 
-    static func userLogs() -> ResultGroup {
+    @Sendable static func userLogs() -> ResultGroup {
         let items = Paths.children(Paths.library.appendingPathComponent("Logs")).map { ResultItem.file($0) }
         return group("user-logs", "User Log Files", "Activity and crash logs written by your apps.", "doc.text", items)
     }
 
-    static func systemLogs() -> ResultGroup {
+    @Sendable static func systemLogs() -> ResultGroup {
         var items = Paths.children(URL(fileURLWithPath: "/Library/Logs"))
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
         // Only rotated archives in /var/log; live logs stay.
@@ -87,7 +87,7 @@ public struct CleanupEngine: ScanEngine {
                      "doc.text.magnifyingglass", items)
     }
 
-    static func xcodeJunk() -> ResultGroup {
+    @Sendable static func xcodeJunk() -> ResultGroup {
         let dev = Paths.library.appendingPathComponent("Developer")
         let xcode = dev.appendingPathComponent("Xcode")
         var items: [ResultItem] = []
@@ -109,7 +109,7 @@ public struct CleanupEngine: ScanEngine {
                      "hammer", items.filter { ($0.size ?? 1) > 0 })
     }
 
-    static func iosBackups() -> ResultGroup {
+    @Sendable static func iosBackups() -> ResultGroup {
         let backups = Paths.children(Paths.library.appendingPathComponent("Application Support/MobileSync/Backup"))
         // Newest backup per device is flagged "Latest" and never preselected.
         var byDevice: [String: (URL, Date)] = [:]
@@ -131,7 +131,7 @@ public struct CleanupEngine: ScanEngine {
         return group("ios-backups", "iOS Device Backups", "Local backups of your iPhone and iPad.", "iphone", items)
     }
 
-    static func brokenPreferences() -> ResultGroup {
+    @Sendable static func brokenPreferences() -> ResultGroup {
         let items = Paths.children(Paths.library.appendingPathComponent("Preferences")).filter { url in
             let v = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
             guard url.pathExtension == "plist", v?.isRegularFile == true, (v?.fileSize ?? 0) < 20_000_000,
@@ -142,14 +142,14 @@ public struct CleanupEngine: ScanEngine {
                      "Preference files that can no longer be read and may make apps misbehave.", "wrench.adjustable", items)
     }
 
-    static func brokenLoginItems() -> ResultGroup {
+    @Sendable static func brokenLoginItems() -> ResultGroup {
         let items = LaunchItems.all().filter { $0.isBroken && !$0.isSystemWide }
             .map { ResultItem.file($0.plist, subtitle: "Missing: \($0.executable ?? "?")", action: .removeLaunchItem($0.plist, admin: false)) }
         return group("broken-login", "Broken Login Items",
                      "Launch agents pointing to apps that are no longer installed.", "bolt.slash", items)
     }
 
-    static func deletedUsers() -> ResultGroup {
+    @Sendable static func deletedUsers() -> ResultGroup {
         let items = Paths.children(URL(fileURLWithPath: "/Users/Deleted Users"))
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
         return group("deleted-users", "Deleted Users", "Data left over from user accounts that were removed.", "person.crop.circle.badge.xmark", items)
@@ -176,7 +176,7 @@ public struct CleanupEngine: ScanEngine {
         (".cache/huggingface/xet", "Hugging Face"),
     ]
 
-    static func aiClutter() -> ResultGroup {
+    @Sendable static func aiClutter() -> ResultGroup {
         let items = aiPaths.map { (Paths.home($0.0), $0.1) }.filter { Paths.exists($0.0) }
             .map { ResultItem.file($0.0, subtitle: "\($0.1) · \(Paths.abbreviate($0.0.deletingLastPathComponent()))") }
             .filter { ($0.size ?? 0) > 0 }
@@ -185,7 +185,7 @@ public struct CleanupEngine: ScanEngine {
                      "sparkles", items)
     }
 
-    static func localModels() -> ResultGroup {
+    @Sendable static func localModels() -> ResultGroup {
         var items: [ResultItem] = []
         // Ollama: manifests/<registry>/<namespace>/<model>/<tag> list the blobs a model uses.
         let ollama = Paths.home(".ollama/models")
@@ -217,14 +217,14 @@ public struct CleanupEngine: ScanEngine {
 
     // MARK: Mail & Trash
 
-    static func mailAttachments() -> ResultGroup {
+    @Sendable static func mailAttachments() -> ResultGroup {
         let dl = Paths.library.appendingPathComponent("Containers/com.apple.mail/Data/Library/Mail Downloads")
         let items = Paths.children(dl).map { ResultItem.file($0) }
         return group("mail", "Mail Attachments",
                      "Copies of attachments you opened in Mail. The originals stay on the mail server.", "paperclip", items)
     }
 
-    static func trashBins() -> ResultGroup {
+    @Sendable static func trashBins() -> ResultGroup {
         var items = Paths.children(Paths.home(".Trash"), hidden: true)
             .filter { $0.lastPathComponent != ".DS_Store" }
             .map { ResultItem.file($0, subtitle: "Trash", action: .delete($0)) }
