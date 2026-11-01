@@ -182,7 +182,8 @@ public enum HealthAlerts {
 extension HealthAlerts {
     /// Third-party launch items Protection would flag. Spawns `codesign` per item, so it runs on a slower timer.
     public static func currentThreats() -> [(key: String, name: String)] {
-        ProtectionEngine.suspiciousLaunchItems().items.map { ($0.id, $0.title) }
+        // Launch items on the Ignore List are not reported again.
+        IgnoreList.apply([ProtectionEngine.suspiciousLaunchItems()])[0].items.map { ($0.id, $0.title) }
     }
 
     /// The app (or process) holding the most memory, by resident size.

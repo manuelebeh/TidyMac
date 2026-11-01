@@ -34,9 +34,9 @@ final class ModuleController: ObservableObject {
                 await engine.scan { p in Task { @MainActor in self.current = p } }
             }.value
             guard !Task.isCancelled else { return }
-            groups = result
-            selected = Set(result.flatMap(\.items).filter(\.selectedByDefault).map(\.id))
-            recordMalwareScan(result)
+            groups = IgnoreList.apply(result)
+            selected = Set(groups.flatMap(\.items).filter(\.selectedByDefault).map(\.id))
+            recordMalwareScan(groups)
             phase = .results
         }
     }
@@ -65,6 +65,13 @@ final class ModuleController: ObservableObject {
 
     func toggle(_ item: ResultItem) {
         if selected.contains(item.id) { selected.remove(item.id) } else { selected.insert(item.id) }
+    }
+
+    /// Adds the item to the Ignore List and hides it from these results.
+    func ignore(_ item: ResultItem) {
+        IgnoreList.add([item])
+        selected.remove(item.id)
+        for i in groups.indices { groups[i].items.removeAll { $0.id == item.id } }
     }
 
     func toggle(_ group: ResultGroup) {
@@ -302,8 +309,11 @@ struct ReviewSheet: View {
                             }
                             .contextMenu {
                                 if let u = item.url { Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([u]) } }
+                                Button("Add to Ignore List") { controller.ignore(item) }
                             }
                         }
+                        Text("Right-click an item to add it to the Ignore List. Manage the list in Settings (⌘,).")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .padding()

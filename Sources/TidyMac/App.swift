@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let engine = module.engine(clutterRoot: Paths.home)
             Task.detached {
                 let start = Date()
-                let groups = await engine.scan { _ in }
+                let groups = IgnoreList.apply(await engine.scan { _ in })
                 for g in groups {
                     print("== \(g.title) — \(g.items.count) items, \(FileSize.format(g.totalSize)), \(g.items.filter(\.selectedByDefault).count) preselected")
                     for item in g.items.prefix(8) {
