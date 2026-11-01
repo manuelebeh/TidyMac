@@ -5,8 +5,7 @@ import UserNotifications
 @main
 struct TidyMacApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-    @StateObject private var app = AppState()
-    @StateObject private var monitor = MonitorModel()
+    private var app: AppState { delegate.app }
 
     var body: some Scene {
         WindowGroup("TidyMac", id: "main") {
@@ -28,18 +27,14 @@ struct TidyMacApp: App {
         Settings {
             SettingsView()
         }
-
-        // The menu bar item, which keeps running after the main window closes.
-        MenuBarExtra {
-            TrayView(app: app, monitor: monitor)
-        } label: {
-            Image(nsImage: MenuBarIcon.image(attention: monitor.needsAttention))
-        }
-        .menuBarExtraStyle(.window)
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    @MainActor lazy var app = AppState()
+    /// The menu bar item (`TrayController`), which keeps running after the main window closes.
+    @MainActor private var tray: TrayController?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // `--snapshot-tray <png>` renders the menu bar panel to an image and quits (for visual checks).
         let args = ProcessInfo.processInfo.arguments
@@ -148,7 +143,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Running from `swift run` has no bundle; make it a regular foreground app anyway.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        MainActor.assumeIsolated { HealthMonitor.shared.start() }
+        MainActor.assumeIsolated {
+            HealthMonitor.shared.start()
+            tray = TrayController(app: app, monitor: MonitorModel())
+        }
+        // `--open-tray` opens the menu bar panel at launch (for checks; other apps may cover the menu bar).
+        if args.contains("--open-tray") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { MainActor.assumeIsolated { self.tray?.open() } }
+        }
         // Finder › right-click an app › Services (or Quick Actions) › Uninstall with TidyMac.
         NSApp.servicesProvider = FinderService.shared
         NSUpdateDynamicServices()
@@ -183,11 +185,14 @@ final class AppState: ObservableObject {
     /// Set by a `tidymac://uninstall` link; shows the Uninstaller on that app.
     @Published var uninstallTarget: URL?
     let screenCleaning = ScreenCleaningSession()
+    /// Opens (or brings back) the main window; set once it has appeared.
+    var openMain: (() -> Void)?
     let controllers: [Module: ModuleController] = Dictionary(uniqueKeysWithValues: Module.allCases.map { ($0, ModuleController(module: $0)) })
 }
 
 struct RootView: View {
     @ObservedObject var app: AppState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         ZStack {
@@ -209,7 +214,11 @@ struct RootView: View {
             }
         }
         .animation(Motion.animation(.easeInOut(duration: 0.35)), value: app.module)
-        .onAppear { AppDelegate.mainWindowOpened() }
+        .onAppear {
+            AppDelegate.mainWindowOpened()
+            // The menu bar panel lives outside SwiftUI's scenes and reopens the main window through this.
+            app.openMain = { [openWindow] in openWindow(id: "main") }
+        }
         .background {
             // Its own view, so it does not compete with the Screen Cleaning sheet attached below.
             Color.clear.sheet(isPresented: Binding(get: { app.uninstallTarget != nil }, set: { if !$0 { app.uninstallTarget = nil } })) {
