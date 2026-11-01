@@ -14,6 +14,8 @@ final class ModuleController: ObservableObject {
     @Published var selected: Set<String> = []
     @Published var report: ActionReport?
     @Published var reviewing = false
+    /// Running apps that hold files about to be removed; non-empty shows the quit sheet.
+    @Published var appsToQuit: [NSRunningApplication] = []
     @Published var clutterRoot = Paths.home
     private var task: Task<Void, Never>?
 
@@ -54,6 +56,17 @@ final class ModuleController: ObservableObject {
     func run() {
         let items = selectedItems
         guard !items.isEmpty else { return }
+        let apps = RunningApps.related(to: AppTerminator.removedURLs(items))
+        if apps.isEmpty { execute(items) } else { appsToQuit = apps }
+    }
+
+    /// Called by the quit sheet once the apps have quit, or when the user continues anyway.
+    func continueAfterQuitting() {
+        appsToQuit = []
+        if phase == .results { execute(selectedItems) }
+    }
+
+    private func execute(_ items: [ResultItem]) {
         phase = .running
         Task {
             let r = await Task.detached { await Executor.run(items) }.value
@@ -105,6 +118,10 @@ struct ModuleScreen: View {
             bottomButton.padding(.bottom, 22)
         }
         .sheet(isPresented: $controller.reviewing) { ReviewSheet(controller: controller) }
+        .sheet(isPresented: Binding(get: { !controller.appsToQuit.isEmpty }, set: { if !$0 { controller.appsToQuit = [] } })) {
+            QuitAppsSheet(apps: controller.appsToQuit, onContinue: controller.continueAfterQuitting,
+                          onCancel: { controller.appsToQuit = [] })
+        }
     }
 
     @ViewBuilder var bottomButton: some View {

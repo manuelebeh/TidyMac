@@ -9,6 +9,8 @@ struct UninstallerSheet: View {
     @State private var leftovers: [Leftover] = []
     @State private var filter = ""
     @State private var message: String?
+    /// The app waiting to be uninstalled and the running apps to quit first.
+    @State private var pending: (app: InstalledApp, running: [NSRunningApplication])?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -61,6 +63,11 @@ struct UninstallerSheet: View {
             }
         }
         .frame(width: 900, height: 580)
+        .sheet(isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } })) {
+            if let p = pending {
+                QuitAppsSheet(apps: p.running, onContinue: { pending = nil; remove(p.app) }, onCancel: { pending = nil })
+            }
+        }
         .task {
             apps = await Task.detached { Uninstaller.installedApps() }.value
             for i in apps.indices {
@@ -71,7 +78,13 @@ struct UninstallerSheet: View {
         }
     }
 
+    /// Asks to quit the app (and anything holding its files) first, as CleanMyMac's Uninstaller does.
     func uninstall(_ a: InstalledApp) {
+        let apps = RunningApps.related(to: [a.url] + leftovers.map(\.url))
+        if apps.isEmpty { remove(a) } else { pending = (a, apps) }
+    }
+
+    func remove(_ a: InstalledApp) {
         let items = ([a.url] + leftovers.map(\.url)).map { u in
             // /Applications is root-owned for some installers; fall back to an admin delete.
             var item = ResultItem.file(u, action: FileManager.default.isDeletableFile(atPath: u.path) ? .trash(u) : .adminDelete(u))
