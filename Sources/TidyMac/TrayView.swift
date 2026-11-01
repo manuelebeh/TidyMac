@@ -161,14 +161,22 @@ final class MonitorModel: ObservableObject {
     func eject(_ list: [SystemMonitor.Drive]) {
         ejectMessage = nil
         ejecting.formUnion(list.map(\.id))
+        let clean = GeneralSettings.cleansOnEject()
         Task {
             var failed: [String] = []
+            var cleaned: Int64 = 0
             for d in list {
+                // "Clean up junk automatically on ejection": the drive's own Trash, which would otherwise stay on it.
+                if clean, !d.isDiskImage {
+                    let junk = await Task.detached { SystemMonitor.driveTrash(d) }.value
+                    if !junk.isEmpty { cleaned += await Task.detached { await Executor.run(junk) }.value.freed }
+                }
                 let ok = await Task.detached { (try? NSWorkspace.shared.unmountAndEjectDevice(at: d.url)) != nil }.value
                 if !ok { failed.append(d.name) }
                 ejecting.remove(d.id)
             }
             ejectMessage = failed.isEmpty ? "Successfully ejected!" : "\(failed.joined(separator: ", ")) could not be ejected."
+            if cleaned > 0 { ejectMessage! += " \(FileSize.format(cleaned)) of junk cleaned." }
             drives = await Task.detached { SystemMonitor.externalDrives() }.value
             updateIssues()
         }
@@ -310,7 +318,7 @@ struct TrayView: View {
         .background(TrayBackground())
         .onAppear { monitor.start() }
         .onDisappear { monitor.stop() }
-        .animation(.easeInOut(duration: 0.2), value: detail)
+        .animation(Motion.animation(.easeInOut(duration: 0.2)), value: detail)
     }
 
     var content: some View {

@@ -266,6 +266,20 @@ public enum SystemMonitor {
 }
 
 extension SystemMonitor {
+    /// Names of the apps in the Trash, without walking them; nil without Full Disk Access.
+    public static func trashedApps(trash: URL = Paths.home(".Trash")) -> [String]? {
+        guard let kids = try? FileManager.default.contentsOfDirectory(atPath: trash.path) else { return nil }
+        return kids.filter { $0.hasSuffix(".app") }.map { String($0.dropLast(4)) }.sorted()
+    }
+
+    /// The user's Trash on an external drive (`.Trashes/<uid>`), as items to delete for good.
+    public static func driveTrash(_ drive: Drive, uid: uid_t = getuid()) -> [ResultItem] {
+        let dir = drive.url.appendingPathComponent(".Trashes/\(uid)")
+        let kids = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        return kids.map { ResultItem(title: $0.lastPathComponent, subtitle: drive.name, size: FileSize.allocated($0), url: $0, action: .delete($0)) }
+            .map { var i = $0; i.category = "trash"; return i }
+    }
+
     /// Marketing name such as "MacBook Pro"; `hw.model` only gives the identifier ("Mac16,8").
     public static func machineName() -> String {
         let out = Shell.run("/usr/sbin/system_profiler", ["SPHardwareDataType", "-json"]).output

@@ -6,6 +6,7 @@ import UserNotifications
 struct SettingsView: View {
     var body: some View {
         TabView {
+            GeneralSettingsView().tabItem { Label("General", systemImage: "gearshape") }
             NotificationSettingsView().tabItem { Label("Notifications", systemImage: "bell") }
             ScanSettingsView().tabItem { Label("Scanning", systemImage: "magnifyingglass") }
             IgnoreListSettingsView().tabItem { Label("Ignore List", systemImage: "eye.slash") }
@@ -27,6 +28,12 @@ struct NotificationSettingsView: View {
     @AppStorage("\(k).externalDrives") private var externalDrives = d.externalDrives
     @AppStorage("\(k).driveConnected") private var driveConnected = d.driveConnected
     @AppStorage("\(k).bluetooth") private var bluetooth = d.bluetooth
+    @AppStorage("\(k).smartCareReminder") private var smartCareReminder = d.smartCareReminder
+    @AppStorage("\(k).smartCareInterval") private var smartCareInterval = d.smartCareInterval
+    @AppStorage("\(k).hungApps") private var hungApps = d.hungApps
+    @AppStorage("\(k).heavyChrome") private var heavyChrome = d.heavyChrome
+    @AppStorage("\(k).trashedApps") private var trashedApps = d.trashedApps
+    @AppStorage(GeneralSettings.cleanOnEjectKey) private var cleanOnEject = false
 
     @State private var openAtLogin = HealthMonitor.opensAtLogin
     @State private var loginError: String?
@@ -58,9 +65,27 @@ struct NotificationSettingsView: View {
                 Toggle("Notify when a drive is connected to the Mac", isOn: $driveConnected)
             }
             Section("General") {
+                HStack {
+                    Toggle("Remind to run regular Smart Care", isOn: $smartCareReminder)
+                    Spacer()
+                    Picker("Remind to run regular Smart Care", selection: $smartCareInterval) {
+                        ForEach(HealthAlerts.Settings.smartCareIntervals, id: \.days) { Text($0.title).tag($0.days) }
+                    }
+                    .labelsHidden().fixedSize().disabled(!smartCareReminder)
+                }
                 Toggle("Notify when too low on free RAM", isOn: $memory)
                 Toggle("Warn about critical battery health", isOn: $battery)
                 Toggle("Warn when connected device batteries are running low", isOn: $bluetooth)
+            }
+            Section("Applications") {
+                described("Offer to uninstall applications correctly", isOn: $trashedApps,
+                          "If you put an application into Trash, you will be offered to remove the files it left behind.")
+                if trashedApps, SystemMonitor.trashedApps() == nil {
+                    Text("Allow Full Disk Access so TidyMac can see apps in the Trash.").font(.caption).foregroundStyle(.secondary)
+                }
+                described("Notify about hung applications", isOn: $hungApps,
+                          "If any of your apps stop responding, force quit them right from the notification.")
+                Toggle("Notify when Chrome uses too much memory", isOn: $heavyChrome)
             }
             Section {
                 Toggle("Notify about detected threats", isOn: $threats)
@@ -76,18 +101,27 @@ struct NotificationSettingsView: View {
                     openAtLogin = HealthMonitor.opensAtLogin
                 }))
                 if let loginError { Text(loginError).font(.caption).foregroundStyle(.red) }
+                described("Clean up junk automatically on ejection", isOn: $cleanOnEject,
+                          "Ejecting a drive from the menu first empties that drive's Trash. Those files are deleted for good.")
             } header: {
                 Text("Menu")
             } footer: {
-                Text("Keeps the menu and its alerts running after a restart.").font(.caption).foregroundStyle(.secondary)
+                Text("Open at Login keeps the menu and its alerts running after a restart.").font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        // Scrolls rather than growing past a laptop screen.
+        .frame(width: 480, height: 640)
         .task {
             guard Bundle.main.bundleIdentifier != nil else { return }
             authorization = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        }
+    }
+
+    private func described(_ title: String, isOn: Binding<Bool>, _ detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle(title, isOn: isOn)
+            Text(detail).font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -226,5 +260,43 @@ struct ScanSettingsView: View {
     private func toggle(_ title: String, isOn: Bool, isLast: Bool, flip: @escaping () -> Void) -> some View {
         Toggle(title, isOn: Binding(get: { isOn }, set: { _ in flip() }))
             .disabled(isOn && isLast)
+    }
+}
+
+/// Settings › General.
+struct GeneralSettingsView: View {
+    @AppStorage(GeneralSettings.soundsKey) private var sounds = true
+    @AppStorage(GeneralSettings.reduceMotionKey) private var reduceMotion = GeneralSettings.ReduceMotion.system.rawValue
+    @AppStorage(GeneralSettings.keepInDockKey) private var keepInDock = true
+    @AppStorage(GeneralSettings.assistantKey) private var assistant = true
+    @State private var fullDiskAccess = Permissions.hasFullDiskAccess
+
+    var body: some View {
+        Form {
+            Section("General") {
+                Toggle("Play sounds for main TidyMac actions", isOn: $sounds)
+                Picker("Reduce Motion:", selection: $reduceMotion) {
+                    ForEach(GeneralSettings.ReduceMotion.allCases, id: \.self) { Text($0.rawValue).tag($0.rawValue) }
+                }
+                Toggle("Keep icon in Dock when TidyMac is not open", isOn: $keepInDock)
+                    .onChange(of: keepInDock) { _ in AppDelegate.updateDockIcon() }
+                Toggle("Show Assistant recommendations", isOn: $assistant)
+            }
+            Section("Full Disk Access") {
+                HStack {
+                    Label(fullDiskAccess ? "Full Disk Access enabled for TidyMac" : "Full Disk Access disabled for TidyMac",
+                          systemImage: fullDiskAccess ? "checkmark.shield" : "exclamationmark.shield")
+                    Spacer()
+                    if !fullDiskAccess { Button("Enable") { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) } }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 480)
+        .fixedSize(horizontal: false, vertical: true)
+        // Picks up access granted in System Settings while this window was open.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            fullDiskAccess = Permissions.hasFullDiskAccess
+        }
     }
 }

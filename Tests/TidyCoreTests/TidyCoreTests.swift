@@ -533,3 +533,86 @@ extension TidyCoreTests {
         XCTAssertEqual(MacHealth(recommendations: skipped.visible(recs, now: now)).state, .excellent)
     }
 }
+
+extension TidyCoreTests {
+    private var roomyDisk: SystemMonitor.Storage { .init(name: "HD", total: 500_000_000_000, available: 200_000_000_000) }
+    private var calmMemory: SystemMonitor.Memory {
+        .init(total: 16_000_000_000, active: 0, wired: 0, compressed: 0, available: 8_000_000_000, swapUsed: 0, pressureLevel: 1)
+    }
+
+    func testTrashedAppsAreAnnouncedOnceAfterTheFirstLook() {
+        var state = HealthAlerts.State()
+        let t0 = Date()
+        func look(_ apps: [String]?, at t: TimeInterval, settings: HealthAlerts.Settings = .init()) -> [String] {
+            HealthAlerts.evaluate(.init(storage: roomyDisk, memory: calmMemory, trashedApps: apps), settings: settings, state: &state, now: t0 + t).map(\.key)
+        }
+        XCTAssertTrue(look(["Old"], at: 0).isEmpty, "the first look only learns what is there")
+        XCTAssertEqual(look(["New", "Old"], at: 60), ["trashedApp:New"])
+        XCTAssertTrue(look(["New", "Old"], at: 120).isEmpty)
+        XCTAssertTrue(look(nil, at: 180).isEmpty, "no access keeps the known list")
+        var off = HealthAlerts.Settings(); off.trashedApps = false
+        XCTAssertTrue(look(["Another", "New", "Old"], at: 240, settings: off).isEmpty)
+        XCTAssertTrue(look(["Another", "New", "Old"], at: 300).isEmpty, "apps trashed while off are not announced later")
+    }
+
+    func testSmartCareReminderHungAppsAndChrome() {
+        var state = HealthAlerts.State()
+        let now = Date()
+        var s = HealthAlerts.Settings(); s.smartCareInterval = 3
+        let r = HealthAlerts.Readings(storage: roomyDisk, memory: calmMemory, hungApps: ["Pages"], chromeMemory: 5_000_000_000,
+                                      lastCleanup: now.addingTimeInterval(-4 * 86_400))
+        let alerts = HealthAlerts.evaluate(r, settings: s, state: &state, now: now)
+        XCTAssertEqual(alerts.map(\.kind), [.smartCare, .hungApps, .heavyChrome])
+        XCTAssertTrue(alerts[0].body.contains("4 days"))
+        XCTAssertTrue(alerts[1].body.hasPrefix("Pages is not responding"))
+        // The reminder comes back after another interval; hung apps and Chrome after six hours.
+        XCTAssertTrue(HealthAlerts.evaluate(r, settings: s, state: &state, now: now + 3_600).isEmpty)
+        XCTAssertEqual(HealthAlerts.evaluate(r, settings: s, state: &state, now: now + 7 * 3_600).map(\.kind), [.hungApps, .heavyChrome])
+        XCTAssertEqual(HealthAlerts.evaluate(r, settings: s, state: &state, now: now + 3 * 86_400).map(\.kind), [.smartCare, .hungApps, .heavyChrome])
+
+        state = HealthAlerts.State(); s.smartCareInterval = 7
+        let light = HealthAlerts.Readings(storage: roomyDisk, memory: calmMemory, chromeMemory: 3_000_000_000,
+                                          lastCleanup: now.addingTimeInterval(-4 * 86_400))
+        XCTAssertTrue(HealthAlerts.evaluate(light, settings: s, state: &state, now: now).isEmpty, "4 GB limit on 16 GB, weekly reminder")
+        XCTAssertEqual(HealthAlerts.chromeLimit(totalMemory: 4_000_000_000), 2_000_000_000)
+        let consumers = SystemMonitor.parseConsumers("""
+          1 1000000 1.0 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+          2 2000000 1.0 /Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev
+          3 500000 1.0 /Applications/Safari.app/Contents/MacOS/Safari
+        """)
+        XCTAssertEqual(HealthAlerts.chromeMemory(consumers), 3_000_000 * 1024)
+        XCTAssertNil(HealthAlerts.chromeMemory([]))
+    }
+
+    func testGeneralSettingsDefaultsAndReduceMotion() throws {
+        let d = try XCTUnwrap(UserDefaults(suiteName: "TidyMacTests.general"))
+        defer { d.removePersistentDomain(forName: "TidyMacTests.general") }
+        XCTAssertTrue(GeneralSettings.playsSounds(d))
+        XCTAssertTrue(GeneralSettings.keepsDockIcon(d))
+        XCTAssertTrue(GeneralSettings.showsAssistant(d))
+        XCTAssertFalse(GeneralSettings.cleansOnEject(d))
+        XCTAssertTrue(GeneralSettings.reducesMotion(system: true, d))
+        XCTAssertFalse(GeneralSettings.reducesMotion(system: false, d))
+        d.set("Enabled", forKey: GeneralSettings.reduceMotionKey)
+        XCTAssertTrue(GeneralSettings.reducesMotion(system: false, d))
+        d.set("Disabled", forKey: GeneralSettings.reduceMotionKey)
+        XCTAssertFalse(GeneralSettings.reducesMotion(system: true, d))
+        d.set(false, forKey: GeneralSettings.soundsKey)
+        XCTAssertFalse(GeneralSettings.playsSounds(d))
+    }
+
+    func testDriveTrashAndTrashedAppsListing() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let trash = root.appendingPathComponent(".Trashes/\(getuid())")
+        try FileManager.default.createDirectory(at: trash.appendingPathComponent("Old.app"), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: trash.appendingPathComponent("notes.txt"))
+        let drive = SystemMonitor.Drive(url: root, name: "USB", total: 1, available: 1, format: nil, isDiskImage: false)
+        let items = SystemMonitor.driveTrash(drive)
+        XCTAssertEqual(Set(items.map(\.title)), ["Old.app", "notes.txt"])
+        XCTAssertTrue(items.allSatisfy { $0.category == "trash" && $0.subtitle == "USB" })
+        if case .delete = items[0].action {} else { XCTFail("drive trash items are deleted for good") }
+        XCTAssertEqual(SystemMonitor.trashedApps(trash: trash), ["Old"])
+        XCTAssertNil(SystemMonitor.trashedApps(trash: root.appendingPathComponent("missing")))
+    }
+}

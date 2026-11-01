@@ -40,6 +40,7 @@ final class ModuleController: ObservableObject {
             selected = Set(groups.flatMap(\.items).filter(\.selectedByDefault).map(\.id))
             recordMalwareScan(groups)
             phase = .results
+            Sounds.scanFinished()
         }
     }
 
@@ -73,6 +74,7 @@ final class ModuleController: ObservableObject {
             PerformanceEngine.markRun(r.succeeded)
             report = r
             phase = .done
+            Sounds.cleanupFinished()
         }
     }
 

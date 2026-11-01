@@ -11,6 +11,7 @@ struct ActivityScreen: View {
     @State private var showAll = false
     @State private var showUnused = false
     @State private var confirmRestart = false
+    @AppStorage(GeneralSettings.assistantKey) private var showsAssistant = true
     private let module = Module.activity
 
     var body: some View {
@@ -24,7 +25,7 @@ struct ActivityScreen: View {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 14) {
                     HealthCard(health: health, machine: machine)
-                    recommendations
+                    if showsAssistant { recommendations }
                 }
                 .frame(width: 300)
                 Grid(horizontalSpacing: 16, verticalSpacing: 16) {
