@@ -9,6 +9,7 @@ struct SettingsView: View {
             GeneralSettingsView().tabItem { Label("General", systemImage: "gearshape") }
             NotificationSettingsView().tabItem { Label("Notifications", systemImage: "bell") }
             ScanSettingsView().tabItem { Label("Scanning", systemImage: "magnifyingglass") }
+            AutomationSettingsView().tabItem { Label("Automations", systemImage: "clock.arrow.circlepath") }
             IgnoreListSettingsView().tabItem { Label("Ignore List", systemImage: "eye.slash") }
         }
     }
