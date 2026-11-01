@@ -2,8 +2,18 @@ import SwiftUI
 import TidyCore
 import UserNotifications
 
-/// TidyMac › Settings (⌘,). Mirrors CleanMyMac's Settings › Notifications and the Menu's "Open at Login".
+/// TidyMac › Settings (⌘,).
 struct SettingsView: View {
+    var body: some View {
+        TabView {
+            NotificationSettingsView().tabItem { Label("Notifications", systemImage: "bell") }
+            IgnoreListSettingsView().tabItem { Label("Ignore List", systemImage: "eye.slash") }
+        }
+    }
+}
+
+/// Mirrors CleanMyMac's Settings › Notifications and the Menu's "Open at Login".
+struct NotificationSettingsView: View {
     private static let k = HealthAlerts.Settings.defaultsKey
     private static let d = HealthAlerts.Settings()
     @AppStorage("\(k).lowDisk") private var lowDisk = d.lowDisk
@@ -92,4 +102,86 @@ struct SettingsView: View {
             .disabled(!isOn.wrappedValue)
         }
     }
+}
+
+/// Mirrors CleanMyMac's Settings › Ignore List: sections on the left, ignored items on the right.
+struct IgnoreListSettingsView: View {
+    @State private var entries: [IgnoreList.Entry] = []
+    @State private var section: IgnoreList.Section?
+    @State private var picked: Set<String> = []
+    @State private var confirmReset: Reset?
+
+    private enum Reset { case section(IgnoreList.Section), all }
+
+    private var sections: [IgnoreList.Section] {
+        let used = Set(entries.map(\.section))
+        return IgnoreList.Section.allCases.filter(used.contains)
+    }
+    private var current: IgnoreList.Section? { section.flatMap { sections.contains($0) ? $0 : nil } ?? sections.first }
+    private var shown: [IgnoreList.Entry] { entries.filter { $0.section == current }.sorted { $0.date > $1.date } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("View and manage the items that were earlier excluded from scan results:")
+            if entries.isEmpty {
+                Text("Add items to this list directly from TidyMac's detailed scan results: right-click an item and choose Add to Ignore List.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .multilineTextAlignment(.center)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.5)))
+            } else {
+                HSplitView {
+                    List(sections, selection: Binding(get: { current }, set: { section = $0; picked = [] })) { s in
+                        HStack {
+                            Text(s.title)
+                            Spacer()
+                            Text("\(entries.filter { $0.section == s }.count)").foregroundStyle(.secondary)
+                        }.tag(s)
+                    }
+                    .frame(minWidth: 180, maxWidth: 220)
+                    List(shown, selection: $picked) { e in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(e.title).lineLimit(1)
+                            if let s = e.subtitle { Text(s).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                        }
+                        .tag(e.id)
+                        .contextMenu { Button("Remove from Ignore List") { remove(picked.contains(e.id) ? picked : [e.id]) } }
+                    }
+                    .onDeleteCommand { remove(picked) }
+                    .frame(minWidth: 300)
+                }
+            }
+            HStack {
+                Text("All changes take effect after a new scan.").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Remove") { remove(picked) }.disabled(picked.isEmpty)
+                Button("Reset Selected Ignore List") { current.map { confirmReset = .section($0) } }.disabled(current == nil)
+                Button("Reset All Ignore Lists") { confirmReset = .all }.disabled(entries.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 680, height: 420)
+        .onAppear(perform: reload)
+        .alert(resetTitle, isPresented: Binding(get: { confirmReset != nil }, set: { if !$0 { confirmReset = nil } })) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset Ignore List", role: .destructive) {
+                switch confirmReset {
+                case .section(let s): IgnoreList.reset(s)
+                case .all: IgnoreList.reset()
+                case nil: break
+                }
+                reload()
+            }
+        } message: {
+            Text("TidyMac will no longer ignore the items you previously added.")
+        }
+    }
+
+    private var resetTitle: String {
+        if case .section = confirmReset { return "Are you sure you want to reset the selected category of the Ignore List?" }
+        return "Are you sure you want to reset your Ignore List to its initial state?"
+    }
+
+    private func reload() { entries = IgnoreList.entries(); picked = [] }
+    private func remove(_ ids: Set<String>) { IgnoreList.remove(ids); reload() }
 }

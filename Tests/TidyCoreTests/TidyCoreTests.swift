@@ -332,4 +332,35 @@ final class TidyCoreTests: XCTestCase {
         } }
         XCTAssertLessThanOrEqual(b.map { hypot($0.x, $0.y) + $0.r }.max()!, 200.001)
     }
+
+    func testIgnoreListHidesItemsAcrossGroups() {
+        let d = UserDefaults(suiteName: UUID().uuidString)!
+        let a = ResultItem(id: "/a", title: "a", action: .open(URL(fileURLWithPath: "/a")))
+        let b = ResultItem(id: "/b", title: "b", action: .open(URL(fileURLWithPath: "/b")))
+        let cache = ResultGroup(id: "user-cache", title: "Cache", description: "", symbol: "", items: [a, b])
+        IgnoreList.add([cache.items[0]], defaults: d)
+        IgnoreList.add([cache.items[0]], defaults: d)
+        XCTAssertEqual(IgnoreList.entries(defaults: d).count, 1)
+        XCTAssertEqual(IgnoreList.entries(defaults: d)[0].section, .systemJunk)
+        // Smart Care regroups the same item under another group: it is still hidden, and emptied groups stay.
+        let smartCare = ResultGroup(id: "cleanup", title: "Cleanup", description: "", symbol: "", items: [cache.items[0]])
+        let out = IgnoreList.apply([cache, smartCare], defaults: d)
+        XCTAssertEqual(out.map { $0.items.map(\.id) }, [["/b"], []])
+    }
+
+    func testIgnoreListResetBySection() {
+        let d = UserDefaults(suiteName: UUID().uuidString)!
+        let dup = ResultGroup(id: "duplicates", title: "", description: "", symbol: "",
+                              items: [ResultItem(id: "/d", title: "d", action: .open(URL(fileURLWithPath: "/d")))])
+        let upd = ResultGroup(id: "updates", title: "", description: "", symbol: "",
+                              items: [ResultItem(id: "update:/u", title: "u", action: .open(URL(fileURLWithPath: "/u")))])
+        IgnoreList.add(dup.items + upd.items, defaults: d)
+        IgnoreList.reset(.duplicates, defaults: d)
+        XCTAssertEqual(IgnoreList.entries(defaults: d).map(\.id), ["update:/u"])
+        IgnoreList.remove(["update:/u"], defaults: d)
+        XCTAssertTrue(IgnoreList.entries(defaults: d).isEmpty)
+        IgnoreList.add(dup.items, defaults: d)
+        IgnoreList.reset(defaults: d)
+        XCTAssertFalse(IgnoreList.contains("/d", defaults: d))
+    }
 }
