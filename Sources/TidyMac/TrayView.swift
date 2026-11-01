@@ -299,7 +299,6 @@ struct TrayView: View {
         self.app = app; self.monitor = monitor; self.scrolls = scrolls
         _detail = State(initialValue: detail)
     }
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.colorScheme) private var scheme
 
     enum Card: String { case storage, memory, battery, cpu, network, drives, devices }
@@ -323,10 +322,23 @@ struct TrayView: View {
         }
         .frame(width: Self.width)
         .background(TrayBackground())
-        .background(WindowReader { window = $0 })
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.12)))
+        .background(WindowReader { window = $0; fitWindow() })
         .onAppear { monitor.start() }
         .onDisappear { monitor.stop(); detail = nil; panel.hide() }
         .onChange(of: detail) { _ in updatePanel() }
+        .onChange(of: contentHeight) { _ in fitWindow() }
+    }
+
+    /// Fits the panel to the content as it grows or shrinks, keeping its top under the menu bar.
+    func fitWindow() {
+        DispatchQueue.main.async {
+            guard let window, let size = window.contentView?.fittingSize, size.height > 0,
+                  abs(window.frame.height - size.height) > 0.5 else { return }
+            window.setFrame(NSRect(x: window.frame.minX, y: window.frame.maxY - size.height, width: window.frame.width, height: size.height),
+                            display: true)
+        }
     }
 
     var content: some View {
@@ -549,7 +561,7 @@ struct TrayView: View {
         case .hungApps: monitor.forceQuitHungApps()
         case .bluetoothLow: detail = .devices
         case .externalFull: open(.spaceLens)
-        case .screenCleaning: app.screenCleaning.start()
+        case .screenCleaning: TrayController.shared?.close(); app.screenCleaning.start()
         }
     }
 
@@ -559,15 +571,11 @@ struct TrayView: View {
             ZStack {
                 Button("Show TidyMac") { open(nil) }.buttonStyle(TrayTextStyle())
                 HStack(spacing: 6) {
-                    Button { app.screenCleaning.start() } label: { Image(systemName: "sparkles.tv") }
+                    Button { TrayController.shared?.close(); app.screenCleaning.start() } label: { Image(systemName: "sparkles.tv") }
                         .buttonStyle(TraySquareStyle()).help("Screen Cleaning Mode")
                     Spacer()
-                    if #available(macOS 14, *) {
-                        SettingsLink { Image(systemName: "gearshape.fill") }.buttonStyle(TraySquareStyle()).help("Settings")
-                    } else {
-                        Button { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) } label: { Image(systemName: "gearshape.fill") }
-                            .buttonStyle(TraySquareStyle()).help("Settings")
-                    }
+                    Button { TrayController.openSettings() } label: { Image(systemName: "gearshape.fill") }
+                        .buttonStyle(TraySquareStyle()).help("Settings")
                     Menu {
                         Button("About TidyMac") { NSApp.orderFrontStandardAboutPanel(nil); NSApp.activate(ignoringOtherApps: true) }
                         Button("Provide Feedback...") { NSWorkspace.shared.open(URL(string: "https://github.com/manuelebeh/TidyMac/issues")!) }
@@ -586,7 +594,12 @@ struct TrayView: View {
 
     func open(_ module: Module?) {
         if let module { app.module = module }
-        openWindow(id: "main")
+        TrayController.shared?.close()
+        if let openMain = app.openMain {
+            openMain()
+        } else if let url = URL(string: "tidymac://open/\(app.module.rawValue)") {
+            NSWorkspace.shared.open(url)
+        }
         NSApp.activate(ignoringOtherApps: true)
     }
 
