@@ -33,6 +33,8 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
                 UNNotificationCategory(identifier: "hung", actions: [UNNotificationAction(identifier: "forceQuit", title: "Force Quit All"),
                                                                      UNNotificationAction(identifier: "ignoreDay", title: "Wait")], intentIdentifiers: []),
                 UNNotificationCategory(identifier: "drive", actions: [UNNotificationAction(identifier: "show", title: "Show")], intentIdentifiers: []),
+                UNNotificationCategory(identifier: "automation", actions: [UNNotificationAction(identifier: "clean", title: "Clean"),
+                                                                           UNNotificationAction(identifier: "later", title: "Later")], intentIdentifiers: []),
             ])
             center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
@@ -48,8 +50,10 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
 
     func check(now: Date = Date()) async {
         let settings = HealthAlerts.Settings.load()
+        let rules = Automations.load()
+        let needs = Automations.needs(rules)
         let wantThreats = settings.threats && now.timeIntervalSince(lastThreatCheck) >= Self.threatInterval
-        let wantTrash = settings.trashSize && now.timeIntervalSince(lastTrashCheck) >= Self.trashInterval
+        let wantTrash = (settings.trashSize || needs.trash) && now.timeIntervalSince(lastTrashCheck) >= Self.trashInterval
         if wantThreats { lastThreatCheck = now }
         if wantTrash { lastTrashCheck = now }
         let previousTrash = trashSize
@@ -63,7 +67,7 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
                 batteryHealth: SystemMonitor.battery()?.healthPercent,
                 threats: wantThreats ? HealthAlerts.currentThreats() : nil,
                 topConsumer: memory.pressureLevel >= 2 ? HealthAlerts.topMemoryConsumer() : nil,
-                externalDrives: settings.externalDrives ? SystemMonitor.externalDrives() : [],
+                externalDrives: settings.externalDrives || needs.drives ? SystemMonitor.externalDrives() : [],
                 bluetooth: settings.bluetooth ? SystemMonitor.bluetoothDevices() : [],
                 hungApps: hung,
                 chromeMemory: settings.heavyChrome ? HealthAlerts.chromeMemory(SystemMonitor.consumers()) : nil,
@@ -76,12 +80,22 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         let due = HealthAlerts.evaluate(readings, settings: settings, state: &state, now: now)
         state.save()
         for alert in due { post(alert) }
+
+        // Settings › Automations.
+        var runs = Automations.State.load()
+        let storage = readings.storage
+        let ready = Automations.due(rules, .init(freeSpace: storage.total > 0 ? storage.available : nil, trashSize: readings.trashSize,
+                                                 driveAlmostFull: readings.externalDrives.contains(where: \.almostFull)),
+                                    state: &runs, now: now)
+        runs.save()
+        for rule in ready { Task { await AutomationRunner.shared.run(rule) } }
     }
 
     func announceMount(_ url: URL) {
-        guard HealthAlerts.Settings.load().driveConnected,
-              let drive = SystemMonitor.externalDrives().first(where: { $0.url.standardizedFileURL == url.standardizedFileURL }),
+        guard let drive = SystemMonitor.externalDrives().first(where: { $0.url.standardizedFileURL == url.standardizedFileURL }),
               !drive.isDiskImage else { return }
+        for rule in Automations.onDriveConnected(Automations.load()) { Task { await AutomationRunner.shared.run(rule) } }
+        guard HealthAlerts.Settings.load().driveConnected else { return }
         let content = UNMutableNotificationContent()
         content.title = "\"\(drive.name)\" connected"
         content.body = "\(FileSize.format(drive.available)) available of \(FileSize.format(drive.total)). Click to show the drive in Finder."
@@ -113,6 +127,20 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         let info = response.notification.request.content.userInfo
         if let path = info["reveal"] as? String, response.actionIdentifier != UNNotificationDismissActionIdentifier {
             await MainActor.run { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+            return
+        }
+        // An automation that asks before cleaning.
+        if let rule = info["rule"] as? String {
+            let action = response.actionIdentifier
+            await MainActor.run {
+                switch action {
+                case "clean":
+                    guard let r = Automations.load().first(where: { $0.id.uuidString == rule }) else { return }
+                    Task { await AutomationRunner.shared.run(r, confirmed: true) }
+                case UNNotificationDefaultActionIdentifier: NSWorkspace.shared.open(URL(string: "tidymac://open/cleanup")!)
+                default: break
+                }
+            }
             return
         }
         guard let key = info["key"] as? String else { return }
