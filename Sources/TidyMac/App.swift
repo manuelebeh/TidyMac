@@ -91,8 +91,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let monitor = MonitorModel(background: false)
                 if args[i] == "--snapshot-tray" { monitor.loadAllNow() }
                 let card = i + 2 < args.count ? TrayView.Card(rawValue: args[i + 2]) : nil
-                let content: AnyView = args[i] == "--snapshot-tray" ? AnyView(TrayView(app: AppState(), monitor: monitor, detail: card, scrolls: false)
-                    .environment(\.colorScheme, args.contains("--light") ? .light : .dark))
+                let state = AppState()
+                // The detail panel sits on the left of the menu, as it does on screen.
+                let content: AnyView = args[i] == "--snapshot-tray" ? AnyView(HStack(alignment: .top, spacing: TrayDetailPanel.gap) {
+                    if let card { TrayDetail(card: card, app: state, monitor: monitor, open: { _ in }) }
+                    TrayView(app: state, monitor: monitor, detail: card, scrolls: false)
+                }
+                .background(card == nil ? Color.clear : Color.black)
+                .environment(\.colorScheme, args.contains("--light") ? .light : .dark))
                     : AnyView(ScreenCleaningOverlay(session: ScreenCleaningSession(), main: true).frame(width: 1280, height: 800))
                 let renderer = ImageRenderer(content: content)
                 renderer.scale = 2
