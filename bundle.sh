@@ -20,6 +20,13 @@ cat > "$APP/Contents/Info.plist" <<PL
   <key>CFBundleURLName</key><string>dev.local.TidyMac</string>
   <key>CFBundleURLSchemes</key><array><string>tidymac</string></array>
 </dict></array>
+<key>NSServices</key><array><dict>
+  <key>NSMenuItem</key><dict><key>default</key><string>Uninstall with TidyMac</string></dict>
+  <key>NSMessage</key><string>uninstallApplications</string>
+  <key>NSPortName</key><string>TidyMac</string>
+  <key>NSRequiredContext</key><dict/>
+  <key>NSSendFileTypes</key><array><string>com.apple.application-bundle</string></array>
+</dict></array>
 </dict></plist>
 PL
 codesign --force --sign - "$APP"

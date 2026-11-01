@@ -15,14 +15,15 @@ struct TidyMacApp: App {
                 // Sets the window's appearance, so sheets get a dark background to match their light text.
                 .preferredColorScheme(.dark)
                 // A notification opens tidymac://open/<module>; reuse the open window instead of adding one.
-                .handlesExternalEvents(preferring: ["open"], allowing: ["*"])
+                .handlesExternalEvents(preferring: ["open", "uninstall"], allowing: ["*"])
                 .onOpenURL { url in
                     if url.host == "open", let m = Module(rawValue: url.lastPathComponent) { app.module = m }
+                    if let target = Uninstaller.appURL(fromUninstallURL: url) { app.module = .applications; app.uninstallTarget = target }
                 }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
-        .handlesExternalEvents(matching: ["open"])
+        .handlesExternalEvents(matching: ["open", "uninstall"])
 
         Settings {
             SettingsView()
@@ -117,6 +118,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         MainActor.assumeIsolated { HealthMonitor.shared.start() }
+        // Finder › right-click an app › Services (or Quick Actions) › Uninstall with TidyMac.
+        NSApp.servicesProvider = FinderService.shared
+        NSUpdateDynamicServices()
+        DispatchQueue.main.async { MainActor.assumeIsolated { MoveOffer.offerIfNeeded() } }
         let center = NotificationCenter.default
         center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
             MainActor.assumeIsolated { Self.updateDockIcon(closing: note.object as? NSWindow) }
@@ -144,6 +149,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 final class AppState: ObservableObject {
     @Published var module: Module = .smartCare
+    /// Set by a `tidymac://uninstall` link; shows the Uninstaller on that app.
+    @Published var uninstallTarget: URL?
     let screenCleaning = ScreenCleaningSession()
     let controllers: [Module: ModuleController] = Dictionary(uniqueKeysWithValues: Module.allCases.map { ($0, ModuleController(module: $0)) })
 }
@@ -172,6 +179,12 @@ struct RootView: View {
         }
         .animation(Motion.animation(.easeInOut(duration: 0.35)), value: app.module)
         .onAppear { AppDelegate.mainWindowOpened() }
+        .background {
+            // Its own view, so it does not compete with the Screen Cleaning sheet attached below.
+            Color.clear.sheet(isPresented: Binding(get: { app.uninstallTarget != nil }, set: { if !$0 { app.uninstallTarget = nil } })) {
+                UninstallerSheet(module: .applications, select: app.uninstallTarget)
+            }
+        }
         .sheet(isPresented: Binding(get: { app.screenCleaning.showSuccess }, set: { app.screenCleaning.showSuccess = $0 })) {
             ScreenCleaningSuccess(session: app.screenCleaning)
         }

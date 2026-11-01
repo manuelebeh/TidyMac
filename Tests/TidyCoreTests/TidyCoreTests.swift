@@ -655,3 +655,49 @@ extension TidyCoreTests {
         XCTAssertTrue(RemovalLog.entries(defaults: d).isEmpty)
     }
 }
+
+extension TidyCoreTests {
+    func testUninstallLinkRoundTrip() {
+        let app = URL(fileURLWithPath: "/Applications/Super Notes.app")
+        let link = Uninstaller.uninstallURL(for: app)
+        XCTAssertEqual(link.scheme, "tidymac")
+        XCTAssertEqual(link.host, "uninstall")
+        XCTAssertEqual(Uninstaller.appURL(fromUninstallURL: link)?.path, app.path)
+        XCTAssertNil(Uninstaller.appURL(fromUninstallURL: URL(string: "tidymac://open/applications")!))
+        XCTAssertNil(Uninstaller.appURL(fromUninstallURL: URL(string: "tidymac://uninstall?path=/etc/passwd")!))
+        XCTAssertNil(Uninstaller.appURL(fromUninstallURL: URL(string: "tidymac://uninstall?path=relative/App.app")!))
+        XCTAssertNil(Uninstaller.appURL(fromUninstallURL: URL(string: "other://uninstall?path=/Applications/A.app")!))
+    }
+
+    func testAppAtAnyLocationAndMoveToApplications() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let downloads = root.appendingPathComponent("Downloads"), apps = root.appendingPathComponent("Applications")
+        try FileManager.default.createDirectory(at: apps, withIntermediateDirectories: true)
+        let bundle = downloads.appendingPathComponent("Tidy Test.app")
+        try FileManager.default.createDirectory(at: bundle.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+        try PropertyListSerialization.data(fromPropertyList: ["CFBundleIdentifier": "dev.test.tidy"], format: .xml, options: 0)
+            .write(to: bundle.appendingPathComponent("Contents/Info.plist"))
+        XCTAssertEqual(Uninstaller.app(at: bundle)?.bundleID, "dev.test.tidy")
+        XCTAssertNil(Uninstaller.app(at: downloads))
+
+        let d = try XCTUnwrap(UserDefaults(suiteName: "TidyMacTests.move"))
+        defer { d.removePersistentDomain(forName: "TidyMacTests.move") }
+        XCTAssertTrue(MoveToApplications.shouldOffer(bundle: bundle, home: root, defaults: d))
+        XCTAssertFalse(MoveToApplications.shouldOffer(bundle: URL(fileURLWithPath: "/Applications/TidyMac.app"), home: root, defaults: d))
+        XCTAssertFalse(MoveToApplications.shouldOffer(bundle: apps.appendingPathComponent("TidyMac.app"), home: root, defaults: d))
+        XCTAssertFalse(MoveToApplications.shouldOffer(bundle: downloads.appendingPathComponent("tidymac"), home: root, defaults: d))
+        d.set(true, forKey: MoveToApplications.declinedKey)
+        XCTAssertFalse(MoveToApplications.shouldOffer(bundle: bundle, home: root, defaults: d))
+
+        // An older copy is replaced and the original leaves Downloads.
+        try FileManager.default.createDirectory(at: apps.appendingPathComponent("Tidy Test.app"), withIntermediateDirectories: true)
+        var trashed: [String] = []
+        let moved = try MoveToApplications.move(bundle, to: apps) { u in trashed.append(u.lastPathComponent + "@" + u.deletingLastPathComponent().lastPathComponent)
+            try FileManager.default.removeItem(at: u) }
+        XCTAssertEqual(moved, apps.appendingPathComponent("Tidy Test.app"))
+        XCTAssertEqual(Bundle(url: moved)?.bundleIdentifier, "dev.test.tidy")
+        XCTAssertEqual(trashed, ["Tidy Test.app@Applications", "Tidy Test.app@Downloads"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: bundle.path))
+    }
+}

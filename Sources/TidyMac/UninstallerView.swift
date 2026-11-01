@@ -45,9 +45,13 @@ struct UninstallerSheet: View {
     /// The app waiting to be uninstalled and the running apps to quit first.
     @State private var pending: (app: InstalledApp, running: [NSRunningApplication])?
 
+    /// The app to open on, from Finder's "Uninstall with TidyMac" or a `tidymac://uninstall` link.
+    private let target: URL?
+
     /// My Activity's "Uninstall unused apps" opens the list already filtered.
-    init(module: Module, filter: UninstallerFilter = .all) {
+    init(module: Module, filter: UninstallerFilter = .all, select target: URL? = nil) {
         self.module = module
+        self.target = target
         _filter = State(initialValue: filter)
     }
 
@@ -116,6 +120,17 @@ struct UninstallerSheet: View {
         }
         .task {
             apps = await Task.detached { Uninstaller.installedApps() }.value
+            if let target {
+                // An app outside the usual folders (Downloads, a second drive) is added to the list for this session.
+                let path = target.standardizedFileURL.path
+                let app = apps.first { $0.url.standardizedFileURL.path == path } ?? Uninstaller.app(at: target)
+                if let app {
+                    if !apps.contains(where: { $0.id == app.id }) { apps.insert(app, at: 0) }
+                    select(app)
+                } else {
+                    message = "\(target.lastPathComponent) is not an application TidyMac can uninstall."
+                }
+            }
             for i in apps.indices {
                 let app = apps[i]
                 let s = await Task.detached { Uninstaller.size(of: app) }.value

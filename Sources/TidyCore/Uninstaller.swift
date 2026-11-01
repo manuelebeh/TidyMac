@@ -84,6 +84,33 @@ public enum Uninstaller {
         return apps.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    /// Any app bundle, wherever it is: Finder's "Uninstall with TidyMac" can point at an app outside the usual folders.
+    public static func app(at url: URL, fm: FileManager = .default) -> InstalledApp? {
+        guard url.pathExtension == "app", fm.fileExists(atPath: url.path) else { return nil }
+        var a = InstalledApp(url: url, name: url.deletingPathExtension().lastPathComponent, bundleID: Bundle(url: url)?.bundleIdentifier, size: 0)
+        a.store = store(of: url, fm: fm)
+        a.lastUsed = lastUsed(url)
+        return a
+    }
+
+    /// `tidymac://uninstall?path=/Applications/Foo.app` opens the Uninstaller on that app. Finder's service uses it,
+    /// and Shortcuts can call it with "Open URLs".
+    public static func uninstallURL(for app: URL) -> URL {
+        var c = URLComponents()
+        c.scheme = "tidymac"; c.host = "uninstall"
+        c.queryItems = [URLQueryItem(name: "path", value: app.standardizedFileURL.path)]
+        return c.url!
+    }
+
+    /// The app an uninstall link points at; nil for other links and for paths that are not app bundles.
+    public static func appURL(fromUninstallURL url: URL) -> URL? {
+        guard url.scheme == "tidymac", url.host == "uninstall",
+              let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "path" })?.value,
+              path.hasPrefix("/") else { return nil }
+        let app = URL(fileURLWithPath: path).standardizedFileURL
+        return app.pathExtension == "app" ? app : nil
+    }
+
     static func store(of url: URL, fm: FileManager) -> InstalledApp.Store {
         if fm.fileExists(atPath: url.appendingPathComponent("Contents/_MASReceipt/receipt").path) { return .appStore }
         if url.path.contains("/steamapps/") { return .steam }
