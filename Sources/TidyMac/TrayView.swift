@@ -15,6 +15,10 @@ final class MonitorModel: ObservableObject {
     @Published var network = SystemMonitor.network()
     @Published var networkInfo: SystemMonitor.NetworkInfo?
     @Published var cpuHistory: [Double] = []
+    @Published var cpuUserHistory: [Double] = []
+    @Published var cpuSystemHistory: [Double] = []
+    /// Marketing name such as "MacBook Pro", read once (system_profiler is slow).
+    @Published var machine = "Mac"
     @Published var downloadHistory: [Double] = []
     @Published var uploadHistory: [Double] = []
     @Published var trash: (size: Int64, apps: Int)?
@@ -55,6 +59,7 @@ final class MonitorModel: ObservableObject {
     }
 
     func start() {
+        if machine == "Mac" { Task { machine = await Task.detached { SystemMonitor.machineName() }.value } }
         refreshFast()
         refreshSlow()
         fastTimer?.invalidate()
@@ -72,6 +77,8 @@ final class MonitorModel: ObservableObject {
         battery = SystemMonitor.battery()
         network = SystemMonitor.network()
         Self.append(cpu.load, to: &cpuHistory)
+        Self.append(cpu.user, to: &cpuUserHistory)
+        Self.append(cpu.system, to: &cpuSystemHistory)
         Self.append(network.download, to: &downloadHistory)
         Self.append(network.upload, to: &uploadHistory)
         let wantsConsumers = wantsConsumers, every10s = ticks % 5 == 0
@@ -129,7 +136,7 @@ final class MonitorModel: ObservableObject {
         for _ in 0..<12 { refreshFast(); usleep(150_000) }
         consumers = SystemMonitor.consumers(); bluetooth = SystemMonitor.bluetoothDevices(); driveHealth = SystemMonitor.driveHealth()
         drives = SystemMonitor.externalDrives(); networkInfo = SystemMonitor.networkInfo(); trash = SystemMonitor.trash()
-        hungApps = HungApps.current()
+        hungApps = HungApps.current(); machine = SystemMonitor.machineName()
         health = MacHealth.current(hasFullDiskAccess: Permissions.hasFullDiskAccess, screenCleaningDue: ScreenCleaningSession.reminderDue,
                                    driveHealth: driveHealth)
         updateIssues()
@@ -274,19 +281,18 @@ struct TrayView: View {
     @ObservedObject var app: AppState
     @ObservedObject var monitor: MonitorModel
     @State private var detail: Card?
-    @State private var contentHeight: CGFloat = 640
-    @State private var confirmEmptyTrash = false
-    @State private var showAllDevices = false
+    @State private var contentHeight: CGFloat = 560
+    @State private var window: NSWindow?
+    @StateObject private var panel = TrayDetailPanel()
     /// Screen height minus the menu bar, header, footer and padding.
     static var maxScrollHeight: CGFloat { (NSScreen.main?.visibleFrame.height ?? 900) - 150 }
     struct ContentHeight: PreferenceKey {
         static let defaultValue: CGFloat = 0
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
     }
-    /// Devices listed before "Show more".
-    static let visibleDevices = 4
+    static let width: CGFloat = 420
 
-    /// ImageRenderer (`--snapshot-tray`) cannot draw scroll views.
+    /// ImageRenderer (`--snapshot-tray`) cannot draw scroll views or windows.
     var scrolls = true
 
     @MainActor init(app: AppState, monitor: MonitorModel, detail: Card? = nil, scrolls: Bool = true) {
@@ -299,137 +305,158 @@ struct TrayView: View {
     enum Card: String { case storage, memory, battery, cpu, network, drives, devices }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-            // Scrolls only when cards, details and recommendations no longer fit on screen.
-            if scrolls {
-                ScrollView(showsIndicators: false) {
-                    content.background(GeometryReader { Color.clear.preference(key: ContentHeight.self, value: $0.size.height) })
+        VStack(alignment: .leading, spacing: 0) {
+            header.padding(.horizontal, 21).padding(.top, 18).padding(.bottom, 16)
+            // Scrolls only when the cards and recommendations no longer fit on screen.
+            Group {
+                if scrolls {
+                    ScrollView(showsIndicators: false) {
+                        content.background(GeometryReader { Color.clear.preference(key: ContentHeight.self, value: $0.size.height) })
+                    }
+                    .frame(height: min(contentHeight, Self.maxScrollHeight))
+                    .onPreferenceChange(ContentHeight.self) { contentHeight = $0 }
+                } else {
+                    content
                 }
-                .frame(height: min(contentHeight, Self.maxScrollHeight))
-                .onPreferenceChange(ContentHeight.self) { contentHeight = $0 }
-            } else {
-                content
             }
             footer
         }
-        .padding(16)
-        .frame(width: 380)
+        .frame(width: Self.width)
         .background(TrayBackground())
+        .background(WindowReader { window = $0 })
         .onAppear { monitor.start() }
-        .onDisappear { monitor.stop() }
-        .animation(Motion.animation(.easeInOut(duration: 0.2)), value: detail)
+        .onDisappear { monitor.stop(); detail = nil; panel.hide() }
+        .onChange(of: detail) { _ in updatePanel() }
     }
 
     var content: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+        VStack(alignment: .leading, spacing: 11) {
+            protectionCard
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 11, alignment: .top), GridItem(.flexible(), spacing: 11, alignment: .top)],
+                      alignment: .leading, spacing: 11) {
                 storageCard
                 memoryCard
                 if let b = monitor.battery { batteryCard(b) }
                 cpuCard
                 networkCard
-                protectionCard
-                drivesCard
                 devicesCard
+                if !monitor.drives.isEmpty { drivesCard }
             }
-            if let detail { detailView(detail).transition(.opacity.combined(with: .move(edge: .top))) }
-            if !monitor.visibleIssues.isEmpty { recommendations }
+            if !monitor.visibleIssues.isEmpty { recommendations.transition(.opacity.combined(with: .offset(y: 8))) }
         }
+        .padding(.horizontal, 10)
+        .padding(.bottom, 12)
     }
 
     // MARK: Header
 
-    /// The Mac model with a glow in the colour of its Mac Health state.
+    /// Mac Health with the Mac on a glow in the colour of its state; a click opens Smart Care.
     var header: some View {
         let state = monitor.health?.state
-        let color = state?.color(scheme) ?? .secondary
         return HStack(spacing: 12) {
-            ZStack {
-                Circle().stroke(LinearGradient(colors: [color, color.opacity(0.15)], startPoint: .top, endPoint: .bottom), lineWidth: 3)
-                    .shadow(color: color.opacity(0.8), radius: 6)
-                Image(systemName: "laptopcomputer").font(.system(size: 17)).foregroundStyle(.primary)
-            }
-            .frame(width: 42, height: 42)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(Host.current().localizedName ?? "This Mac").font(.headline).foregroundStyle(.primary).lineLimit(1)
-                HStack(spacing: 4) {
-                    Text("Mac Health:").foregroundStyle(.secondary)
-                    Text(state?.rawValue ?? "…").fontWeight(.semibold).foregroundStyle(color)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text("Mac Health:")
+                    Text(state?.rawValue ?? "…").foregroundStyle(state?.color(scheme) ?? .secondary)
                 }
-                .font(.caption)
-                Text(lastCare).font(.caption2).foregroundStyle(.secondary)
+                .font(.system(size: 18, weight: .semibold))
+                Text(monitor.machine).font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            .help(monitor.health?.description ?? "")
             Spacer()
-            Button { open(.smartCare) } label: { Text("Smart Care") }.buttonStyle(PillButtonStyle())
+            HealthGlow(color: state?.glow ?? .secondary)
         }
-    }
-
-    var lastCare: String {
-        guard let last = History.entries.last?.date else { return "No cleanup yet" }
-        return "Last cleanup \(RelativeDateTimeFormatter().localizedString(for: last, relativeTo: Date()))"
+        .contentShape(Rectangle())
+        .onTapGesture { open(.smartCare) }
+        .help((monitor.health?.description ?? "") + "\nClick to open Smart Care.")
     }
 
     // MARK: Cards
 
+    /// TidyMac has no real-time malware monitor; the card shows the last on-demand scan.
+    var protectionCard: some View {
+        let last = History.entries.last { $0.scanned != nil }
+        let threats = last?.threats ?? 0
+        let shield: Color = last == nil ? .secondary : threats > 0 ? TrayStyle.warning : Color(hex: 0x22C503)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: threats > 0 ? "exclamationmark.shield.fill" : "checkmark.shield.fill")
+                    .symbolRenderingMode(.palette).foregroundStyle(.white, shield)
+                    .font(.system(size: 19))
+                Text("Protection").font(.system(size: 15, weight: .semibold))
+                Spacer()
+                if last == nil {
+                    Button("Scan") { open(.protection) }.buttonStyle(TrayLinkStyle())
+                } else {
+                    Label(threats > 0 ? "\(threats) to review" : "No threats", systemImage: threats > 0 ? "exclamationmark.triangle" : "checkmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(threats > 0 ? TrayStyle.warning : .primary)
+                }
+            }
+            Text("On-demand malware check").font(.system(size: 13, weight: .medium)).padding(.top, 16)
+            Text(last.map { "Last scan: \(RelativeDateTimeFormatter().localizedString(for: $0.date, relativeTo: Date()))" } ?? "No scan yet")
+                .font(.system(size: 11)).foregroundStyle(.secondary).padding(.top, 4)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .trayCard(radius: 12)
+        .contentShape(Rectangle())
+        .onTapGesture { open(.protection) }
+        .help("Open Protection")
+    }
+
     var storageCard: some View {
         let s = monitor.storage
-        let used = s.total > 0 ? Double(s.total - s.available) / Double(s.total) : 0
-        let low = monitor.issues.contains { $0.kind == .lowDiskSpace }
-        let severity: Metric.Severity = s.total > 0 && s.available < s.total / 50 ? .critical : low ? .warning : .normal
-        return MonitorCard(title: s.name, symbol: "internaldrive.fill", tint: Module.cleanup.accent, fraction: used,
-                           value: "Available: \(formatSize(s.available))", severity: max(severity, monitor.driveHealth.map { Metric.driveHealth($0).severity } ?? .normal),
-                           hint: "Click for Storage details", selected: detail == .storage,
-                           action: ("Free Up", false, { open(.cleanup) })) { toggle(.storage) }
+        let low = monitor.issues.contains { $0.kind == .lowDiskSpace } || (s.total > 0 && s.available < s.total / 50)
+        return TrayTile(title: s.name, symbol: "internaldrive.fill", subtitle: "Available: \(formatSize(s.available))",
+                        subtitleColor: low ? TrayStyle.warning : .secondary, selected: detail == .storage, hint: "Click for Storage details",
+                        action: ("Free Up", false, { open(.cleanup) })) { toggle(.storage) }
     }
 
     var memoryCard: some View {
         let m = monitor.memory
-        return MonitorCard(title: "Memory", symbol: "memorychip.fill", tint: Module.applications.accent,
-                           fraction: Double(m.used) / Double(max(m.total, 1)),
-                           value: "Pressure: \(m.pressure)", severity: Metric.memoryPressure(m).severity,
-                           hint: "Click for Memory details", selected: detail == .memory,
-                           action: (monitor.freeingMemory ? "Freeing Up..." : "Free Up", monitor.freeingMemory, { monitor.freeUpMemory() })) { toggle(.memory) }
+        let tight = Metric.memoryPressure(m).severity > .normal
+        return TrayTile(title: "Memory", symbol: "memorychip", subtitle: "Pressure: \(m.pressure)",
+                        subtitleColor: tight ? TrayStyle.warning : .secondary, selected: detail == .memory, hint: "Click for Memory details",
+                        action: (monitor.freeingMemory ? "Freeing Up..." : "Free Up", monitor.freeingMemory, { monitor.freeUpMemory() })) { toggle(.memory) }
     }
 
     func batteryCard(_ b: SystemMonitor.Battery) -> some View {
-        MonitorCard(title: "Battery", symbol: b.isCharging ? "battery.100.bolt" : "battery.75", tint: Module.clutter.accent,
-                    fraction: Double(b.percent) / 100, value: "\(b.percent)% · \(b.status)",
-                    severity: Metric.batteryHealth(b.healthPercent).severity, hint: "Click for Battery details",
-                    selected: detail == .battery, action: nil) { toggle(.battery) }
+        TrayTile(title: "Battery", symbol: b.isCharging ? "battery.100percent.bolt" : "battery.50percent", trailing: "\(b.percent)%",
+                 trailingColor: b.percent <= 20 && !b.isPluggedIn ? TrayStyle.warning : .primary,
+                 subtitle: Self.batteryLine(b), selected: detail == .battery, hint: "Click for Battery details") { toggle(.battery) }
+    }
+
+    /// "4h 3m remaining", like the menu's other durations.
+    static func batteryLine(_ b: SystemMonitor.Battery) -> String {
+        guard !b.isCharging, !b.isPluggedIn, let m = b.minutesRemaining else { return b.status }
+        return "\(m / 60)h \(m % 60)m remaining"
     }
 
     var cpuCard: some View {
-        MonitorCard(title: "CPU", symbol: "cpu.fill", tint: Module.performance.accent, fraction: monitor.cpu.load,
-                    value: "Load: \(Int(monitor.cpu.load * 100))%", severity: Metric.uptime(monitor.cpu.uptime).severity,
-                    hint: "Click for CPU details", selected: detail == .cpu, action: nil) { toggle(.cpu) }
+        TrayTile(title: "CPU", symbol: "cpu", subtitle: "Load: \(Int(monitor.cpu.load * 100))%",
+                 subtitleColor: monitor.cpu.load > 0.8 ? TrayStyle.warning : .secondary,
+                 selected: detail == .cpu, hint: "Click for CPU details") { toggle(.cpu) }
     }
 
     var networkCard: some View {
         let n = monitor.network
-        let severity: Metric.Severity = !n.connected ? .warning : monitor.networkInfo.flatMap(Metric.networkSecurity)?.severity ?? .normal
-        return MonitorCard(title: "Network", symbol: monitor.networkInfo?.kind == .wired ? "cable.connector" : "wifi",
-                           tint: Module.protection.accent, fraction: nil,
-                           value: n.connected ? "↓ \(speed(n.download))  ↑ \(speed(n.upload))" : "Internet connection is missing",
-                           severity: severity, hint: "Click for Network details", selected: detail == .network,
-                           action: (monitor.testingSpeed ? "Testing..." : "Test Speed", monitor.testingSpeed, { monitor.runSpeedTest(); detail = .network })) { toggle(.network) }
-    }
-
-    /// TidyMac has no real-time malware monitor; this shows the on-demand checks.
-    var protectionCard: some View {
-        MonitorCard(title: "Protection", symbol: "hand.raised.fill", tint: Module.protection.accent, fraction: nil,
-                    value: "On-demand malware check", hint: "Open Protection", selected: false,
-                    action: ("Scan", false, { open(.protection) })) { open(.protection) }
-    }
-
-    var drivesCard: some View {
-        let d = monitor.drives
-        return MonitorCard(title: "External Drives", symbol: "externaldrive.fill", tint: Module.spaceLens.accent, fraction: nil,
-                           value: d.isEmpty ? "No devices connected" : d.count == 1 ? "\(d[0].name) · \(formatSize(d[0].available)) free" : "\(d.count) connected",
-                           severity: d.contains(where: \.almostFull) ? .warning : .normal, hint: "Click for External Drives details",
-                           selected: detail == .drives,
-                           action: d.isEmpty ? nil : (monitor.ejecting.isEmpty ? "Eject All" : "Ejecting...", !monitor.ejecting.isEmpty, { monitor.eject(d) })) { toggle(.drives) }
+        let wired = monitor.networkInfo?.kind == .wired
+        return TrayTile(title: n.connected ? monitor.networkInfo?.name ?? "Network" : "Network", symbol: wired ? "cable.connector" : "wifi",
+                        subtitle: n.connected ? nil : "Internet connection is missing", subtitleColor: TrayStyle.warning,
+                        selected: detail == .network, hint: "Click for Network details",
+                        action: (monitor.testingSpeed ? "Testing..." : "Test Speed", monitor.testingSpeed, { monitor.runSpeedTest(); detail = .network })) {
+            toggle(.network)
+        } extra: {
+            if n.connected {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(Self.speed(n.upload), systemImage: "arrow.up")
+                    Label(Self.speed(n.download), systemImage: "arrow.down")
+                }
+                .font(.system(size: 11).monospacedDigit())
+                .labelStyle(TrayStyle.TightLabel())
+                .padding(.top, 8)
+            }
+        }
     }
 
     var devicesCard: some View {
@@ -437,283 +464,64 @@ struct TrayView: View {
         let value = b.isEmpty ? "No devices connected"
             : b.count == 1 ? "\(b[0].name)\(b[0].lowest.map { " · \($0)%" } ?? "")" : "\(b.count) connected"
         let low = b.contains { ($0.lowest ?? 100) <= HealthAlerts.bluetoothLowLevel }
-        return MonitorCard(title: "Connected Devices", symbol: "dot.radiowaves.left.and.right", tint: Module.myTools.accent, fraction: nil,
-                           value: value, severity: low ? .warning : .normal, hint: "Click for Connected Devices details",
-                           selected: detail == .devices, action: nil) { toggle(.devices) }
+        return TrayTile(title: "Connected Devices", symbol: nil, subtitle: value, subtitleColor: low ? TrayStyle.warning : .secondary,
+                        selected: detail == .devices, hint: "Click for Connected Devices details") { toggle(.devices) }
     }
 
-    func toggle(_ c: Card) {
-        detail = detail == c ? nil : c
+    var drivesCard: some View {
+        let d = monitor.drives
+        return TrayTile(title: "External Drives", symbol: "externaldrive.fill",
+                        subtitle: d.count == 1 ? "\(d[0].name) · \(formatSize(d[0].available)) free" : "\(d.count) connected",
+                        subtitleColor: d.contains(where: \.almostFull) ? TrayStyle.warning : .secondary,
+                        selected: detail == .drives, hint: "Click for External Drives details",
+                        action: (monitor.ejecting.isEmpty ? "Eject All" : "Ejecting...", !monitor.ejecting.isEmpty, { monitor.eject(d) })) { toggle(.drives) }
+    }
+
+    func toggle(_ c: Card) { detail = detail == c ? nil : c }
+
+    /// Details open in their own panel on the left of the menu.
+    func updatePanel() {
         monitor.wantsConsumers = detail == .memory || detail == .cpu
         if monitor.wantsConsumers { monitor.loadConsumers() }
-    }
-
-    // MARK: Details
-
-    @ViewBuilder func detailView(_ c: Card) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            switch c {
-            case .storage: storageDetail
-            case .memory: memoryDetail
-            case .battery: batteryDetail
-            case .cpu: cpuDetail
-            case .network: networkDetail
-            case .drives:
-                if monitor.drives.isEmpty { note("When connected, external storage devices will appear here.") }
-                ForEach(monitor.drives) { driveRow($0) }
-                if let m = monitor.ejectMessage { note(m, warning: !m.hasPrefix("Success")) }
-            case .devices: devicesDetail
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(.primary.opacity(0.08)))
-    }
-
-    @ViewBuilder var storageDetail: some View {
-        let s = monitor.storage
-        row("Capacity", formatSize(s.total)); row("Used", formatSize(s.total - s.available)); row("Available", formatSize(s.available))
-        if let h = monitor.driveHealth { MetricRow(metric: Metric.driveHealth(h)) }
-        sectionTitle("Components")
-        // The Trash, with its own Free Up.
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "trash.fill").foregroundStyle(.primary).frame(width: 26, height: 26)
-                .background(RoundedRectangle(cornerRadius: 7).fill(Module.cleanup.accent.opacity(0.4)))
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Trash").font(.callout.weight(.semibold)).foregroundStyle(.primary)
-                if let t = monitor.trash {
-                    Text(t.size == 0 ? "Empty" : formatSize(t.size)).font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Text("Allow Full Disk Access to analyze Trash contents.").font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer()
-            if monitor.trash == nil {
-                Button("Allow Access") { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) }.buttonStyle(PillButtonStyle())
-            } else if confirmEmptyTrash {
-                Button("Cancel") { confirmEmptyTrash = false }.buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
-                Button("Delete for Good") { confirmEmptyTrash = false; monitor.emptyTrash() }.buttonStyle(PillButtonStyle())
-            } else if (monitor.trash?.size ?? 0) > 0 {
-                Button(monitor.emptyingTrash ? "Freeing Up..." : "Free Up") { confirmEmptyTrash = true }
-                    .buttonStyle(PillButtonStyle()).disabled(monitor.emptyingTrash)
-            }
-        }
-        if confirmEmptyTrash { note("Items in the Trash are deleted permanently. This cannot be undone.", warning: true) }
-    }
-
-    @ViewBuilder var memoryDetail: some View {
-        let m = monitor.memory
-        let parts: [(String, Int64, Color, String)] = [
-            ("Active", m.active, Module.applications.accent, "The amount of RAM that’s being actively used"),
-            ("Wired", m.wired, Module.smartCare.accent, "Memory that’s used by the system, so it must stay in RAM and can’t be borrowed by other apps"),
-            ("Compressed", m.compressed, Module.performance.accent, "The amount of memory that was compressed to make more RAM available for active apps"),
-            ("Available", m.available, .primary.opacity(0.2), "The amount of RAM that can be used freely"),
-        ]
-        SegmentBar(parts: parts.map { (Double($0.1), $0.2) })
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 4) {
-            ForEach(parts, id: \.0) { p in
-                HStack(spacing: 6) {
-                    Circle().fill(p.2).frame(width: 7, height: 7)
-                    Text(p.0).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(formatSize(p.1)).monospacedDigit().foregroundStyle(.primary)
-                }
-                .font(.caption).help(p.3)
-            }
-        }
-        MetricRow(metric: Metric.memoryPressure(m))
-        MetricRow(metric: Metric.swap(m))
-        topConsumers(by: \.memory) { formatSize($0.memory) }
-    }
-
-    @ViewBuilder var batteryDetail: some View {
-        if let b = monitor.battery {
-            let status = b.chartStatus
-            HStack(alignment: .firstTextBaseline) {
-                Text(status.title).font(.callout.weight(.semibold)).foregroundStyle(.primary)
-                Spacer()
-                Text("\(b.percent)%").font(.title3.weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
-            }
-            if let d = status.detail { note(d) }
-            Bar(fraction: Double(b.percent) / 100, color: b.percent <= 20 ? .orange : Module.clutter.accent)
-            if let c = b.cycleCount {
-                row("Cycles", "\(c) charge cycles")
-                    .help("Your battery is designed to retain up to 80% of its original charge capacity at its maximum cycle count.")
-            }
-            MetricRow(metric: Metric.batteryHealth(b.healthPercent))
-            if let t = b.temperature { MetricRow(metric: Metric.batteryTemperature(t)) }
-        }
-    }
-
-    @ViewBuilder var cpuDetail: some View {
-        let p = monitor.cpu
-        Sparkline(series: [(monitor.cpuHistory, Module.performance.accent)], capacity: MonitorModel.historyLength, maxValue: 1)
-        row("User", "\(Int(p.user * 100))%"); row("System", "\(Int(p.system * 100))%"); row("Available", "\(Int(p.idle * 100))%")
-        MetricRow(metric: Metric.uptime(p.uptime))
-        topConsumers(by: \.cpu) { String(format: "%.1f%%", $0.cpu) }
-    }
-
-    @ViewBuilder var networkDetail: some View {
-        let n = monitor.network
-        if !n.connected {
-            note("No network connection. Check router and network cables and try reconnecting to Wi-Fi.", warning: true)
+        guard scrolls, let window else { return }
+        if let detail {
+            panel.show(AnyView(TrayDetail(card: detail, app: app, monitor: monitor, open: open).environment(\.colorScheme, scheme)), beside: window)
         } else {
-            Sparkline(series: [(monitor.downloadHistory, Module.protection.accent), (monitor.uploadHistory, Module.applications.accent)],
-                      capacity: MonitorModel.historyLength)
-            HStack(spacing: 12) {
-                Label("Download \(speed(n.download))", systemImage: "arrow.down").foregroundStyle(Module.protection.accent)
-                Label("Upload \(speed(n.upload))", systemImage: "arrow.up").foregroundStyle(Module.applications.accent)
-            }
-            .font(.caption.monospacedDigit())
-            if let info = monitor.networkInfo {
-                row("Connection type", info.kind == .wifi ? "Wi-Fi connection" : info.kind == .wired ? "Wired connection" : info.kind.rawValue)
-                if let name = info.name { row("Name", name) }
-                row("Interface", info.interface)
-                if let security = Metric.networkSecurity(info) { MetricRow(metric: security) }
-            }
-            row("Downloaded", formatSize(n.received)).help("Amount of data transferred to your Mac since its network interface came up")
-            row("Uploaded", formatSize(n.sent)).help("Amount of data transferred from your Mac since its network interface came up")
+            panel.hide()
         }
-        sectionTitle("Test Your Connection")
-        if let s = monitor.speedTest {
-            row("Download", speed(s.download)); row("Upload", speed(s.upload))
-            let good = SystemMonitor.goodFor(download: s.download, upload: s.upload)
-            if good.isEmpty {
-                note("Internet connection speed is very low. Try reconnecting to Wi-Fi or contact your service provider.", warning: true)
-            } else {
-                Text("Good for:").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                FlowRow(items: good)
-            }
-        } else if monitor.testingSpeed {
-            note("Running, about 20 seconds… TidyMac uses macOS’s networkQuality to measure your connection.")
-        } else if monitor.speedTestFailed {
-            note("Network error. Check your internet connection and try again.", warning: true)
-        } else {
-            note("Measures your download and upload speed with macOS’s networkQuality.")
-        }
-        if !monitor.testingSpeed {
-            Button(monitor.speedTest == nil ? "Test Speed" : "Test Again") { monitor.runSpeedTest() }.buttonStyle(PillButtonStyle())
-        }
-    }
-
-    @ViewBuilder var devicesDetail: some View {
-        let all = monitor.bluetooth
-        if all.isEmpty { note("Connect wireless devices to your Mac, and they will appear here.") }
-        ForEach(showAllDevices ? all : Array(all.prefix(Self.visibleDevices))) { d in
-            HStack {
-                Image(systemName: deviceSymbol(d.kind)).foregroundStyle(.primary.opacity(0.8)).frame(width: 18)
-                Text(d.name).foregroundStyle(.primary).lineLimit(1)
-                Spacer()
-                if d.batteries.isEmpty {
-                    Text("No battery data").foregroundStyle(.secondary).help("Battery charge information is not available for this device")
-                } else {
-                    // AirPods report Left, Right and Case separately.
-                    HStack(spacing: 8) {
-                        ForEach(d.batteries, id: \.label) { b in
-                            HStack(spacing: 3) {
-                                if !b.label.isEmpty { Text(b.label.prefix(1)).foregroundStyle(.secondary).help(b.label) }
-                                Text("\(b.percent)%").monospacedDigit()
-                                    .foregroundStyle(b.label != "Case" && b.percent <= HealthAlerts.bluetoothLowLevel ? .orange : .primary)
-                            }
-                        }
-                    }
-                }
-            }
-            .font(.callout)
-        }
-        if all.count > Self.visibleDevices {
-            Button(showAllDevices ? "Show less" : "Show \(all.count - Self.visibleDevices) more") { showAllDevices.toggle() }
-                .buttonStyle(.plain).font(.caption.weight(.medium)).foregroundStyle(.secondary)
-        }
-    }
-
-    func note(_ text: String, warning: Bool = false) -> some View {
-        Text(text).font(.caption).foregroundStyle(warning ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary)).fixedSize(horizontal: false, vertical: true)
-    }
-
-    func sectionTitle(_ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Divider().overlay(.primary.opacity(0.15)).padding(.top, 2)
-            Text(text).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder func topConsumers(by key: KeyPath<SystemMonitor.Consumer, some Comparable>, _ value: @escaping (SystemMonitor.Consumer) -> String) -> some View {
-        sectionTitle("Top Consumers")
-        ForEach(monitor.consumers.sorted { $0[keyPath: key] > $1[keyPath: key] }.prefix(5)) { c in
-            HStack(spacing: 8) {
-                Text(c.name).foregroundStyle(.primary).lineLimit(1)
-                Spacer()
-                Text(value(c)).monospacedDigit().foregroundStyle(.primary.opacity(0.8))
-                if c.pid != nil {
-                    Menu("Quit") { Button("Force Quit") { monitor.quit(c, force: true) } } primaryAction: { monitor.quit(c, force: false) }
-                        .menuStyle(.borderlessButton).fixedSize().font(.caption)
-                }
-            }.font(.callout)
-        }
-    }
-
-    func driveRow(_ d: SystemMonitor.Drive) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Image(systemName: d.isDiskImage ? "opticaldiscdrive" : "externaldrive").foregroundStyle(.primary.opacity(0.8))
-                Text(d.name).foregroundStyle(.primary).lineLimit(1)
-                Text(d.isDiskImage ? "Disk Image" : d.format ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Spacer()
-                Button { monitor.eject([d]) } label: { Image(systemName: "eject.fill") }
-                    .buttonStyle(.plain).foregroundStyle(.primary).disabled(monitor.ejecting.contains(d.id)).help("Eject")
-            }
-            Bar(fraction: d.total > 0 ? Double(d.total - d.available) / Double(d.total) : 0, color: d.almostFull ? .orange : Module.spaceLens.accent)
-            Text(d.almostFull ? "Almost Full · \(formatSize(d.available)) available" : "\(formatSize(d.available)) available of \(formatSize(d.total))")
-                .font(.caption).foregroundStyle(d.almostFull ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-        }.font(.callout)
-    }
-
-    func deviceSymbol(_ kind: String?) -> String {
-        switch kind?.lowercased() ?? "" {
-        case let k where k.contains("mouse"): "computermouse"
-        case let k where k.contains("keyboard"): "keyboard"
-        case let k where k.contains("trackpad"): "rectangle.and.hand.point.up.left"
-        case let k where k.contains("head") || k.contains("ear"): "headphones"
-        case let k where k.contains("speaker"): "hifispeaker"
-        case let k where k.contains("game"): "gamecontroller"
-        default: "dot.radiowaves.left.and.right"
-        }
-    }
-
-    func row(_ k: String, _ v: String) -> some View {
-        HStack { Text(k).foregroundStyle(.secondary); Spacer(); Text(v).monospacedDigit().foregroundStyle(.primary).lineLimit(1) }.font(.callout)
     }
 
     // MARK: Recommendations & footer
 
     var recommendations: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Today's Recommendation").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 11) {
+            Text("Today's Recommendation").font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary.opacity(0.85))
+                .padding(.leading, 11).padding(.top, 8)
             ForEach(monitor.visibleIssues) { issue in
                 let look = Self.look(issue.kind)
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: look.symbol).font(.system(size: 12, weight: .semibold)).foregroundStyle(.primary)
-                        .frame(width: 26, height: 26).background(RoundedRectangle(cornerRadius: 7).fill(look.module.accent.opacity(0.45)))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(issue.title).font(.callout.weight(.semibold)).foregroundStyle(.primary)
-                        Text(issue.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        HStack(spacing: 10) {
-                            Button(look.action) { fix(issue) }.buttonStyle(PillButtonStyle())
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: look.symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(LinearGradient(colors: look.module.aurora, startPoint: .topLeading, endPoint: .bottomTrailing)))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(issue.title).font(.system(size: 13, weight: .semibold))
+                        Text(issue.detail).font(.system(size: 13)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 14) {
+                            Spacer()
                             Menu("Ignore") {
                                 ForEach(SystemMonitor.IgnoreOption.allCases, id: \.self) { o in
                                     Button(o.title) { monitor.ignore(issue.kind, o) }
                                 }
                             }
-                            .menuStyle(.borderlessButton).fixedSize().font(.caption)
+                            .menuStyle(.borderlessButton).fixedSize().font(.system(size: 12))
+                            Button(look.action) { fix(issue) }.buttonStyle(TrayButtonStyle())
                         }
-                        .padding(.top, 4)
+                        .padding(.top, 8)
                     }
-                    Spacer(minLength: 0)
                 }
-                .padding(10)
-                .background(RoundedRectangle(cornerRadius: 12).fill(.primary.opacity(0.08)))
+                .padding(16)
+                .trayCard(radius: 12)
             }
         }
     }
@@ -728,7 +536,7 @@ struct TrayView: View {
         case .hungApps: ("hourglass", .performance, "Force Quit All")
         case .bluetoothLow: ("battery.25", .myTools, "See All Devices")
         case .externalFull: ("externaldrive.fill", .spaceLens, "Free Up")
-        case .screenCleaning: ("sparkles.tv", .smartCare, "Try")
+        case .screenCleaning: ("sparkles.tv", .protection, "Try Screen Cleaning Mode")
         }
     }
 
@@ -746,26 +554,34 @@ struct TrayView: View {
     }
 
     var footer: some View {
-        HStack(spacing: 12) {
-            Button("Open TidyMac") { open(nil) }.buttonStyle(PillButtonStyle())
-            Spacer()
-            Button { app.screenCleaning.start() } label: { Image(systemName: "sparkles.tv") }
-                .buttonStyle(.plain).foregroundStyle(.primary).help("Screen Cleaning Mode")
-            if #available(macOS 14, *) {
-                SettingsLink { Image(systemName: "gearshape") }.buttonStyle(.plain).foregroundStyle(.primary).help("Settings")
-            } else {
-                Button { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) } label: { Image(systemName: "gearshape") }
-                    .buttonStyle(.plain).foregroundStyle(.primary).help("Settings")
+        VStack(spacing: 0) {
+            Rectangle().fill(.primary.opacity(0.08)).frame(height: 1)
+            ZStack {
+                Button("Show TidyMac") { open(nil) }.buttonStyle(TrayTextStyle())
+                HStack(spacing: 6) {
+                    Button { app.screenCleaning.start() } label: { Image(systemName: "sparkles.tv") }
+                        .buttonStyle(TraySquareStyle()).help("Screen Cleaning Mode")
+                    Spacer()
+                    if #available(macOS 14, *) {
+                        SettingsLink { Image(systemName: "gearshape.fill") }.buttonStyle(TraySquareStyle()).help("Settings")
+                    } else {
+                        Button { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) } label: { Image(systemName: "gearshape.fill") }
+                            .buttonStyle(TraySquareStyle()).help("Settings")
+                    }
+                    Menu {
+                        Button("About TidyMac") { NSApp.orderFrontStandardAboutPanel(nil); NSApp.activate(ignoringOtherApps: true) }
+                        Button("Provide Feedback...") { NSWorkspace.shared.open(URL(string: "https://github.com/manuelebeh/TidyMac/issues")!) }
+                        Divider()
+                        Button("Quit") { NSApp.terminate(nil) }
+                    } label: { Image(systemName: "ellipsis") }
+                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                        .frame(width: 26, height: 26)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.primary.opacity(0.16)))
+                        .help("More")
+                }
             }
-            Menu {
-                Button("About TidyMac") { NSApp.orderFrontStandardAboutPanel(nil); NSApp.activate(ignoringOtherApps: true) }
-                Button("Provide Feedback...") { NSWorkspace.shared.open(URL(string: "https://github.com/manuelebeh/TidyMac/issues")!) }
-                Divider()
-                Button("Quit") { NSApp.terminate(nil) }
-            } label: { Image(systemName: "ellipsis.circle").foregroundStyle(.primary) }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .padding(.horizontal, 12).padding(.vertical, 11)
         }
-        .font(.system(size: 14))
     }
 
     func open(_ module: Module?) {
@@ -774,164 +590,245 @@ struct TrayView: View {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    func speed(_ bytesPerSecond: Double) -> String {
-        bytesPerSecond < 1_000 ? "0 KB/s" : "\(formatSize(Int64(bytesPerSecond)))/s"
+    static func speed(_ bytesPerSecond: Double) -> String {
+        bytesPerSecond < 1_000 ? "0 KB/sec" : "\(formatSize(Int64(bytesPerSecond)))/sec"
     }
 }
 
-/// The Smart Care gradient in Dark Mode, a pale version of it in Light Mode.
-struct TrayBackground: View {
-    @Environment(\.colorScheme) private var scheme
-    var body: some View {
-        if scheme == .dark {
-            ModuleBackground(module: .smartCare)
-        } else {
-            ZStack {
-                LinearGradient(colors: [Color(hex: 0xFBF5FD), Color(hex: 0xEEE2FA)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                RadialGradient(colors: [Module.smartCare.accent.opacity(0.18), .clear], center: .init(x: 0.85, y: 0.1), startRadius: 10, endRadius: 360)
-            }
-            .ignoresSafeArea()
+/// Colours and small pieces shared by the menu and its detail panel.
+enum TrayStyle {
+    static let link = Color(hex: 0x4FB0FF)
+    static let selected = Color(hex: 0x4D7DFF)
+    static let warning = Color(hex: 0xF5B942)
+
+    static func color(_ s: Metric.Severity) -> Color {
+        switch s {
+        case .normal: .primary
+        case .warning: warning
+        case .critical: Color(hex: 0xFF6B6B)
+        }
+    }
+
+    /// Icon and text closer together than the system label.
+    struct TightLabel: LabelStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            HStack(spacing: 6) { configuration.icon.fontWeight(.semibold); configuration.title }
         }
     }
 }
 
-/// One monitor tile: icon with a severity dot, small ring gauge, value line and an optional action pill.
-struct MonitorCard: View {
-    let title: String, symbol: String, tint: Color
-    let fraction: Double?
-    let value: String
-    var severity: Metric.Severity = .normal
-    let hint: String
+/// Card surface of the menu: faint glass with a hairline edge, a blue edge when selected.
+struct TrayCard: ViewModifier {
+    var radius: CGFloat = 10
+    var selected = false
+    var hover = false
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        let dark = scheme == .dark
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        content
+            .background(shape.fill(dark ? Color.white.opacity(hover ? 0.11 : 0.07) : Color.white.opacity(hover ? 0.75 : 0.58)))
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(selected ? TrayStyle.selected : dark ? Color.white.opacity(0.09) : Color.black.opacity(0.07),
+                                        lineWidth: selected ? 2 : 1))
+    }
+}
+
+extension View {
+    func trayCard(radius: CGFloat = 10, selected: Bool = false, hover: Bool = false) -> some View {
+        modifier(TrayCard(radius: radius, selected: selected, hover: hover))
+    }
+}
+
+/// One monitor tile: glyph, title with an optional value on the right, a status line and a link at the bottom right.
+struct TrayTile<Extra: View>: View {
+    let title: String
+    let symbol: String?
+    var trailing: String? = nil
+    var trailingColor: Color = .primary
+    var subtitle: String? = nil
+    var subtitleColor: Color = .secondary
     let selected: Bool
-    let action: (title: String, busy: Bool, run: () -> Void)?
+    let hint: String
+    var action: (title: String, busy: Bool, run: () -> Void)? = nil
     let onTap: () -> Void
+    @ViewBuilder var extra: Extra
+    @State private var hover = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(.primary)
-                    .frame(width: 26, height: 26).background(RoundedRectangle(cornerRadius: 7).fill(tint.opacity(0.5)))
-                    .overlay(alignment: .topTrailing) {
-                        if severity > .normal {
-                            Circle().fill(severity.color).frame(width: 9, height: 9).offset(x: 3, y: -3)
-                        }
+        HStack(alignment: .top, spacing: 12) {
+            if let symbol {
+                Image(systemName: symbol).font(.system(size: 15, weight: .medium)).foregroundStyle(.primary.opacity(0.9))
+                    .frame(width: 22, height: 17)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    Spacer(minLength: 0)
+                    if let trailing {
+                        Text(trailing).font(.system(size: 12, weight: .semibold)).monospacedDigit().foregroundStyle(trailingColor)
                     }
-                Spacer()
-                if let fraction {
-                    ZStack {
-                        Circle().stroke(.primary.opacity(0.15), lineWidth: 4)
-                        Circle().trim(from: 0, to: min(max(fraction, 0), 1))
-                            .stroke(tint, style: StrokeStyle(lineWidth: 4, lineCap: .round)).rotationEffect(.degrees(-90))
-                    }.frame(width: 24, height: 24)
+                }
+                if let subtitle {
+                    Text(subtitle).font(.system(size: 11)).foregroundStyle(subtitleColor).lineLimit(1).minimumScaleFactor(0.85)
+                }
+                extra
+                if let action {
+                    HStack {
+                        Spacer()
+                        Button(action.title, action: action.run).buttonStyle(TrayLinkStyle()).disabled(action.busy)
+                    }
+                    .padding(.top, 6)
                 }
             }
-            Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(.primary).lineLimit(1)
-            Text(value).font(.caption).foregroundStyle(.primary.opacity(0.75)).lineLimit(1).minimumScaleFactor(0.8)
-            if let action {
-                Button(action.title, action: action.run).buttonStyle(PillButtonStyle()).disabled(action.busy)
-            }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(.primary.opacity(selected ? 0.16 : 0.08)))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(.primary.opacity(selected ? 0.3 : 0.1)))
+        .padding(.horizontal, 14).padding(.vertical, 13)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .trayCard(selected: selected, hover: hover)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+        .onHover { hover = $0 }
+        .animation(Motion.animation(.easeOut(duration: 0.15)), value: hover)
+        .animation(Motion.animation(.easeInOut(duration: 0.2)), value: selected)
         .help(hint)
     }
 }
 
-/// A detail row with a value coloured by severity and a line explaining it.
-struct MetricRow: View {
-    let metric: Metric
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(metric.title).foregroundStyle(.secondary)
-                Spacer()
-                Text(metric.value).monospacedDigit().fontWeight(.medium).foregroundStyle(metric.severity.color)
-            }
-            .font(.callout)
-            Text(metric.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+extension TrayTile where Extra == EmptyView {
+    init(title: String, symbol: String?, trailing: String? = nil, trailingColor: Color = .primary, subtitle: String? = nil,
+         subtitleColor: Color = .secondary, selected: Bool, hint: String, action: (title: String, busy: Bool, run: () -> Void)? = nil,
+         onTap: @escaping () -> Void) {
+        self.init(title: title, symbol: symbol, trailing: trailing, trailingColor: trailingColor, subtitle: subtitle, subtitleColor: subtitleColor,
+                  selected: selected, hint: hint, action: action, onTap: onTap) { EmptyView() }
+    }
+}
+
+/// Blue text links: "Free Up", "Test Speed", "Quit".
+struct TrayLinkStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Link(label: configuration.label, pressed: configuration.isPressed) }
+
+    private struct Link<Label: View>: View {
+        let label: Label
+        let pressed: Bool
+        @State private var hover = false
+        @Environment(\.isEnabled) private var enabled
+        var body: some View {
+            label
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(TrayStyle.link.opacity(!enabled ? 0.5 : pressed ? 0.6 : hover ? 0.8 : 1))
+                .contentShape(Rectangle())
+                .onHover { hover = $0 }
         }
     }
 }
 
-extension Metric.Severity {
-    var color: Color {
-        switch self {
-        case .normal: .green
-        case .warning: .orange
-        case .critical: .red
+/// The bordered button of a recommendation.
+struct TrayButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Body(label: configuration.label, pressed: configuration.isPressed) }
+
+    private struct Body<Label: View>: View {
+        let label: Label
+        let pressed: Bool
+        @State private var hover = false
+        var body: some View {
+            label
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(.primary.opacity(pressed ? 0.22 : hover ? 0.16 : 0.1)))
+                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(.primary.opacity(0.18)))
+                .onHover { hover = $0 }
+                .animation(Motion.animation(.easeOut(duration: 0.12)), value: hover)
         }
     }
 }
 
-/// A live line chart; new samples come in from the right until the history is full.
-struct Sparkline: View {
-    let series: [(values: [Double], color: Color)]
-    let capacity: Int
-    var maxValue: Double?
+/// Square footer buttons.
+struct TraySquareStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Square(label: configuration.label, pressed: configuration.isPressed) }
+
+    private struct Square<Label: View>: View {
+        let label: Label
+        let pressed: Bool
+        @State private var hover = false
+        var body: some View {
+            label
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(width: 26, height: 26)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.primary.opacity(pressed ? 0.32 : hover ? 0.24 : 0.16)))
+                .contentShape(Rectangle())
+                .onHover { hover = $0 }
+                .animation(Motion.animation(.easeOut(duration: 0.12)), value: hover)
+        }
+    }
+}
+
+/// "Show TidyMac": plain text that brightens under the pointer.
+struct TrayTextStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Body(label: configuration.label, pressed: configuration.isPressed) }
+
+    private struct Body<Label: View>: View {
+        let label: Label
+        let pressed: Bool
+        @State private var hover = false
+        var body: some View {
+            label
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.primary.opacity(pressed ? 0.6 : hover ? 1 : 0.88))
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .contentShape(Rectangle())
+                .onHover { hover = $0 }
+        }
+    }
+}
+
+/// The Smart Care live background in Dark Mode, a pale version of it in Light Mode.
+struct TrayBackground: View {
+    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        LiveBackground(palette: scheme == .dark ? Module.smartCare.live : Module.smartCare.live.light(base: 0xF6EEFC))
+            .ignoresSafeArea()
+    }
+}
+
+/// The Mac in the menu header, a cyan laptop standing on a glow in the colour of its Mac Health state. The glow breathes slowly.
+struct HealthGlow: View {
+    let color: Color
 
     var body: some View {
-        GeometryReader { g in
-            let top = maxValue ?? max(series.flatMap(\.values).max() ?? 0, 1)
+        Cycle(period: 4.8) { wave, _ in
             ZStack {
-                ForEach(series.indices, id: \.self) { i in
-                    let pts = points(series[i].values, size: g.size, top: top)
-                    if let first = pts.first, let last = pts.last {
-                        Path { p in
-                            p.move(to: CGPoint(x: first.x, y: g.size.height)); pts.forEach { p.addLine(to: $0) }
-                            p.addLine(to: CGPoint(x: last.x, y: g.size.height)); p.closeSubpath()
-                        }
-                        .fill(LinearGradient(colors: [series[i].color.opacity(0.35), series[i].color.opacity(0)], startPoint: .top, endPoint: .bottom))
-                        Path { p in p.addLines(pts) }
-                            .stroke(series[i].color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-                    }
-                }
+                Ellipse().fill(RadialGradient(colors: [color.opacity(0.9), color.opacity(0)], center: .center, startRadius: 0, endRadius: 34))
+                    .frame(width: 70, height: 24)
+                    .offset(y: 17)
+                    .blur(radius: 5)
+                    .opacity(0.5 + 0.4 * wave)
+                    .scaleEffect(0.94 + 0.12 * wave)
+                Image(systemName: "laptopcomputer").font(.system(size: 40, weight: .regular))
+                    .foregroundStyle(LinearGradient(colors: [Color(hex: 0xB4F0FF), Color(hex: 0x3DA8F2)], startPoint: .top, endPoint: .bottom))
+                    .shadow(color: Color(hex: 0x55CEFE).opacity(0.45), radius: 6, y: 2)
             }
         }
-        .frame(height: 54)
-        .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 8).fill(.primary.opacity(0.05)))
-    }
-
-    func points(_ values: [Double], size: CGSize, top: Double) -> [CGPoint] {
-        let step = size.width / CGFloat(max(capacity - 1, 1))
-        let start = CGFloat(capacity - values.count) * step
-        return values.enumerated().map { i, v in
-            CGPoint(x: start + CGFloat(i) * step, y: size.height * (1 - CGFloat(min(max(v / top, 0), 1))))
-        }
+        .frame(width: 66, height: 48)
+        .animation(Motion.animation(.easeInOut(duration: 0.6)), value: color)
     }
 }
 
-/// A horizontal bar split into coloured parts, like the memory chart's groups.
-struct SegmentBar: View {
-    let parts: [(value: Double, color: Color)]
-    var body: some View {
-        GeometryReader { g in
-            let total = max(parts.reduce(0) { $0 + $1.value }, 1)
-            HStack(spacing: 2) {
-                ForEach(parts.indices, id: \.self) { i in
-                    Rectangle().fill(parts[i].color).frame(width: max(0, (g.size.width - CGFloat(parts.count - 1) * 2) * parts[i].value / total))
-                }
-            }
-            .clipShape(Capsule())
-        }
-        .frame(height: 8)
-    }
-}
+/// Hands back the window a view is in (the menu bar panel), once it is in one.
+struct WindowReader: NSViewRepresentable {
+    let found: (NSWindow?) -> Void
+    func makeNSView(context: Context) -> NSView { Probe(found: found) }
+    func updateNSView(_ nsView: NSView, context: Context) {}
 
-/// Small tags that wrap onto new lines ("Good for:" activities).
-struct FlowRow: View {
-    let items: [String]
-    var body: some View {
-        // Two fixed columns are enough for the six speed test activities.
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 4) {
-            ForEach(items, id: \.self) { item in
-                Label(item, systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.primary)
-                    .symbolRenderingMode(.hierarchical)
-            }
+    private final class Probe: NSView {
+        let found: (NSWindow?) -> Void
+        init(found: @escaping (NSWindow?) -> Void) { self.found = found; super.init(frame: .zero) }
+        required init?(coder: NSCoder) { nil }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            let window = window
+            DispatchQueue.main.async { self.found(window) }
         }
     }
 }
