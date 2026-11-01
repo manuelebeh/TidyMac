@@ -32,8 +32,8 @@ struct SpaceLensScreen: View {
                         }.padding(.top, 12)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.bottom, 110)
-                ScanButton(title: "Scan", module: module) { selected = [:]; message = nil; path = [Paths.home] }.padding(.bottom, 22)
+                .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.bottom, 90)
+                EdgeButton { ScanButton(title: "Scan", module: module) { selected = [:]; message = nil; path = [Paths.home] } }
             } else {
                 map
             }
