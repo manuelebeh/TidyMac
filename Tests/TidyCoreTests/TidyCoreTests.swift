@@ -233,6 +233,97 @@ final class TidyCoreTests: XCTestCase {
         XCTAssertEqual(kinds, [.lowDiskSpace, .trashSize, .trashedApps])
     }
 
+    func testTrayIssuesForFrozenAppsDevicesAndDrives() {
+        let s = SystemMonitor.Storage(name: "HD", total: 500_000_000_000, available: 200_000_000_000)
+        let m = SystemMonitor.Memory(total: 1, active: 0, wired: 0, compressed: 0, available: 1, swapUsed: 0, pressureLevel: 1)
+        let mouse = SystemMonitor.BluetoothDevice(name: "Mouse", kind: "Mouse", batteries: [.init(label: "", percent: 10)])
+        let pods = SystemMonitor.BluetoothDevice(name: "AirPods", kind: "Headphones", batteries: [.init(label: "Case", percent: 5), .init(label: "Left", percent: 90)])
+        let usb = SystemMonitor.Drive(url: URL(fileURLWithPath: "/Volumes/USB"), name: "USB", total: 64_000_000_000, available: 2_000_000_000, format: nil, isDiskImage: false)
+        let issues = SystemMonitor.issues(storage: s, memory: m, trashSize: nil, trashedApps: 0, hungApps: ["Pages"], bluetooth: [mouse, pods], drives: [usb])
+        XCTAssertEqual(issues.map(\.kind), [.hungApps, .bluetoothLow, .externalFull])
+        XCTAssertTrue(issues[0].detail.hasPrefix("Pages is not responding"))
+        XCTAssertTrue(issues[1].detail.contains("Mouse (10%)"))
+        XCTAssertFalse(issues[1].detail.contains("AirPods"), "a low charging case alone does not count")
+    }
+
+    func testIgnoredIssuesComeBackWhenDue() throws {
+        let s = SystemMonitor.Storage(name: "HD", total: 500_000_000_000, available: 5_000_000_000)
+        let m = SystemMonitor.Memory(total: 1, active: 0, wired: 0, compressed: 0, available: 1, swapUsed: 0, pressureLevel: 4)
+        let issues = SystemMonitor.issues(storage: s, memory: m, trashSize: nil, trashedApps: 0)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        var ignored = SystemMonitor.IgnoredIssues()
+        ignored.ignore(.lowDiskSpace, .day, now: now)
+        ignored.ignore(.heavyMemory, .forever, now: now)
+        XCTAssertEqual(ignored.visible(issues, now: now).count, 0)
+        XCTAssertEqual(ignored.visible(issues, now: now.addingTimeInterval(86_401)).map(\.kind), [.lowDiskSpace])
+
+        let cal = Calendar(identifier: .gregorian)
+        let tomorrow = SystemMonitor.IgnoreOption.untilTomorrow.until(from: now, calendar: cal)
+        XCTAssertEqual(tomorrow, cal.startOfDay(for: now.addingTimeInterval(86_400)))
+
+        let d = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
+        ignored.save(d)
+        XCTAssertEqual(SystemMonitor.IgnoredIssues.load(d), ignored)
+    }
+
+    func testMetricSeverities() {
+        func mem(_ level: Int, swap: Int64 = 0) -> SystemMonitor.Memory {
+            .init(total: 16_000_000_000, active: 0, wired: 0, compressed: 0, available: 1, swapUsed: swap, pressureLevel: level)
+        }
+        XCTAssertEqual([1, 2, 4].map { Metric.memoryPressure(mem($0)).severity }, [.normal, .warning, .critical])
+        XCTAssertEqual(Metric.swap(mem(1, swap: 5_000_000_000)).severity, .warning)
+        XCTAssertEqual(Metric.uptime(6 * 86_400).severity, .normal)
+        XCTAssertEqual(Metric.uptime(8 * 86_400).severity, .warning)
+        XCTAssertEqual(Metric.uptime(8 * 86_400 + 3 * 3600).value, "8d 3h")
+        XCTAssertEqual([100, 85, 75, 60].map { Metric.batteryHealth($0).severity }, [.normal, .normal, .warning, .critical])
+        XCTAssertEqual(Metric.batteryHealth(85).detail, "Your battery is in good condition, but already lost some capacity.")
+        XCTAssertEqual(Metric.batteryTemperature(42).severity, .warning)
+        XCTAssertEqual(Metric.driveHealth(.failing).severity, .critical)
+    }
+
+    func testNetworkSecurityRatings() {
+        XCTAssertEqual(SystemMonitor.WiFiSecurity(coreWLAN: 0)?.rating, .open)
+        XCTAssertEqual(SystemMonitor.WiFiSecurity(coreWLAN: 1)?.rating, .weak)
+        XCTAssertEqual(SystemMonitor.WiFiSecurity(coreWLAN: 4)?.rating, .good)
+        XCTAssertEqual(SystemMonitor.WiFiSecurity(coreWLAN: 11)?.rating, .strong)
+        XCTAssertNil(SystemMonitor.WiFiSecurity(coreWLAN: Int.max), "kCWSecurityUnknown")
+
+        let open = SystemMonitor.NetworkInfo(kind: .wifi, interface: "en0", name: nil, security: .init(coreWLAN: 0))
+        XCTAssertEqual(Metric.networkSecurity(open)?.severity, .critical)
+        let wpa3 = SystemMonitor.NetworkInfo(kind: .wifi, interface: "en0", name: "Home", security: .init(coreWLAN: 11))
+        XCTAssertEqual(Metric.networkSecurity(wpa3)?.detail, "Your network security settings are rated as Strong (WPA3 Personal). You’re good!")
+        let wired = SystemMonitor.NetworkInfo(kind: .wired, interface: "en5", name: nil, security: nil)
+        XCTAssertEqual(Metric.networkSecurity(wired)?.value, "Strong")
+        XCTAssertNil(Metric.networkSecurity(.init(kind: .wifi, interface: "en0", name: nil, security: nil)))
+    }
+
+    func testSpeedTestLegend() {
+        let mbit = 1_000_000.0 / 8
+        XCTAssertEqual(SystemMonitor.goodFor(download: 0.2 * mbit, upload: 0.1 * mbit), [])
+        XCTAssertEqual(SystemMonitor.goodFor(download: 3 * mbit, upload: 1 * mbit), ["Messaging", "Audio calls", "Music streaming"])
+        XCTAssertEqual(SystemMonitor.goodFor(download: 100 * mbit, upload: 20 * mbit).count, 6)
+    }
+
+    func testBatteryChartStatus() {
+        func battery(charging: Bool, plugged: Bool, charged: Bool) -> SystemMonitor.Battery {
+            .init(percent: 50, isCharging: charging, isPluggedIn: plugged, isCharged: charged, minutesRemaining: 135, minutesToFull: 40,
+                  cycleCount: nil, healthPercent: nil, temperature: nil)
+        }
+        XCTAssertEqual(battery(charging: true, plugged: true, charged: false).chartStatus.detail, "40 min until full")
+        XCTAssertEqual(battery(charging: false, plugged: false, charged: false).chartStatus.detail, "About 2 h 15 min until empty")
+        XCTAssertEqual(battery(charging: false, plugged: true, charged: true).chartStatus.title, "Fully Charged")
+    }
+
+    func testNetworkCountersAre64Bit() {
+        let counters = SystemMonitor.interfaceCounters()
+        XCTAssertTrue(counters.contains { $0.name == "lo0" }, "the loopback interface is always listed")
+        XCTAssertTrue(counters.contains { $0.name.hasPrefix("en") }, "interfaces after the first are read too")
+        _ = SystemMonitor.network()
+        let n = SystemMonitor.network()
+        XCTAssertGreaterThanOrEqual(n.download, 0)
+        XCTAssertGreaterThanOrEqual(n.received, 0)
+    }
+
     func testBubblePackingDoesNotOverlap() {
         let b = SpaceLens.pack([100, 80, 50, 50, 20, 10, 5], radius: 200)
         XCTAssertEqual(b.count, 7)

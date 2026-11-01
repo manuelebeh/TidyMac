@@ -6,6 +6,7 @@ import UserNotifications
 struct TidyMacApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @StateObject private var app = AppState()
+    @StateObject private var monitor = MonitorModel()
 
     var body: some Scene {
         WindowGroup("TidyMac", id: "main") {
@@ -28,9 +29,9 @@ struct TidyMacApp: App {
 
         // Equivalent of CleanMyMac's separate "CleanMyMac Menu" login item.
         MenuBarExtra {
-            TrayView(app: app)
+            TrayView(app: app, monitor: monitor)
         } label: {
-            Image(systemName: "sparkles")
+            Image(nsImage: MenuBarIcon.image(attention: monitor.needsAttention))
         }
         .menuBarExtraStyle(.window)
     }
@@ -59,11 +60,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let i = args.firstIndex(of: "--snapshot-tray") ?? args.firstIndex(of: "--snapshot-screen-clean"), i + 1 < args.count {
             MainActor.assumeIsolated {
-                // `--snapshot-tray <png> [card]` opens that card's details (storage, memory, cpu, drives, devices…).
-                let monitor = MonitorModel()
+                // `--snapshot-tray <png> [card] [--light]` opens that card's details (storage, memory, cpu, drives, devices…).
+                let monitor = MonitorModel(background: false)
                 if args[i] == "--snapshot-tray" { monitor.loadAllNow() }
                 let card = i + 2 < args.count ? TrayView.Card(rawValue: args[i + 2]) : nil
-                let content: AnyView = args[i] == "--snapshot-tray" ? AnyView(TrayView(app: AppState(), monitor: monitor, detail: card, scrolls: false))
+                let content: AnyView = args[i] == "--snapshot-tray" ? AnyView(TrayView(app: AppState(), monitor: monitor, detail: card, scrolls: false)
+                    .environment(\.colorScheme, args.contains("--light") ? .light : .dark))
                     : AnyView(ScreenCleaningOverlay(session: ScreenCleaningSession(), main: true).frame(width: 1280, height: 800))
                 let renderer = ImageRenderer(content: content)
                 renderer.scale = 2
