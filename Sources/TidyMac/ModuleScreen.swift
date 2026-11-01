@@ -118,8 +118,8 @@ struct ModuleScreen: View {
             .id(controller.phase == .running ? .scanning : controller.phase)
             .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.97)), removal: .opacity))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.bottom, 130)
-            bottomButton.padding(.bottom, 8)
+            .padding(.bottom, 96)
+            EdgeButton { bottomButton }
         }
         .animation(Motion.animation(.easeInOut(duration: 0.35)), value: controller.phase)
         .sheet(isPresented: $controller.reviewing) { ReviewSheet(controller: controller) }
