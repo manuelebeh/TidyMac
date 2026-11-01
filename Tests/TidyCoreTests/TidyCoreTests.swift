@@ -700,4 +700,63 @@ extension TidyCoreTests {
         XCTAssertEqual(trashed, ["Tidy Test.app@Applications", "Tidy Test.app@Downloads"])
         XCTAssertFalse(FileManager.default.fileExists(atPath: bundle.path))
     }
+
+    func testScheduledAutomationRunsOncePerSlotAndCatchesUp() {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
+        func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date { cal.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))! }
+        // Mondays at 10:00; 2 November 2026 is a Monday.
+        let rule = Automations.Rule(name: "Weekly", trigger: .schedule(.init(frequency: .weekly, hour: 10, weekday: 2)), categories: ["user-cache"], created: at(1, 12))
+        var state = Automations.State()
+        func due(_ now: Date) -> Int { Automations.due([rule], .init(), state: &state, now: now, calendar: cal).count }
+        XCTAssertEqual(due(at(2, 9, 59)), 0)
+        XCTAssertEqual(due(at(2, 10)), 1)
+        XCTAssertEqual(due(at(2, 10, 1)), 0)
+        // The 9 November slot was missed while the Mac was off.
+        XCTAssertEqual(due(at(10, 8)), 1)
+        XCTAssertEqual(due(at(10, 12)), 0)
+        // A rule added after this week's slot waits for the next one.
+        var late = rule; late.id = UUID(); late.created = at(2, 11)
+        XCTAssertTrue(Automations.due([late], .init(), state: &state, now: at(2, 11, 1), calendar: cal).isEmpty)
+        XCTAssertEqual(Automations.Schedule(frequency: .monthly, hour: 3, day: 15).previous(at(20, 0), calendar: cal), at(15, 3))
+    }
+
+    func testConditionAutomationRunsWhenItAppearsAndRearms() {
+        var rule = Automations.Rule(name: "Low", trigger: .freeSpaceBelow(10_000_000_000), categories: ["user-cache"])
+        var state = Automations.State()
+        func due(_ free: Int64?) -> Int { Automations.due([rule], .init(freeSpace: free), state: &state).count }
+        XCTAssertEqual(due(5_000_000_000), 1)
+        XCTAssertEqual(due(4_000_000_000), 0)
+        // An unknown reading changes nothing.
+        XCTAssertEqual(due(nil), 0)
+        XCTAssertEqual(due(5_000_000_000), 0)
+        XCTAssertEqual(due(20_000_000_000), 0)
+        XCTAssertEqual(due(5_000_000_000), 1)
+        // Turned off, it does not run; turned back on while the condition holds, it does.
+        rule.enabled = false
+        XCTAssertEqual(due(5_000_000_000), 0)
+        rule.enabled = true
+        XCTAssertEqual(due(5_000_000_000), 1)
+    }
+
+    func testAutomationsSkipWhatNeedsAnAdministrator() throws {
+        let u = try write("x.bin", 10)
+        XCTAssertTrue(Automations.runsUnattended(.trash(u)))
+        XCTAssertTrue(Automations.runsUnattended(.delete(u)))
+        XCTAssertFalse(Automations.runsUnattended(.delete(URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"))))
+        XCTAssertFalse(Automations.runsUnattended(.adminDelete(u)))
+        XCTAssertFalse(Automations.runsUnattended(.shell("purge", admin: true)))
+        XCTAssertTrue(Automations.runsUnattended(.shell("true", admin: false)))
+    }
+
+    func testAutomationRulesRoundTrip() {
+        let d = UserDefaults(suiteName: UUID().uuidString)!
+        let rules = [Automations.Rule(name: "A", trigger: .schedule(.init(frequency: .daily, hour: 8)), categories: ["trash"], mode: .auto),
+                     Automations.Rule(name: "B", trigger: .trashOver(2_000_000_000), categories: ["trash"]),
+                     Automations.Rule(name: "C", trigger: .driveConnected, categories: ["trash"])]
+        Automations.save(rules, d)
+        XCTAssertEqual(Automations.load(d), rules)
+        XCTAssertEqual(Automations.onDriveConnected(rules).map(\.name), ["C"])
+        XCTAssertTrue(Automations.needs(rules).trash)
+        XCTAssertFalse(Automations.needs(rules).drives)
+    }
 }

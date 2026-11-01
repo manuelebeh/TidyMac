@@ -14,9 +14,8 @@ public struct SmartCareEngine: ScanEngine {
         async let updates = s.scansSmartCare("applications") ? ApplicationsEngine.updates(for: Uninstaller.installedApps()).items : []
         async let clutter = s.scansSmartCare("clutter") ? Self.clutter(progress: progress) : []
 
-        // Only groups Smart Care treats as safe to run unattended keep their default selection.
-        let safeCleanup: Set<String> = ["user-cache", "user-logs", "xcode", "broken-prefs", "broken-login", "ai-junk", "mail", "trash"]
-        let junk = await cleanup.filter { safeCleanup.contains($0.id) }.flatMap(\.items).filter(\.selectedByDefault)
+        // Only groups safe to run unattended keep their default selection.
+        let junk = await cleanup.filter { CleanupEngine.unattended.contains($0.id) }.flatMap(\.items).filter(\.selectedByDefault)
         let tasks = await performance.first { $0.id == "maintenance" }?.items.filter(\.selectedByDefault) ?? []
 
         return [

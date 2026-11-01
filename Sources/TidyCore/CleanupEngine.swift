@@ -28,6 +28,9 @@ public struct CleanupEngine: ScanEngine {
         Category(id: "trash", title: "Trash Bins", build: trashBins),
     ]
 
+    /// Categories safe to clean with nobody watching: Smart Care keeps their selection and Settings › Automations offers them.
+    public static let unattended: Set<String> = ["user-cache", "user-logs", "xcode", "broken-prefs", "broken-login", "ai-junk", "mail", "trash"]
+
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {
         let builders = Self.categories.filter { settings.scansCleanup($0.id) }.map(\.build)
         return await withTaskGroup(of: (Int, ResultGroup?).self) { tg in
