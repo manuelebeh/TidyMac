@@ -14,7 +14,7 @@ struct SettingsView: View {
     }
 }
 
-/// Mirrors CleanMyMac's Settings › Notifications and the Menu's "Open at Login".
+/// Settings › Notifications, plus the menu's "Open at Login".
 struct NotificationSettingsView: View {
     private static let k = HealthAlerts.Settings.defaultsKey
     private static let d = HealthAlerts.Settings()
@@ -139,7 +139,7 @@ struct NotificationSettingsView: View {
     }
 }
 
-/// Mirrors CleanMyMac's Settings › Ignore List: sections on the left, ignored items on the right.
+/// Settings › Ignore List: sections on the left, ignored items on the right.
 struct IgnoreListSettingsView: View {
     @State private var entries: [IgnoreList.Entry] = []
     @State private var section: IgnoreList.Section?
@@ -221,7 +221,7 @@ struct IgnoreListSettingsView: View {
     private func remove(_ ids: Set<String>) { IgnoreList.remove(ids); reload() }
 }
 
-/// Mirrors CleanMyMac's Settings › Scanning: modules for Smart Care, categories for Cleanup.
+/// Settings › Scanning: modules for Smart Care, categories for Cleanup.
 struct ScanSettingsView: View {
     @State private var settings = ScanSettings.load()
 
@@ -263,7 +263,7 @@ struct ScanSettingsView: View {
     }
 }
 
-/// Mirrors CleanMyMac's Settings › General.
+/// Settings › General.
 struct GeneralSettingsView: View {
     @AppStorage(GeneralSettings.soundsKey) private var sounds = true
     @AppStorage(GeneralSettings.reduceMotionKey) private var reduceMotion = GeneralSettings.ReduceMotion.system.rawValue

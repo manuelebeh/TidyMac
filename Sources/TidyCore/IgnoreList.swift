@@ -1,6 +1,6 @@
 import Foundation
 
-/// Items the user excluded from scan results (CleanMyMac's Settings › Ignore List). Matching is by `ResultItem.id`,
+/// Items the user excluded from scan results (Settings › Ignore List). Matching is by `ResultItem.id`,
 /// so an item ignored in Smart Care is also hidden in Cleanup or My Tools. Changes apply on the next scan.
 public enum IgnoreList {
     static let key = "TidyMac.ignoreList"
@@ -16,7 +16,7 @@ public enum IgnoreList {
         public var section: Section { Section(group: category) }
     }
 
-    /// Sections follow CleanMyMac's Ignore List categories, with TidyMac's group IDs mapped onto them.
+    /// Sections group TidyMac's result group IDs into the categories shown in Settings.
     public enum Section: String, CaseIterable, Identifiable, Sendable {
         case systemJunk, aiClutter, mail, largeOld, duplicates, similar, downloads, uninstaller, updater, malware, other
 

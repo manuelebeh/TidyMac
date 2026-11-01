@@ -1,7 +1,6 @@
 import Foundation
 
-/// Settings › General, after CleanMyMac's (`Settings_General_Section_General_*`), plus the menu's
-/// "Clean up junk automatically on ejection". Stored as plain keys so the Settings window can bind them with `@AppStorage`.
+/// Settings › General, plus the menu's "Clean up junk automatically on ejection". Stored as plain keys so the Settings window can bind them with `@AppStorage`.
 public enum GeneralSettings {
     public enum ReduceMotion: String, CaseIterable, Sendable { case system = "System", enabled = "Enabled", disabled = "Disabled" }
 

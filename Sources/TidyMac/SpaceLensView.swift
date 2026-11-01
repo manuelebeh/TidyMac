@@ -2,7 +2,7 @@ import SwiftUI
 import TidyCore
 
 /// Space Lens: intro, then a bubble map of the current folder with a size list beside it.
-/// Selections are kept while moving between folders and reviewed together before removal, as in CleanMyMac.
+/// Selections are kept while moving between folders and reviewed together before removal.
 struct SpaceLensScreen: View {
     @ObservedObject var app: AppState
     @State private var path: [URL] = []

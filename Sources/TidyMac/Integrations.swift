@@ -1,8 +1,8 @@
 import AppKit
 import TidyCore
 
-/// The "Uninstall with TidyMac" service declared in Info.plist (`NSServices`). CleanMyMac adds the same item with a
-/// Finder Sync extension; a service needs no extension, which a SwiftPM build cannot produce.
+/// The "Uninstall with TidyMac" service declared in Info.plist (`NSServices`). A service rather than a Finder Sync
+/// extension, since a SwiftPM build cannot produce an extension.
 final class FinderService: NSObject {
     static let shared = FinderService()
 

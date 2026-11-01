@@ -1,6 +1,6 @@
 import Foundation
 
-/// Background alerts, after CleanMyMac's HealthMonitor login item and its Menu "issues":
+/// Background alerts, matching the menu's issues:
 /// low disk space, Trash over the user's limit, heavy memory usage, critical battery health and threats.
 /// The rules are pure so they can be tested; `TidyMac.HealthMonitor` feeds them readings and posts notifications.
 public enum HealthAlerts {
@@ -16,7 +16,7 @@ public enum HealthAlerts {
         public let target: String
     }
 
-    /// Settings → Notifications in CleanMyMac. Thresholds are TidyMac's defaults; CleanMyMac lets the user pick them too.
+    /// Settings › Notifications. The free space and Trash limits can be changed there.
     public struct Settings: Sendable, Equatable {
         public var lowDisk = true
         public var freeSpaceLimit: Int64 = 10_000_000_000
@@ -37,7 +37,7 @@ public enum HealthAlerts {
         public var trashedApps = true
         public init() {}
 
-        /// CleanMyMac's reminder options: Once in 3 Days, Weekly, Every 2 Weeks, Monthly.
+        /// Reminder options: Once in 3 Days, Weekly, Every 2 Weeks, Monthly.
         public static let smartCareIntervals: [(days: Int, title: String)] = [(3, "Once in 3 Days"), (7, "Weekly"), (14, "Every 2 Weeks"), (30, "Monthly")]
 
         public static let defaultsKey = "TidyMac.alerts"
@@ -103,7 +103,7 @@ public enum HealthAlerts {
         public func save(_ d: UserDefaults = .standard) {
             if let data = try? JSONEncoder().encode(self) { d.set(data, forKey: Self.defaultsKey) }
         }
-        /// CleanMyMac's "Ignore" menu: for a day, 3 days, a week, forever.
+        /// The "Ignore" menu: for a day, 3 days, a week, forever.
         public mutating func ignore(_ key: String, for interval: TimeInterval?, now: Date = Date()) {
             snoozed[key] = interval.map { now.addingTimeInterval($0) } ?? .distantFuture
         }
@@ -111,7 +111,7 @@ public enum HealthAlerts {
 
     /// Memory pressure has to stay at "warning" this long before it is worth a notification; "critical" alerts at once.
     public static let memoryGrace: TimeInterval = 5 * 60
-    /// Bluetooth battery level that counts as low; CleanMyMac's own threshold is not in its resources.
+    /// Bluetooth battery level that counts as low.
     public static let bluetoothLowLevel = 20
 
     /// Chrome counts as heavy above a quarter of the RAM, and never below 2 GB (TidyMac's threshold).

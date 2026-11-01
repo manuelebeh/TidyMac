@@ -18,7 +18,7 @@ enum RunningApps {
     }
 }
 
-/// Mirrors CleanMyMac's ApplicationsTerminator: Quit / Quit All, Force Quit for apps that do not quit,
+/// Asks to quit the apps holding files about to be removed: Quit / Quit All, Force Quit for apps that do not quit,
 /// or Ignore and Continue. It continues on its own once every app has quit.
 struct QuitAppsSheet: View {
     @State var apps: [NSRunningApplication]

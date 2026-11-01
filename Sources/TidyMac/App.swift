@@ -29,7 +29,7 @@ struct TidyMacApp: App {
             SettingsView()
         }
 
-        // Equivalent of CleanMyMac's separate "CleanMyMac Menu" login item.
+        // The menu bar item, which keeps running after the main window closes.
         MenuBarExtra {
             TrayView(app: app, monitor: monitor)
         } label: {

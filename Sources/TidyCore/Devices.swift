@@ -1,7 +1,7 @@
 import DiskArbitration
 import Foundation
 
-/// Readings behind CleanMyMac Menu's Top Consumers, External Drives, Connected Devices and drive health.
+/// Readings behind the menu's Top Consumers, External Drives, Connected Devices and drive health.
 extension SystemMonitor {
 
     // MARK: Top Consumers
@@ -60,7 +60,7 @@ extension SystemMonitor {
         public init(url: URL, name: String, total: Int64, available: Int64, format: String?, isDiskImage: Bool) {
             self.url = url; self.name = name; self.total = total; self.available = available; self.format = format; self.isDiskImage = isDiskImage
         }
-        /// CleanMyMac's "Connected disk is almost full": under 10% free.
+        /// "Connected disk is almost full": under 10% free.
         public var almostFull: Bool { !isDiskImage && total > 0 && available * 10 < total }
     }
 
@@ -131,7 +131,6 @@ extension SystemMonitor {
     // MARK: Drive health
 
     public enum DriveHealth: Sendable { case good, failing, unknown
-        /// CleanMyMac Menu's wording.
         public var text: String {
             switch self {
             case .good: "This drive is in good condition."
@@ -141,7 +140,7 @@ extension SystemMonitor {
         }
     }
 
-    /// The startup disk's S.M.A.R.T. status. macOS only exposes pass/fail, not the wear level CleanMyMac reads with its helper.
+    /// The startup disk's S.M.A.R.T. status. macOS only exposes pass/fail, not a wear level, which would need a privileged helper.
     public static func driveHealth() -> DriveHealth {
         let out = Shell.run("/usr/sbin/diskutil", ["info", "-plist", "/"]).output
         guard let plist = try? PropertyListSerialization.propertyList(from: Data(out.utf8), format: nil) as? [String: Any],

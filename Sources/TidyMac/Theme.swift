@@ -7,7 +7,7 @@ extension Color {
     }
 }
 
-/// Sidebar modules, in CleanMyMac's order, with the palette sampled from its screenshots.
+/// Sidebar modules, in display order, with each module's palette.
 enum Module: String, CaseIterable, Identifiable {
     case smartCare, cleanup, protection, performance, applications, clutter, spaceLens, myTools, activity
     var id: String { rawValue }

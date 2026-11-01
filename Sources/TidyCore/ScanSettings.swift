@@ -1,6 +1,6 @@
 import Foundation
 
-/// Settings › Scanning (CleanMyMac's "Modules to scan using Smart Care" and "Categories to scan using Cleanup").
+/// Settings › Scanning: "Modules to scan using Smart Care" and "Categories to scan using Cleanup".
 /// Stored as what is turned off, so modules and categories added later are on by default.
 /// My Tools ignores these settings: a tool runs the one check the user picked.
 public struct ScanSettings: Codable, Sendable, Equatable {

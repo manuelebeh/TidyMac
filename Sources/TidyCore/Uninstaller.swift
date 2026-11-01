@@ -4,7 +4,7 @@ import Foundation
 public struct InstalledApp: Identifiable, Sendable {
     public enum Kind: Sendable { case app, audioPlugin }
 
-    /// Where the app came from (CleanMyMac's Stores filter).
+    /// Where the app came from (the Stores filter).
     public enum Store: String, CaseIterable, Sendable { case appStore = "App Store", setapp = "Setapp", steam = "Steam", other = "Other" }
 
     public var id: URL { url }
@@ -19,13 +19,13 @@ public struct InstalledApp: Identifiable, Sendable {
 
     public var vendor: Vendor { Vendor(bundleID: bundleID) }
 
-    /// Not opened for six months (CleanMyMac's Unused filter). Apps without a Spotlight date are not counted.
+    /// Not opened for six months (the Unused filter). Apps without a Spotlight date are not counted.
     public func isUnused(now: Date = Date()) -> Bool {
         lastUsed.map { now.timeIntervalSince($0) > 182 * 86_400 } ?? false
     }
 }
 
-/// CleanMyMac's Vendors filter, by bundle ID prefix.
+/// The Vendors filter, by bundle ID prefix.
 public enum Vendor: String, CaseIterable, Sendable {
     case apple = "Apple", adobe = "Adobe", google = "Google", jetBrains = "JetBrains", microsoft = "Microsoft", other = "Other"
 
@@ -38,7 +38,7 @@ public enum Vendor: String, CaseIterable, Sendable {
 }
 
 public struct Leftover: Identifiable, Hashable, Sendable {
-    /// Resource groups from CleanMyMac's Uninstaller (`resource_group_*`).
+    /// How the Uninstaller groups the files it found.
     public enum Kind: String, CaseIterable, Sendable {
         case supportingFiles = "Supporting Files", preferences = "Preferences", caches = "Caches", container = "Container",
              logs = "Logs", crashes = "Crashes", launchItems = "Login Items", binaries = "Binaries", plugins = "Plugins",
@@ -94,7 +94,7 @@ public enum Uninstaller {
     }
 
     /// `tidymac://uninstall?path=/Applications/Foo.app` opens the Uninstaller on that app. Finder's service uses it,
-    /// and Shortcuts can call it with "Open URLs" (CleanMyMac ships an "Uninstall Application" intent instead).
+    /// and Shortcuts can call it with "Open URLs".
     public static func uninstallURL(for app: URL) -> URL {
         var c = URLComponents()
         c.scheme = "tidymac"; c.host = "uninstall"

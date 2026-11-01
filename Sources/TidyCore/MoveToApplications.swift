@@ -1,6 +1,6 @@
 import Foundation
 
-/// "Move to Applications folder" on first launch, as CleanMyMac offers. Running from Downloads or a disk image breaks
+/// "Move to Applications folder" on first launch. Running from Downloads or a disk image breaks
 /// Open at Login and updates, so TidyMac copies itself to /Applications and relaunches from there.
 public enum MoveToApplications {
     public static let declinedKey = "TidyMac.moveToApplicationsDeclined"

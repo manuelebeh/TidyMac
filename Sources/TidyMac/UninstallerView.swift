@@ -1,7 +1,7 @@
 import SwiftUI
 import TidyCore
 
-/// The Uninstaller's list filters (CleanMyMac's `uninstaller_filter_*`).
+/// The Uninstaller's list filters.
 enum UninstallerFilter: Hashable {
     case all, unused, store(InstalledApp.Store), vendor(Vendor), audioPlugins
 
@@ -215,7 +215,7 @@ struct UninstallerSheet: View {
         }
     }
 
-    /// Asks to quit the app (and anything holding its files) first, as CleanMyMac's Uninstaller does.
+    /// Asks to quit the app (and anything holding its files) first.
     func uninstall(_ a: InstalledApp) {
         let apps = RunningApps.related(to: [a.url] + leftovers.map(\.url))
         if apps.isEmpty { remove(a) } else { pending = (a, apps) }

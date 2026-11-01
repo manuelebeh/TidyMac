@@ -145,7 +145,7 @@ final class MonitorModel: ObservableObject {
         Task { consumers = await Task.detached { SystemMonitor.consumers() }.value }
     }
 
-    /// CleanMyMac Menu offers Quit and Force Quit for apps; plain processes are left alone.
+    /// Quit and Force Quit are offered for apps; plain processes are left alone.
     func quit(_ c: SystemMonitor.Consumer, force: Bool) {
         guard let pid = c.pid, let app = NSRunningApplication(processIdentifier: pid) else { return }
         _ = force ? app.forceTerminate() : app.terminate()
@@ -182,7 +182,7 @@ final class MonitorModel: ObservableObject {
         }
     }
 
-    /// `purge` needs root; CleanMyMac uses its privileged helper, TidyMac asks for the password.
+    /// `purge` needs root, so TidyMac asks for the password; there is no privileged helper.
     func freeUpMemory() {
         freeingMemory = true
         Task {
@@ -220,7 +220,7 @@ final class MonitorModel: ObservableObject {
 }
 
 /// Apps the window server marks as not responding (the spinning cursor), through SkyLight's `CGSEventIsAppUnresponsive`.
-/// CleanMyMac Menu imports the related `CGSRegisterNotifyProc`. Private API: when a symbol is missing, nothing is reported.
+/// Private API: when a symbol is missing, nothing is reported.
 enum HungApps {
     private typealias MainConnection = @convention(c) () -> Int32
     private typealias IsUnresponsive = @convention(c) (Int32, UnsafePointer<ProcessSerialNumber>) -> Bool
@@ -245,7 +245,7 @@ enum HungApps {
     }
 }
 
-/// The menu bar icon, with a dot like CleanMyMac's `MonitorAttentionBadgeIcon` when an issue needs attention.
+/// The menu bar icon, with a dot when an issue needs attention.
 /// It stays a template image so macOS tints it for light and dark menu bars.
 enum MenuBarIcon {
     static func image(attention: Bool) -> NSImage {
@@ -283,7 +283,7 @@ struct TrayView: View {
         static let defaultValue: CGFloat = 0
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
     }
-    /// Devices listed before "Show more" (CleanMyMac's `maxVisibleRowsCount`; its value is not in the binary's strings).
+    /// Devices listed before "Show more".
     static let visibleDevices = 4
 
     /// ImageRenderer (`--snapshot-tray`) cannot draw scroll views.
@@ -340,7 +340,7 @@ struct TrayView: View {
 
     // MARK: Header
 
-    /// CleanMyMac shows the Mac model with a glow in the colour of its Mac Health state.
+    /// The Mac model with a glow in the colour of its Mac Health state.
     var header: some View {
         let state = monitor.health?.state
         let color = state?.color(scheme) ?? .secondary
@@ -416,7 +416,7 @@ struct TrayView: View {
                            action: (monitor.testingSpeed ? "Testing..." : "Test Speed", monitor.testingSpeed, { monitor.runSpeedTest(); detail = .network })) { toggle(.network) }
     }
 
-    /// CleanMyMac shows its real-time malware monitor here; TidyMac has on-demand checks only.
+    /// TidyMac has no real-time malware monitor; this shows the on-demand checks.
     var protectionCard: some View {
         MonitorCard(title: "Protection", symbol: "hand.raised.fill", tint: Module.protection.accent, fraction: nil,
                     value: "On-demand malware check", hint: "Open Protection", selected: false,
@@ -475,7 +475,7 @@ struct TrayView: View {
         row("Capacity", formatSize(s.total)); row("Used", formatSize(s.total - s.available)); row("Available", formatSize(s.available))
         if let h = monitor.driveHealth { MetricRow(metric: Metric.driveHealth(h)) }
         sectionTitle("Components")
-        // CleanMyMac's Trash component, with its own Free Up.
+        // The Trash, with its own Free Up.
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "trash.fill").foregroundStyle(.primary).frame(width: 26, height: 26)
                 .background(RoundedRectangle(cornerRadius: 7).fill(Module.cleanup.accent.opacity(0.4)))
@@ -718,7 +718,7 @@ struct TrayView: View {
         }
     }
 
-    /// Icon, module colour and button for each issue, after CleanMyMac's `Recommendation*` icons and issue buttons.
+    /// Icon, module colour and button for each issue.
     static func look(_ kind: SystemMonitor.Issue.Kind) -> (symbol: String, module: Module, action: String) {
         switch kind {
         case .lowDiskSpace: ("internaldrive.fill", .cleanup, "Free Up")
@@ -812,7 +812,6 @@ struct MonitorCard: View {
                 Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(.primary)
                     .frame(width: 26, height: 26).background(RoundedRectangle(cornerRadius: 7).fill(tint.opacity(0.5)))
                     .overlay(alignment: .topTrailing) {
-                        // CleanMyMac's SimpleMonitorBadgeView.
                         if severity > .normal {
                             Circle().fill(severity.color).frame(width: 9, height: 9).offset(x: 3, y: -3)
                         }
@@ -842,7 +841,7 @@ struct MonitorCard: View {
     }
 }
 
-/// A detail row with a value coloured by severity and a line explaining it (CleanMyMac's metric rows).
+/// A detail row with a value coloured by severity and a line explaining it.
 struct MetricRow: View {
     let metric: Metric
     var body: some View {

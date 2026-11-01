@@ -1,6 +1,6 @@
 import Foundation
 
-/// What My Activity counts, named after CleanMyMac's `StatisticsDashboard_TimeSaved_Category_*` strings.
+/// What My Activity counts, one category per kind of work TidyMac does.
 public enum ActivityCategory: String, CaseIterable, Codable, Sendable {
     case systemJunk, mailAttachments, trashBin, privacyItems, appPermissions, backgroundItems, loginItems,
          maintenanceTasks, leftovers, installers, applicationsUpdated, applicationsUninstalled,
@@ -67,7 +67,7 @@ public enum ActivityCategory: String, CaseIterable, Codable, Sendable {
     }
 
     /// Minutes a person would spend doing this by hand: finding where it lives, deciding, removing it.
-    /// CleanMyMac's own figures are not in its resources; these are TidyMac's estimates.
+    /// These are TidyMac's estimates.
     var minutes: (perRun: Double, perItem: Double) {
         switch self {
         case .systemJunk: (10, 0.2)
@@ -187,7 +187,7 @@ public struct ActivitySummary: Sendable {
     }
     public typealias Entry = History.Entry
 
-    /// `StatisticsDashboard_TimeSaved_Hint_*`, chosen by this month's total.
+    /// A line of encouragement, chosen by this month's total.
     public var timeSavedHint: String {
         switch minutesThisMonth {
         case 0: "Time savings dipped. Easy to improve!"
@@ -203,7 +203,7 @@ public struct ActivitySummary: Sendable {
     }
 }
 
-/// "Mac Health" with the recommendations that make it up (`MacStatePopover_*` / `MacState_*` strings).
+/// "Mac Health" with the recommendations that make it up .
 public struct MacHealth: Sendable {
     public enum State: String, Sendable { case excellent = "Excellent", good = "Good", normal = "Fair", requiresAttention = "Requires Attention", critical = "Critical" }
 
@@ -230,7 +230,7 @@ public struct MacHealth: Sendable {
         }
     }
 
-    /// CleanMyMac does not ship its scoring; TidyMac grades by the number of open recommendations.
+    /// Graded by the number of open recommendations; severe ones weigh more.
     public init(recommendations: [Recommendation]) {
         self.recommendations = recommendations
         let severe = recommendations.filter(\.severe).count
@@ -302,7 +302,7 @@ public struct MacHealth: Sendable {
         return MacHealth(recommendations: skipped.visible(out, now: now))
     }
 
-    /// The Assistant's recommendations about apps, restarts and the drive (`Assistant_Recommendation_*` in CleanMyMac).
+    /// The Assistant's recommendations about apps, restarts and the drive.
     public static func assistant(uptime: TimeInterval, driveHealth: SystemMonitor.DriveHealth?, apps: AppFacts?) -> [Recommendation] {
         var out: [Recommendation] = []
         if driveHealth == .failing {

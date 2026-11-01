@@ -1,7 +1,6 @@
 import Foundation
 
 /// Cleanup module: System Junk, AI Clutter, Mail Attachments, Trash Bins.
-/// Group list mirrors CleanMyMac's SystemJunkScanning `ScanTasksFactory` (see REVERSE.md).
 public struct CleanupEngine: ScanEngine {
     let settings: ScanSettings
     public init(settings: ScanSettings = .load()) { self.settings = settings }
@@ -109,7 +108,7 @@ public struct CleanupEngine: ScanEngine {
 
     static func iosBackups() -> ResultGroup {
         let backups = Paths.children(Paths.library.appendingPathComponent("Application Support/MobileSync/Backup"))
-        // Newest backup per device is flagged "Latest" and never preselected, as in CleanMyMac.
+        // Newest backup per device is flagged "Latest" and never preselected.
         var byDevice: [String: (URL, Date)] = [:]
         var info: [URL: (String, Date)] = [:]
         for b in backups {

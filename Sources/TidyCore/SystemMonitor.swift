@@ -3,7 +3,7 @@ import Foundation
 import IOKit
 import IOKit.ps
 
-/// Live readings for the menu bar, mirroring CleanMyMac Menu's monitors
+/// Live readings for the menu bar's monitors
 /// (Storage, Memory, Battery, CPU, Network) and its "Today's Recommendation" issues.
 public enum SystemMonitor {
 
@@ -110,7 +110,7 @@ public enum SystemMonitor {
             return "\(m / 60):\(String(format: "%02d", m % 60)) remaining"
         }
 
-        /// The battery chart's heading and subtitle (`Monitor_Battery_Chart_*`).
+        /// The battery chart's heading and subtitle.
         public var chartStatus: (title: String, detail: String?) {
             func time(_ m: Int) -> String { m >= 60 ? "\(m / 60) h \(m % 60) min" : "\(m) min" }
             if isCharged { return ("Fully Charged", "You're running from a power adapter") }
@@ -210,7 +210,7 @@ public enum SystemMonitor {
         return out
     }
 
-    /// The Ignore menu on CleanMyMac Menu's issues (`Issue_Alert_Ignore_Option_*`).
+    /// The Ignore menu on the menu's issues.
     public enum IgnoreOption: String, CaseIterable, Sendable {
         case untilTomorrow, day, threeDays, week, forever
 

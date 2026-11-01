@@ -80,7 +80,7 @@ public enum SpaceLens {
 }
 
 extension SpaceLens {
-    /// How much an item is protected from removal (`space_lens_list_info_essential_item` / `space_lens_tooltip_system_folder`).
+    /// How much an item is protected from removal.
     public enum Protection: Sendable { case none, systemFolder, essential }
 
     /// Essential items cannot be selected: the system's own folders, the home folder's standard folders and the parts of

@@ -3,7 +3,7 @@ import Darwin
 import Foundation
 import SystemConfiguration
 
-/// CleanMyMac Menu's Network monitor: live speed, the connection info block and the speed test's "Good for:" legend.
+/// The menu's Network monitor: live speed, the connection info block and the speed test's "Good for:" legend.
 extension SystemMonitor {
 
     // MARK: Speed
@@ -73,7 +73,7 @@ extension SystemMonitor {
         public let name: String
         public let rating: Rating
 
-        /// From `CWSecurity`'s raw value. The grading is TidyMac's: CleanMyMac's mapping is not in its resources.
+        /// From `CWSecurity`'s raw value.
         public init?(coreWLAN raw: Int) {
             switch raw {
             case 0: (name, rating) = ("no password", .open)

@@ -1,7 +1,7 @@
 import Foundation
 
-/// Apps to quit before their files are removed (CleanMyMac's ApplicationsTerminator: "Please quit the following
-/// applications to clean all of their related items"). Matching is pure; the UI supplies the running apps.
+/// Apps to quit before their files are removed, so nothing holds them open or writes them back.
+/// Matching is pure; the UI supplies the running apps.
 public enum AppTerminator {
     public struct App: Hashable, Sendable {
         public let pid: Int32

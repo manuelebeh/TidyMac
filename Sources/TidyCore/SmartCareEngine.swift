@@ -1,7 +1,6 @@
 import Foundation
 
 /// Smart Care: one scan across modules, one tile per module, one Run for all.
-/// Tile set and wording follow SmartCareModule's strings (see REVERSE.md).
 public struct SmartCareEngine: ScanEngine {
     let settings: ScanSettings
     public init(settings: ScanSettings = .load()) { self.settings = settings }

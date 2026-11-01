@@ -2,7 +2,7 @@ import SwiftUI
 import TidyCore
 
 /// My Activity: Mac Health with today's recommendations on the left, and what TidyMac has done
-/// so far in four cards on the right (StatisticsDashboard in CleanMyMac, see REVERSE.md).
+/// so far in four cards on the right.
 struct ActivityScreen: View {
     @ObservedObject var app: AppState
     @State private var summary = ActivitySummary()
@@ -225,7 +225,7 @@ struct HealthCard: View {
         .padding(18)
         .frame(height: 230)
         .background(alignment: .topTrailing) {
-            // The glowing ring around the Mac, as on CleanMyMac's health card.
+            // A glowing ring around the Mac in the colour of its health state.
             ZStack {
                 Circle().stroke(LinearGradient(colors: [stateColor, stateColor.opacity(0.1)], startPoint: .top, endPoint: .bottom), lineWidth: 6)
                     .blur(radius: 2).shadow(color: stateColor, radius: 12)

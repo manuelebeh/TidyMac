@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
-/// Screen Cleaning Mode, rebuilt from CleanMyMac's ScreenCleaningMode.framework (see REVERSE.md):
+/// Screen Cleaning Mode:
 /// black windows at the shielding level on every display, the cursor hidden, keyboard and clicks
 /// swallowed while the app is in front, and ⌘ Esc as the only way out. The held keys are also polled
 /// directly so the way out works even if another window takes focus. A countdown ends the session

@@ -1,7 +1,6 @@
 import Foundation
 
-/// One row of a monitor's details, after CleanMyMac Menu's `MetricViewModel`: a value, a severity colour and a line
-/// explaining it. The wording follows its `Monitor_Detailed_*` strings; thresholds marked "TidyMac's" are not in its resources.
+/// One row of a monitor's details: a value, a severity colour and a line explaining it.
 public struct Metric: Identifiable, Sendable, Equatable {
     public enum Severity: Int, Sendable, Comparable {
         case normal, warning, critical
@@ -50,7 +49,7 @@ extension Metric {
         return d > 0 ? "\(d)d \(h)h" : "\(h)h \(m)m"
     }
 
-    /// CleanMyMac's four health texts. The 95/80/70 % cut-offs are TidyMac's; 70 % matches the critical battery alert.
+    /// Four health texts, cut at 95/80/70 %; 70 % matches the critical battery alert.
     public static func batteryHealth(_ percent: Int?) -> Metric {
         guard let p = percent else {
             return Metric(title: "Health", value: "Unknown", severity: .normal, detail: "Battery health could not be calculated at the moment.")
@@ -81,7 +80,7 @@ extension Metric {
         }
     }
 
-    /// Wi-Fi security as CleanMyMac rates it (Open, Basic, Weak, Good, Strong); a wired link is always fine.
+    /// Wi-Fi security rated Open, Basic, Weak, Good or Strong; a wired link is always fine.
     public static func networkSecurity(_ info: SystemMonitor.NetworkInfo) -> Metric? {
         if info.kind == .wired {
             return Metric(title: "Security", value: "Strong", severity: .normal,

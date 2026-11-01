@@ -3,7 +3,7 @@ import ServiceManagement
 import TidyCore
 import UserNotifications
 
-/// TidyMac's take on CleanMyMac's HealthMonitor login item: checks the Mac in the background while TidyMac runs
+/// Checks the Mac in the background while TidyMac runs
 /// (the menu bar item keeps it alive after the window closes) and posts macOS notifications.
 @MainActor
 final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
@@ -104,7 +104,7 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         center.add(UNNotificationRequest(identifier: a.key, content: content, trigger: nil))
     }
 
-    // Shown even while TidyMac is in front, like CleanMyMac's.
+    // Shown even while TidyMac is in front.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .sound, .list]
     }
@@ -134,7 +134,7 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    // MARK: Open at Login (CleanMyMac Menu's setting of the same name)
+    // MARK: Open at Login
 
     static var opensAtLogin: Bool { SMAppService.mainApp.status == .enabled }
 

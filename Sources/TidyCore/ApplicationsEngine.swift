@@ -19,7 +19,7 @@ public struct ApplicationsEngine: ScanEngine {
 
     // MARK: Updater
 
-    /// Where an update comes from (UpdaterScanning's `SparkleApplicationsDataSource` and `MASApplicationsDataSource`).
+    /// Where an update comes from: the developer's Sparkle feed or the App Store.
     public enum UpdateSource: String, Sendable { case developer = "Developer", appStore = "App Store" }
 
     public struct Update: Sendable {
