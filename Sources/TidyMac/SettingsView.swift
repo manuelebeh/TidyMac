@@ -7,6 +7,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             NotificationSettingsView().tabItem { Label("Notifications", systemImage: "bell") }
+            ScanSettingsView().tabItem { Label("Scanning", systemImage: "magnifyingglass") }
             IgnoreListSettingsView().tabItem { Label("Ignore List", systemImage: "eye.slash") }
         }
     }
@@ -184,4 +185,46 @@ struct IgnoreListSettingsView: View {
 
     private func reload() { entries = IgnoreList.entries(); picked = [] }
     private func remove(_ ids: Set<String>) { IgnoreList.remove(ids); reload() }
+}
+
+/// Mirrors CleanMyMac's Settings › Scanning: modules for Smart Care, categories for Cleanup.
+struct ScanSettingsView: View {
+    @State private var settings = ScanSettings.load()
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(ScanSettings.smartCareModules, id: \.id) { m in
+                    toggle(m.title, isOn: !settings.disabledSmartCare.contains(m.id),
+                           isLast: settings.disabledSmartCare.count == ScanSettings.smartCareModules.count - 1) {
+                        settings.disabledSmartCare.formSymmetricDifference([m.id])
+                    }
+                }
+            } header: {
+                Text("Modules to scan using Smart Care:")
+            }
+            Section {
+                ForEach(CleanupEngine.categories, id: \.id) { c in
+                    toggle(c.title, isOn: !settings.disabledCleanup.contains(c.id),
+                           isLast: settings.disabledCleanup.count == CleanupEngine.categories.count - 1) {
+                        settings.disabledCleanup.formSymmetricDifference([c.id])
+                    }
+                }
+            } header: {
+                Text("Categories to scan using Cleanup:")
+            } footer: {
+                Text("Smart Care's cleanup uses these categories too. My Tools always runs the tool you pick.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 480, height: 560)
+        .onChange(of: settings) { $0.save() }
+    }
+
+    /// The last module or category that is still on cannot be turned off: a scan of nothing would look like a clean Mac.
+    private func toggle(_ title: String, isOn: Bool, isLast: Bool, flip: @escaping () -> Void) -> some View {
+        Toggle(title, isOn: Binding(get: { isOn }, set: { _ in flip() }))
+            .disabled(isOn && isLast)
+    }
 }
