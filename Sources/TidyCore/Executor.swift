@@ -92,6 +92,7 @@ public enum Shell {
         return Result(status: p.terminationStatus, output: String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
+    @discardableResult
     public static func osascript(_ source: String) -> Result { run("/usr/bin/osascript", ["-e", source]) }
 }
 

@@ -494,3 +494,42 @@ final class TidyCoreTests: XCTestCase {
         XCTAssertTrue(cleanup.allSatisfy { $0.id == "deleted-users" })
     }
 }
+
+extension TidyCoreTests {
+    func testAssistantRecommendations() throws {
+        let gone = "/nonexistent/Old.app"
+        let here = FileManager.default.temporaryDirectory.path
+        let facts = AppFacts(updates: ["Notes Plus"], unused: [here, gone])
+        XCTAssertEqual(facts.unusedCount, 1)
+
+        let recs = MacHealth.assistant(uptime: 9 * 86_400, driveHealth: .failing, apps: facts)
+        XCTAssertEqual(recs.map(\.id), ["drive", "updates", "unused-apps", "restart"])
+        XCTAssertTrue(recs[0].severe)
+        XCTAssertTrue(recs[1].detail.hasPrefix("Notes Plus is ready"))
+        XCTAssertTrue(recs[3].detail.contains("9 days"))
+
+        let two = AppFacts(updates: ["A", "B"], unused: [gone])
+        let fewer = MacHealth.assistant(uptime: 2 * 86_400, driveHealth: .good, apps: two)
+        XCTAssertEqual(fewer.map(\.id), ["updates"])
+        XCTAssertTrue(fewer[0].detail.hasPrefix("2 apps are"))
+        XCTAssertTrue(MacHealth.assistant(uptime: 0, driveHealth: nil, apps: nil).isEmpty)
+    }
+
+    func testSkippedRecommendationsComeBackTomorrow() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "TidyMacTests.skips"))
+        defer { defaults.removePersistentDomain(forName: "TidyMacTests.skips") }
+        let recs = MacHealth.assistant(uptime: 9 * 86_400, driveHealth: .failing, apps: nil)
+        let now = Date()
+        var skipped = SkippedRecommendations()
+        skipped.skip(["restart"], now: now)
+        skipped.save(defaults: defaults)
+
+        let loaded = SkippedRecommendations.load(defaults: defaults)
+        XCTAssertEqual(loaded.visible(recs, now: now).map(\.id), ["drive"])
+        XCTAssertEqual(loaded.visible(recs, now: now.addingTimeInterval(86_400)).map(\.id), ["drive", "restart"])
+        // A skipped severe item no longer drags the state down.
+        XCTAssertEqual(MacHealth(recommendations: loaded.visible(recs, now: now)).state, .requiresAttention)
+        skipped.skip(["drive"], now: now)
+        XCTAssertEqual(MacHealth(recommendations: skipped.visible(recs, now: now)).state, .excellent)
+    }
+}

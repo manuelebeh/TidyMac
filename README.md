@@ -14,7 +14,7 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 - **My Clutter**: large and old files, duplicates, similar images, downloads.
 - **Space Lens**: a bubble map of what takes up space on your disk.
 - **My Tools**: single-purpose tools with search, favorites and last-scan dates.
-- **My Activity**: Mac health with recommendations, space cleaned, time saved, malware scan history.
+- **My Activity**: Mac health with recommendations, space cleaned, time saved, malware scan history. Recommendations also cover pending app updates, apps unused for six months, a restart after a week of uptime and a failing drive; skip one for the day or hide them all. Opening My Activity runs the update check at most once a day.
 - **Screen Cleaning Mode**: locks the keyboard and trackpad and blanks the screen so you can wipe it.
 - **Menu bar**: Mac Health at a glance, live storage, memory, battery, CPU and network with charts, Wi-Fi security, a speed test, top consumers, external drives with eject, connected Bluetooth devices, drive health, and recommendations you can act on or ignore for a while. The icon gets a dot when something needs attention.
 - **Background alerts**: notifications for low disk space, a full Trash, heavy memory use, critical battery health, new threats, overfilled external drives and low device batteries. Thresholds are configurable in Settings (⌘,).

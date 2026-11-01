@@ -45,6 +45,12 @@ struct UninstallerSheet: View {
     /// The app waiting to be uninstalled and the running apps to quit first.
     @State private var pending: (app: InstalledApp, running: [NSRunningApplication])?
 
+    /// My Activity's "Uninstall unused apps" opens the list already filtered.
+    init(module: Module, filter: UninstallerFilter = .all) {
+        self.module = module
+        _filter = State(initialValue: filter)
+    }
+
     private var shown: [InstalledApp] {
         let list = apps.filter { filter.includes($0) && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) }
         switch sort {

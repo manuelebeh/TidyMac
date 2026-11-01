@@ -82,10 +82,13 @@ public enum SystemMonitor {
         let du = Double(t.user &- prev.user + t.nice &- prev.nice), ds = Double(t.system &- prev.system), di = Double(t.idle &- prev.idle)
         let sum = max(du + ds + di, 1)
 
+        return CPU(user: du / sum, system: ds / sum, idle: di / sum, uptime: uptime())
+    }
+
+    public static func uptime() -> TimeInterval {
         var boot = timeval(); var size = MemoryLayout<timeval>.size
         sysctlbyname("kern.boottime", &boot, &size, nil, 0)
-        return CPU(user: du / sum, system: ds / sum, idle: di / sum,
-                   uptime: Date().timeIntervalSince1970 - TimeInterval(boot.tv_sec))
+        return Date().timeIntervalSince1970 - TimeInterval(boot.tv_sec)
     }
 
     // MARK: Battery

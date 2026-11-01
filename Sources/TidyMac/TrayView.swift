@@ -97,15 +97,15 @@ final class MonitorModel: ObservableObject {
         guard !slowRunning else { return }
         slowRunning = true
         hungApps = HungApps.current()
-        let wantsDriveHealth = driveHealth == nil
+        let known = driveHealth
         let fda = Permissions.hasFullDiskAccess, screenDue = ScreenCleaningSession.reminderDue
         Task {
             let r = await Task.detached {
-                (SystemMonitor.trash(), SystemMonitor.externalDrives(), SystemMonitor.bluetoothDevices(),
-                 wantsDriveHealth ? SystemMonitor.driveHealth() : nil, MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: screenDue))
+                let drive = known ?? SystemMonitor.driveHealth()
+                return (SystemMonitor.trash(), SystemMonitor.externalDrives(), SystemMonitor.bluetoothDevices(), drive,
+                        MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: screenDue, driveHealth: drive))
             }.value
-            trash = r.0; drives = r.1; bluetooth = r.2; health = r.4
-            if let h = r.3 { driveHealth = h }
+            trash = r.0; drives = r.1; bluetooth = r.2; driveHealth = r.3; health = r.4
             if fastTimer == nil { storage = SystemMonitor.storage(); memory = SystemMonitor.memory() }
             slowRunning = false
             updateIssues()
@@ -130,7 +130,8 @@ final class MonitorModel: ObservableObject {
         consumers = SystemMonitor.consumers(); bluetooth = SystemMonitor.bluetoothDevices(); driveHealth = SystemMonitor.driveHealth()
         drives = SystemMonitor.externalDrives(); networkInfo = SystemMonitor.networkInfo(); trash = SystemMonitor.trash()
         hungApps = HungApps.current()
-        health = MacHealth.current(hasFullDiskAccess: Permissions.hasFullDiskAccess, screenCleaningDue: ScreenCleaningSession.reminderDue)
+        health = MacHealth.current(hasFullDiskAccess: Permissions.hasFullDiskAccess, screenCleaningDue: ScreenCleaningSession.reminderDue,
+                                   driveHealth: driveHealth)
         updateIssues()
     }
 
