@@ -1,18 +1,18 @@
 import Foundation
 
-/// Settings › Scanning: "Modules to scan using Smart Care" and "Categories to scan using Cleanup".
+/// Settings › Scanning: "Modules to scan using Full Scan" and "Categories to scan using Cleanup".
 /// Stored as what is turned off, so modules and categories added later are on by default.
-/// My Tools ignores these settings: a tool runs the one check the user picked.
+/// Toolkit ignores these settings: a tool runs the one check the user picked.
 public struct ScanSettings: Codable, Sendable, Equatable {
     static let key = "TidyMac.scanSettings"
 
     public var disabledSmartCare: Set<String> = []
     public var disabledCleanup: Set<String> = []
 
-    /// Smart Care's tiles, by `SmartCareEngine` group ID.
+    /// Full Scan's tiles, by `SmartCareEngine` group ID.
     public static let smartCareModules: [(id: String, title: String)] = [
         ("cleanup", String(localized: "Cleanup")), ("protection", String(localized: "Protection")), ("performance", String(localized: "Performance")),
-        ("applications", String(localized: "Applications")), ("clutter", String(localized: "My Clutter")),
+        ("applications", String(localized: "Applications")), ("clutter", String(localized: "Declutter")),
     ]
 
     public init() {}

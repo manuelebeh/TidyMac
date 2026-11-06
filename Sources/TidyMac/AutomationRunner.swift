@@ -34,7 +34,7 @@ final class AutomationRunner {
         let report = await Task.detached { await Executor.run(items) }.value
         var body = String(localized: "\(FileSize.format(report.freed)) of junk cleaned.")
         if !report.failed.isEmpty { body += String(localized: " \(report.failed.count) items could not be removed.") }
-        // Clicking the result opens My Activity, which counts the run.
+        // Clicking the result opens History, which counts the run.
         post(id: "automation:\(rule.id)", title: rule.name, body: body, category: nil, info: ["key": "automation", "target": "activity"])
         return body
     }

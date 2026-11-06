@@ -55,7 +55,7 @@ public struct ResultItem: Identifiable, Hashable, Sendable {
     public let action: ItemAction
     public let selectedByDefault: Bool
     public let badge: String?
-    /// The result group the item was found in (set by `ResultGroup`); My Activity counts by it.
+    /// The result group the item was found in (set by `ResultGroup`); History counts by it.
     public var category: String?
 
     public init(id: String? = nil, title: String, subtitle: String? = nil, size: Int64? = nil, url: URL? = nil,

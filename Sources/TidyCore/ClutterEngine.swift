@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import Vision
 
-/// My Clutter module: Large & Old Files, Duplicates, Similar Images, Downloads.
+/// Declutter module: Large & Old Files, Duplicates, Similar Images, Downloads.
 public struct ClutterEngine: ScanEngine {
     public let root: URL
     public init(root: URL = Paths.home) { self.root = root }
@@ -32,7 +32,7 @@ public struct ClutterEngine: ScanEngine {
     ]
 
     /// Regular files under `root`, skipping hidden files, packages, ~/Library, source repositories
-    /// (folders with a `.git`) and generated build folders — the same user-file scope as My Clutter.
+    /// (folders with a `.git`) and generated build folders — the same user-file scope as Declutter.
     public static func index(_ root: URL) -> [FileInfo] {
         let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .totalFileAllocatedSizeKey, .contentModificationDateKey, .contentAccessDateKey]
         guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys,
@@ -145,7 +145,7 @@ public struct ClutterEngine: ScanEngine {
                 for (digest, set) in byFull {
                     let sorted = set.sorted { $0.modified > $1.modified }
                     let keep = sorted[0].url
-                    // Only copies in Downloads are preselected ("Duplicate Downloads" in Smart Care).
+                    // Only copies in Downloads are preselected ("Duplicate Downloads" in Full Scan).
                     let downloads = Paths.home("Downloads").path + "/"
                     for f in sorted.dropFirst() {
                         items.append(.file(f.url, size: f.size, subtitle: String(localized: "Copy of \(Paths.abbreviate(keep))"),

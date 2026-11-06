@@ -120,9 +120,9 @@ struct NotificationSettingsView: View {
             }
             Section("General") {
                 HStack {
-                    Toggle("Remind to run regular Smart Care", isOn: $smartCareReminder)
+                    Toggle("Remind to run regular Full Scan", isOn: $smartCareReminder)
                     Spacer()
-                    Picker("Remind to run regular Smart Care", selection: $smartCareInterval) {
+                    Picker("Remind to run regular Full Scan", selection: $smartCareInterval) {
                         ForEach(HealthAlerts.Settings.smartCareIntervals, id: \.days) { Text($0.title).tag($0.days) }
                     }
                     .labelsHidden().fixedSize().disabled(!smartCareReminder)
@@ -275,7 +275,7 @@ struct IgnoreListSettingsView: View {
     private func remove(_ ids: Set<String>) { IgnoreList.remove(ids); reload() }
 }
 
-/// Settings › Scanning: modules for Smart Care, categories for Cleanup.
+/// Settings › Scanning: modules for Full Scan, categories for Cleanup.
 struct ScanSettingsView: View {
     @State private var settings = ScanSettings.load()
 
@@ -289,7 +289,7 @@ struct ScanSettingsView: View {
                     }
                 }
             } header: {
-                Text("Modules to scan using Smart Care:")
+                Text("Modules to scan using Full Scan:")
             }
             Section {
                 ForEach(CleanupEngine.categories, id: \.id) { c in
@@ -301,7 +301,7 @@ struct ScanSettingsView: View {
             } header: {
                 Text("Categories to scan using Cleanup:")
             } footer: {
-                Text("Smart Care's cleanup uses these categories too. My Tools always runs the tool you pick.")
+                Text("Full Scan's cleanup uses these categories too. Toolkit always runs the tool you pick.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

@@ -119,7 +119,7 @@ extension SpaceLens {
     }
 }
 
-/// Space Lens's "Removal Log": what was removed or failed, newest first.
+/// Storage Map's "Removal Log": what was removed or failed, newest first.
 public enum RemovalLog {
     static let key = "TidyMac.removalLog"
     static let limit = 500

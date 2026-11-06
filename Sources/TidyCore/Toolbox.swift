@@ -1,6 +1,6 @@
 import Foundation
 
-/// My Tools: single-purpose scans that run one part of a module on its own.
+/// Toolkit: single-purpose scans that run one part of a module on its own.
 public struct Tool: Identifiable, Sendable {
     public enum Kind: Sendable { case scan(@Sendable () async -> [ResultGroup]), uninstaller, screenCleaning }
 

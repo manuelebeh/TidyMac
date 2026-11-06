@@ -1,6 +1,6 @@
 import Foundation
 
-/// Smart Care: one scan across modules, one tile per module, one Run for all.
+/// Full Scan: one scan across modules, one tile per module, one Run for all.
 public struct SmartCareEngine: ScanEngine {
     let settings: ScanSettings
     public init(settings: ScanSettings = .load()) { self.settings = settings }
@@ -27,7 +27,7 @@ public struct SmartCareEngine: ScanEngine {
                         symbol: "bolt", items: tasks, verb: String(localized: "tasks to run")),
             ResultGroup(id: "applications", title: String(localized: "Applications"), description: String(localized: "Vital updates."),
                         symbol: "square.grid.2x2", items: await updates, verb: String(localized: "updates available")),
-            ResultGroup(id: "clutter", title: String(localized: "My Clutter"), description: String(localized: "Duplicate downloads and large files."),
+            ResultGroup(id: "clutter", title: String(localized: "Declutter"), description: String(localized: "Duplicate downloads and large files."),
                         symbol: "folder", items: await clutter, verb: String(localized: "to review")),
         ].filter { s.scansSmartCare($0.id) }
     }

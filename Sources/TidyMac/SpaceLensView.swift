@@ -1,7 +1,7 @@
 import SwiftUI
 import TidyCore
 
-/// Space Lens: intro, then a bubble map of the current folder with a size list beside it.
+/// Storage Map: intro, then a bubble map of the current folder with a size list beside it.
 /// Selections are kept while moving between folders and reviewed together before removal.
 struct SpaceLensScreen: View {
     @ObservedObject var app: AppState
@@ -235,7 +235,7 @@ struct SpaceLensReviewSheet: View {
     }
 }
 
-/// Space Lens's "Removal Log".
+/// Storage Map's "Removal Log".
 struct RemovalLogSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var entries = RemovalLog.entries()
@@ -244,7 +244,7 @@ struct RemovalLogSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Removal Log").font(.title2.weight(.semibold))
             if entries.isEmpty {
-                Text("Items you remove with Space Lens are listed here.").foregroundStyle(.secondary)
+                Text("Items you remove with Storage Map are listed here.").foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(entries) { e in

@@ -24,7 +24,7 @@ public enum RemovalGuard {
     static let logRoots = ["/Library/Logs", "/private/var/log", "/var/log", "/Users/Deleted Users"]
     /// Where an app bundle may be, wherever else it is: Finder's "Uninstall with TidyMac" can point at any of these.
     static let applicationRoots = ["/Applications", "/Users/Shared", "/Volumes"]
-    /// Folders only their contents may leave when `rm` does the removing. Space Lens can still send them to the Trash,
+    /// Folders only their contents may leave when `rm` does the removing. Storage Map can still send them to the Trash,
     /// with a warning, because that can be undone.
     static let homeRoots = ["Library/Caches", "Library/Logs", "Library/Developer", ".cache", ".config", ".ssh", ".gnupg"]
 

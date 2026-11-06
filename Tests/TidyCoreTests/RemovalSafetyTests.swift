@@ -34,7 +34,7 @@ extension TidyCoreTests {
         func refused(_ path: String, permanent: Bool) -> Bool {
             RemovalGuard.refusal(for: URL(fileURLWithPath: path), permanent: permanent, home: home) != nil
         }
-        // Space Lens may still send these to the Trash, with its warning.
+        // Storage Map may still send these to the Trash, with its warning.
         for path in ["/Users/me/Library/Caches", "/Users/me/Library/Developer", "/Users/me/Library/Mobile Documents/x"] {
             XCTAssertFalse(refused(path, permanent: false), path)
             XCTAssertTrue(refused(path, permanent: true), path)

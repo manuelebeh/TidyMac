@@ -58,7 +58,7 @@ struct UninstallerSheet: View {
     /// The app to open on, from Finder's "Uninstall with TidyMac" or a `tidymac://uninstall` link.
     private let target: URL?
 
-    /// My Activity's "Uninstall unused apps" opens the list already filtered.
+    /// History's "Uninstall unused apps" opens the list already filtered.
     init(module: Module, filter: UninstallerFilter = .all, select target: URL? = nil) {
         self.module = module
         self.target = target
