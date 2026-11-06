@@ -51,3 +51,23 @@ jobs:
       - name: Run a scan with the bundled app
         timeout-minutes: 5
         run: build/TidyMac.app/Contents/MacOS/TidyMac --scan cleanup
+
+  package:
+    name: Package a release build
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Package
+        run: Packaging/package.sh
+
+      - name: Check the packages
+        run: |
+          test "$(lipo -archs build/TidyMac.app/Contents/MacOS/TidyMac)" = "x86_64 arm64"
+          codesign --verify --strict build/TidyMac.app
+          hdiutil verify -quiet dist/TidyMac-*.dmg
+          ditto -x -k dist/TidyMac-*.zip "$RUNNER_TEMP/unzipped"
+          "$RUNNER_TEMP/unzipped/TidyMac.app/Contents/MacOS/TidyMac" --scan cleanup > /dev/null
+          (cd dist && shasum -a 256 -c SHA256SUMS.txt)
+          ruby -c dist/tidymac.rb

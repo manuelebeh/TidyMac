@@ -33,7 +33,7 @@ Use the app bundle rather than `swift run`: notifications and Open at Login need
 2. Keep the change focused. One fix or feature per pull request.
 3. Add or update tests in `Tests/TidyCoreTests` when you change logic in `Sources/TidyCore`. Rules that decide what is shown, selected or reported should be pure functions that can be tested without touching the real system.
 4. Run `swift test` and make sure the app still builds with `./bundle.sh`.
-5. Open a pull request that explains what changed and why. Screenshots help for UI changes.
+5. Open a pull request that explains what changed and why. Screenshots help for UI changes. GitHub Actions runs the build and tests on it.
 
 ## Commit messages
 
@@ -69,3 +69,22 @@ TidyMac deletes files on people's machines, so these are not negotiable:
 - Anything you do not have the right to license under the [MIT license](LICENSE).
 
 By contributing, you agree that your contribution is released under the same license.
+
+## Releasing
+
+1. Set the new version in the `VERSION` file and merge that to `main`.
+2. Tag that commit and push the tag: `git tag v1.2.3 && git push origin v1.2.3`. The tag has to match `VERSION`.
+3. The Release workflow runs the tests, then creates a draft release with the DMG, the ZIP, `SHA256SUMS.txt` and `tidymac.rb`. Review it and publish it. The app's update check only sees published releases.
+4. Copy `tidymac.rb` to `Casks/` in a repository named `homebrew-tap`, so that `brew install --cask manuelebeh/tap/tidymac` installs that version.
+
+Running the workflow by hand from the Actions tab builds the same files as an artifact and publishes nothing. `Packaging/package.sh` does the same locally, into `dist/`.
+
+Signing and notarization need a paid Apple Developer account and a Developer ID Application certificate. The workflow uses them once these repository secrets exist. Without them, the app is signed ad hoc and people have to approve it by hand in System Settings.
+
+| Secret | Value |
+| --- | --- |
+| `DEVELOPER_ID_CERT_P12` | the certificate and its key exported as `.p12`, encoded with `base64` |
+| `DEVELOPER_ID_CERT_PASSWORD` | the password of that `.p12` |
+| `APPLE_ID` | the Apple ID of the developer account |
+| `APPLE_TEAM_ID` | the team ID |
+| `APPLE_APP_PASSWORD` | an app-specific password for that Apple ID |
