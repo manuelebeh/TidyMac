@@ -18,7 +18,9 @@ public struct ClutterEngine: ScanEngine {
         let similar = Self.similarImages(files)
         progress("Downloads")
         let downloads = Self.downloads()
-        return [large, dups, similar, downloads].filter { !$0.isEmpty }
+        progress("Project build folders")
+        let artifacts = Self.projectArtifacts(root: root)
+        return [large, dups, similar, downloads, artifacts].filter { !$0.isEmpty }
     }
 
     public struct FileInfo: Sendable { public let url: URL; public let size: Int64; public let modified: Date; public let accessed: Date }
@@ -65,6 +67,69 @@ public struct ClutterEngine: ScanEngine {
         return ResultGroup(id: "large-old", title: "Large & Old Files",
                            description: "Files over 50 MB, the biggest first. Files not opened for a year are marked Old.",
                            symbol: "doc.badge.ellipsis", items: Array(items), verb: "to review")
+    }
+
+    /// Folders a project can regenerate, and the files next to them that show they belong to one: a folder named `target`
+    /// can be anything, and ~/.gradle is no project. Generic names such as `build` and `dist` are left out on purpose.
+    static let artifactProjectFiles: [String: [String]] = [
+        "node_modules": ["package.json"], ".next": ["package.json"], ".nuxt": ["package.json"], ".turbo": ["package.json"],
+        ".svelte-kit": ["package.json"], ".angular": ["package.json"], ".parcel-cache": ["package.json"],
+        "target": ["Cargo.toml", "pom.xml"], ".build": ["Package.swift"], "Pods": ["Podfile"],
+        ".gradle": ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"],
+        ".tox": ["tox.ini", "pyproject.toml", "setup.py"],
+    ]
+
+    /// The file that shows this folder is a project's artifact; nil when it is not one.
+    static func artifactEvidence(_ dir: URL, fm: FileManager = .default) -> URL? {
+        let name = dir.lastPathComponent
+        let parent = dir.deletingLastPathComponent()
+        var candidates = (artifactProjectFiles[name] ?? []).map { parent.appendingPathComponent($0) }
+        if name == ".venv" || name == "venv" { candidates = [dir.appendingPathComponent("pyvenv.cfg")] }
+        if name.hasPrefix("cmake-build") { candidates = [parent.appendingPathComponent("CMakeLists.txt")] }
+        return candidates.first { fm.fileExists(atPath: $0.path) }
+    }
+
+    /// Dependencies and build output under `root`. Only those of a project untouched for `staleDays` are preselected.
+    public static func projectArtifacts(root: URL, minSize: Int64 = 10_000_000, staleDays: Double = 90, now: Date = Date()) -> ResultGroup {
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey]
+        let fm = FileManager.default
+        guard let e = fm.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants],
+                                    errorHandler: { _, _ in true }) else {
+            return projectArtifactsGroup([])
+        }
+        var found: [(dir: URL, evidence: URL)] = []
+        for case let u as URL in e {
+            let v = try? u.resourceValues(forKeys: Set(keys))
+            guard v?.isDirectory == true, v?.isSymbolicLink != true else { continue }
+            if let evidence = artifactEvidence(u, fm: fm) {
+                found.append((u, evidence))
+                e.skipDescendants()
+            } else if e.level >= 10 || u.path == Paths.library.path || u.lastPathComponent.hasPrefix(".") {
+                e.skipDescendants()
+            }
+        }
+        let sizes = FileSize.allocated(all: found.map(\.dir))
+        let staleBefore = now.addingTimeInterval(-staleDays * 86_400)
+        let items = found.indices.filter { sizes[$0] >= minSize }.map { i -> ResultItem in
+            let (dir, evidence) = found[i]
+            let project = dir.deletingLastPathComponent()
+            // Installing touches the folder, and working on the project touches the rest.
+            let changed = [dir, project, evidence, project.appendingPathComponent(".git/index")].compactMap {
+                (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            }.max() ?? .distantPast
+            let stale = changed < staleBefore
+            return ResultItem.file(dir, size: sizes[i],
+                                   subtitle: "\(Paths.abbreviate(project)) · changed \(RelativeDateTimeFormatter().localizedString(for: changed, relativeTo: now))",
+                                   selected: stale, badge: stale ? "Stale" : nil)
+                .with(title: "\(project.lastPathComponent): \(dir.lastPathComponent)")
+        }
+        return projectArtifactsGroup(items)
+    }
+
+    private static func projectArtifactsGroup(_ items: [ResultItem]) -> ResultGroup {
+        ResultGroup(id: "project-artifacts", title: "Project Build Folders",
+                    description: "Dependencies and build output a project can recreate, such as node_modules, target and .venv. Those of projects untouched for three months are preselected. Getting them back takes a reinstall or a rebuild.",
+                    symbol: "cube.box", items: items.sorted { ($0.size ?? 0) > ($1.size ?? 0) }, verb: "to review")
     }
 
     /// Same size → same hash of the first 64 KB → same full SHA-256. The newest copy is kept.

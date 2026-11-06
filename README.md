@@ -7,11 +7,11 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 ## Features
 
 - **Smart Care**: one scan across cleanup, protection, performance, applications and clutter, then one button to run it all.
-- **Cleanup**: system junk, developer tool caches (npm, pnpm, Bun, Cargo, Gradle, uv and more), AI tool caches and logs, mail attachments, Trash bins.
-- **Protection**: suspicious launch agents and daemons, browser privacy data, application permissions.
+- **Cleanup**: system junk, developer tool caches (npm, pnpm, Bun, Cargo, Gradle, uv and more), simulator runtimes, unused Docker data, AI tool caches and logs, mail attachments, Trash bins.
+- **Protection**: suspicious launch agents and daemons, built-in protections that are turned off (Gatekeeper, FileVault, firewall, System Integrity Protection), browser privacy data, application permissions.
 - **Performance**: maintenance tasks, login items, background items, Time Machine snapshots.
-- **Applications**: uninstaller with leftovers, updates from Sparkle feeds and the App Store, unused installers. The update check sends the IDs of your App Store apps to Apple's public lookup API.
-- **My Clutter**: large and old files, duplicates, similar images, downloads.
+- **Applications**: uninstaller with leftovers, updates from Sparkle feeds, the App Store and Homebrew casks, unused installers. The update check sends the IDs of your App Store apps to Apple's public lookup API, and runs `brew update` when Homebrew is installed. Upgrading a cask runs `brew upgrade --cask` with analytics off.
+- **My Clutter**: large and old files, duplicates, similar images, downloads, and project build folders (node_modules, target, .venv and similar) in the folder you choose. Only those of projects untouched for three months are preselected.
 - **Space Lens**: a bubble map of what takes up space on your disk. Selections carry across folders and are reviewed together before they go to the Trash; essential folders are locked, system folders come with a warning, purgeable space is shown, and every removal lands in a log.
 - **My Tools**: single-purpose tools with search, favorites and last-scan dates.
 - **My Activity**: Mac health with recommendations, space cleaned, time saved, malware scan history. Recommendations also cover pending app updates, apps unused for six months, a restart after a week of uptime and a failing drive; skip one for the day or hide them all. Opening My Activity runs the update check at most once a day.
@@ -40,7 +40,7 @@ Run it as an app bundle rather than with `swift run`: notifications and Open at 
 
 ## Permissions
 
-- **Full Disk Access** is needed to read the Trash and some protected caches. Without it those items are skipped.
+- **Full Disk Access** is needed to read the Trash and some protected caches. Without it those items are skipped. TidyMac notices when you grant it: results offer a new scan, and items macOS blocked during a cleanup are removed as long as you stay on that screen.
 - **Notifications** have to be allowed for TidyMac in System Settings › Notifications for alerts to show up.
 - Administrator tasks, such as freeing RAM or flushing DNS, ask for your password once through the standard macOS prompt. There is no privileged helper.
 
