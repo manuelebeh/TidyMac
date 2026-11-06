@@ -32,13 +32,17 @@ public struct ApplicationsEngine: ScanEngine {
         public var size: Int64?
     }
 
-    /// Sparkle feeds and the App Store, checked side by side.
+    /// Sparkle feeds, the App Store and Homebrew, checked side by side.
     static func updates(for apps: [InstalledApp]) async -> ResultGroup {
         async let sparkle = sparkleUpdates(for: apps)
         async let store = appStoreUpdates(for: apps)
-        let found = await sparkle + store
-        AppFacts.record(apps: apps, updates: found)
-        let items = found.sorted { $0.app.name < $1.app.name }.map { u in
+        // `brew update` can take a while, or hang without a network.
+        async let brew = withDeadline(120) { homebrewUpdates() }
+        let casks = await brew ?? []
+        // An app Homebrew can upgrade is listed once, with the entry that does the work.
+        let found = await (sparkle + store).filter { u in !casks.contains { $0.isSameApp(as: u.app) } }
+        AppFacts.record(apps: apps, updates: found, others: casks.map(\.token))
+        var items = found.sorted { $0.app.name < $1.app.name }.map { u in
             // Sparkle apps install their own updates when opened; App Store updates open the app's store page.
             let target = u.source == .appStore ? u.download ?? u.app.url : u.app.url
             let size = u.size.map { " · " + FileSize.format($0) } ?? ""
@@ -46,9 +50,51 @@ public struct ApplicationsEngine: ScanEngine {
                               subtitle: "\(u.current) → \(u.latest) · \(u.source.rawValue)\(size)",
                               url: u.app.url, action: .open(target), selectedByDefault: false, badge: u.latest)
         }
+        items += casks.sorted { $0.token < $1.token }.map(\.item)
         return ResultGroup(id: "updates", title: "App Updater",
-                           description: "Apps with a newer version from their developer or the App Store.",
+                           description: "Apps with a newer version from their developer, the App Store or Homebrew.",
                            symbol: "arrow.down.app", items: items, verb: "to update")
+    }
+
+    /// A cask Homebrew would upgrade. Casks that update themselves are left to their own updater, as `brew` does.
+    struct HomebrewUpdate: Sendable, Equatable {
+        let token: String
+        let current: String
+        let latest: String
+
+        var item: ResultItem {
+            ResultItem(id: "update:brew:\(token)", title: token, subtitle: "\(current) → \(latest) · Homebrew",
+                       action: .shell("HOMEBREW_NO_ANALYTICS=1 brew upgrade --cask \(Executor.quote(token))", admin: false),
+                       selectedByDefault: false, badge: latest)
+        }
+
+        func isSameApp(as app: InstalledApp) -> Bool {
+            token == app.name.lowercased().replacingOccurrences(of: " ", with: "-")
+        }
+    }
+
+    /// Refreshes Homebrew's package list, since `brew outdated` does not, then reads what is out of date.
+    /// Nothing is installed. Without Homebrew there is simply nothing to report.
+    static func homebrewUpdates() -> [HomebrewUpdate] {
+        let brew = ["HOMEBREW_NO_ANALYTICS=1", "HOMEBREW_NO_ENV_HINTS=1", "brew"]
+        guard Shell.run("/usr/bin/env", brew + ["update", "--quiet"]).status != 127 else { return [] }
+        let r = Shell.run("/usr/bin/env", brew + ["outdated", "--cask", "--json=v2"])
+        return r.status == 0 ? parseHomebrewOutdated(r.jsonObject) : []
+    }
+
+    /// The JSON of `brew outdated --cask --json=v2`. Pinned casks stay as they are.
+    static func parseHomebrewOutdated(_ data: Data) -> [HomebrewUpdate] {
+        // A cask version can carry a build after a comma: "1.4.2,164".
+        func version(_ s: String?) -> String { s?.split(separator: ",").first.map(String.init) ?? "?" }
+        let allowed = CharacterSet.lowercaseLetters.union(.decimalDigits).union(CharacterSet(charactersIn: "@._+-"))
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let casks = json["casks"] as? [[String: Any]] else { return [] }
+        return casks.compactMap { c in
+            guard let token = c["name"] as? String, !token.isEmpty, token.unicodeScalars.allSatisfy(allowed.contains),
+                  c["pinned"] as? Bool != true else { return nil }
+            return HomebrewUpdate(token: token, current: version((c["installed_versions"] as? [String])?.last),
+                                  latest: version(c["current_version"] as? String))
+        }
     }
 
     /// Apps embedding Sparkle publish an appcast feed URL in Info.plist (`SUFeedURL`).

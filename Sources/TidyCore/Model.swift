@@ -70,8 +70,20 @@ public struct ResultGroup: Identifiable, Sendable {
 public struct ActionReport: Sendable {
     public var succeeded: [ResultItem] = []
     public var failed: [(ResultItem, String)] = []
+    /// Failed items that macOS blocked and Full Disk Access might let through. They are also in `failed`.
+    public var needsAccess: [ResultItem] = []
     public var freed: Int64 { succeeded.reduce(0) { $0 + ($1.size ?? 0) } }
     public init() {}
+
+    /// This report once its blocked items were tried again.
+    public func merging(retry: ActionReport) -> ActionReport {
+        var merged = self
+        let retried = Set(needsAccess.map(\.id))
+        merged.succeeded += retry.succeeded
+        merged.failed = failed.filter { !retried.contains($0.0.id) } + retry.failed
+        merged.needsAccess = []
+        return merged
+    }
 }
 
 /// A module's scanner. `progress` receives the location currently being looked at.

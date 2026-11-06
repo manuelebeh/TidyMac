@@ -19,6 +19,8 @@ public struct CleanupEngine: ScanEngine {
         Category(id: "system-logs", title: "System Log Files", build: systemLogs),
         Category(id: "xcode", title: "Xcode Junk", build: xcodeJunk),
         Category(id: "dev-tools", title: "Developer Tool Caches", build: { devToolCaches() }),
+        Category(id: "sim-runtimes", title: "Simulator Runtimes", build: simulatorRuntimes),
+        Category(id: "docker", title: "Docker", build: docker),
         Category(id: "ios-backups", title: "iOS Device Backups", build: iosBackups),
         Category(id: "broken-prefs", title: "Broken Preferences", build: brokenPreferences),
         Category(id: "broken-login", title: "Broken Login Items", build: brokenLoginItems),
@@ -138,13 +140,7 @@ public struct CleanupEngine: ScanEngine {
     static func devToolCaches(home: URL = Paths.home) -> ResultGroup {
         let found = devCaches.map { (url: home.appendingPathComponent($0.path), tool: $0.tool, selected: $0.selected) }
             .filter { Paths.exists($0.url) }
-        // These trees can hold hundreds of thousands of files, and the whole group has one deadline.
-        var sizes = [Int64](repeating: 0, count: found.count)
-        let lock = NSLock()
-        DispatchQueue.concurrentPerform(iterations: found.count) { i in
-            let size = FileSize.allocated(found[i].url)
-            lock.lock(); sizes[i] = size; lock.unlock()
-        }
+        let sizes = FileSize.allocated(all: found.map(\.url))
         let items = found.indices.map { i in
             ResultItem.file(found[i].url, size: sizes[i], selected: found[i].selected)
                 .with(title: "\(found[i].tool): \(found[i].url.lastPathComponent)")
@@ -152,6 +148,67 @@ public struct CleanupEngine: ScanEngine {
         return group("dev-tools", "Developer Tool Caches",
                      "Packages and build files kept by npm, pnpm, Cargo, Gradle and similar tools. They are downloaded again when a project needs them.",
                      "terminal", items)
+    }
+
+    @Sendable static func simulatorRuntimes() -> ResultGroup {
+        // Without developer tools, `xcrun` opens the installer dialog; `xcode-select -p` only reports.
+        var items: [ResultItem] = []
+        if Shell.run("/usr/bin/xcode-select", ["-p"]).status == 0 {
+            let r = Shell.run("/usr/bin/xcrun", ["simctl", "runtime", "list", "-j"])
+            if r.status == 0 { items = simulatorRuntimeItems(json: r.jsonObject) }
+        }
+        return group("sim-runtimes", "Simulator Runtimes",
+                     "iOS, watchOS, tvOS and visionOS simulator images installed for Xcode. A removed runtime has to be downloaded again from Xcode before its simulators can run.",
+                     "iphone.gen3", items)
+    }
+
+    /// Entries of `xcrun simctl runtime list -j` that simctl says can be deleted. Never preselected.
+    static func simulatorRuntimeItems(json: Data, now: Date = Date()) -> [ResultItem] {
+        guard let all = (try? JSONSerialization.jsonObject(with: json)) as? [String: [String: Any]] else { return [] }
+        let platforms = ["iphone": "iOS", "watch": "watchOS", "appletv": "tvOS", "xr": "visionOS"]
+        return all.compactMap { id, r -> ResultItem? in
+            guard UUID(uuidString: id) != nil, r["deletable"] as? Bool == true else { return nil }
+            let platform = r["platformIdentifier"] as? String ?? ""
+            let name = platforms.first { platform.contains($0.key + "simulator") }?.value ?? "Simulator"
+            let used = (r["lastUsedAt"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
+            let usage = used.map { "used \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: now))" } ?? "never used"
+            return ResultItem(id: "sim-runtime:\(id)", title: "\(name) \(r["version"] as? String ?? "")",
+                              subtitle: "Build \(r["build"] as? String ?? "?") · \(usage)",
+                              size: (r["sizeBytes"] as? NSNumber)?.int64Value,
+                              action: .shell("xcrun simctl runtime delete \(id)", admin: false),
+                              selectedByDefault: false, badge: used == nil ? "Never Used" : nil)
+        }
+    }
+
+    /// Running containers, tagged images and volumes are left alone, and a stopped Docker offers nothing. The size stays
+    /// out of the totals: `docker system df` also counts unused tagged images, which `prune -f` keeps.
+    @Sendable static func docker() -> ResultGroup {
+        let r = Shell.run("/usr/bin/env", ["docker", "system", "df", "--format", "{{json .}}"])
+        let reclaimable = r.status == 0 ? dockerReclaimable(r.output) : 0
+        let items = reclaimable == 0 ? [] : [
+            ResultItem(id: "docker-prune", title: "Unused Docker Data",
+                       subtitle: "Stopped containers, dangling images, unused networks and build cache. Up to \(FileSize.format(reclaimable)).",
+                       action: .shell("docker system prune -f", admin: false), selectedByDefault: false),
+        ]
+        return group("docker", "Docker", "What `docker system prune` removes. Running containers, tagged images and volumes stay.", "shippingbox.circle", items)
+    }
+
+    /// Adds up the "Reclaimable" column of `docker system df --format '{{json .}}'`, without volumes, which a prune keeps.
+    static func dockerReclaimable(_ output: String) -> Int64 {
+        output.split(separator: "\n").reduce(0) { total, line in
+            guard let row = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any],
+                  row["Type"] as? String != "Local Volumes", let text = row["Reclaimable"] as? String else { return total }
+            return total + decimalBytes(text)
+        }
+    }
+
+    /// "1.2GB (50%)" → 1_200_000_000. Docker prints decimal units.
+    static func decimalBytes(_ text: String) -> Int64 {
+        let token = text.split(separator: " ").first.map(String.init) ?? ""
+        let number = token.prefix { $0.isNumber || $0 == "." }
+        let units: [String: Double] = ["B": 1, "kB": 1e3, "KB": 1e3, "MB": 1e6, "GB": 1e9, "TB": 1e12, "PB": 1e15]
+        guard let value = Double(number), let unit = units[String(token.dropFirst(number.count))] else { return 0 }
+        return Int64(value * unit)
     }
 
     @Sendable static func iosBackups() -> ResultGroup {

@@ -81,6 +81,14 @@ public enum Toolbox {
              symbol: "gearshape.2.fill", module: "performance", scanTitle: "Looking for background items...",
              keywords: keywords("background items,background apps,background processes,launch agents,daemons,helpers,background tasks,running in background,background services"),
              kind: .scan(performance(["background-items"]))),
+        Tool(id: "developerJunk", title: "Developer Junk",
+             description: "Clear build folders, tool caches, simulator runtimes and unused Docker data.",
+             symbol: "hammer.fill", module: "cleanup", scanTitle: "Looking for developer junk...",
+             keywords: keywords("developer,developer junk,dev tools,build folders,node_modules,target,venv,npm,pnpm,yarn,bun,cargo,gradle,pip,uv,simulator,simulators,runtimes,xcode,docker,prune,homebrew"),
+             kind: .scan({
+                 await groups([CleanupEngine.xcodeJunk, { CleanupEngine.devToolCaches() }, CleanupEngine.simulatorRuntimes, CleanupEngine.docker])()
+                     + [ClutterEngine.projectArtifacts(root: Paths.home)]
+             })),
         Tool(id: "duplicateFinder", title: "Duplicate Finder",
              description: "Remove duplicate files stored in different locations on your Mac.",
              symbol: "doc.on.doc.fill", module: "clutter", scanTitle: "Looking for duplicate files...",
@@ -121,6 +129,11 @@ public enum Toolbox {
              symbol: "hand.raised.fill", module: "protection", scanTitle: "Scanning privacy items...",
              keywords: keywords("privacy,cookies,cache,browsing history,history,autofill,saved logins,downloads history,search history,sessions,recent items,browser data,clear browser,trackers"),
              kind: .scan(groups([ProtectionEngine.privacyItems]))),
+        Tool(id: "securitySettings", title: "Security Settings",
+             description: "Check that Gatekeeper, FileVault, the firewall and System Integrity Protection are on.",
+             symbol: "lock.shield.fill", module: "protection", scanTitle: "Checking security settings...",
+             keywords: keywords("security,security settings,gatekeeper,filevault,encryption,firewall,sip,system integrity protection,audit,protection status"),
+             kind: .scan(groups([ProtectionEngine.securitySettings]))),
         Tool(id: "similarImages", title: "Similar Images",
              description: "Review similar photos and keep only the best ones.",
              symbol: "photo.on.rectangle", module: "clutter", scanTitle: "Looking for similar images...",

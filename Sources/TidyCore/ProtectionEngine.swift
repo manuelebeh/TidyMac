@@ -11,7 +11,66 @@ public struct ProtectionEngine: ScanEngine {
         let privacy = Self.privacyItems()
         progress("Application permissions")
         let perms = Self.permissions()
-        return [threats, privacy, perms].filter { !$0.isEmpty }
+        progress("Security settings")
+        let security = Self.securitySettings()
+        return [threats, security, privacy, perms].filter { !$0.isEmpty }
+    }
+
+    // MARK: Security settings
+
+    public enum SecurityStatus: Sendable { case on, off, unknown }
+
+    /// A built-in protection of macOS: how to read its setting, and what to do when it is off.
+    struct SecurityCheck: Sendable {
+        let id: String
+        let title: String
+        let tool: String
+        let arguments: [String]
+        let offAdvice: String
+        let settings: String
+        let status: @Sendable (String) -> SecurityStatus
+    }
+
+    static let securityPane = "x-apple.systempreferences:com.apple.preference.security"
+
+    static let securityChecks: [SecurityCheck] = [
+        SecurityCheck(id: "gatekeeper", title: "Gatekeeper", tool: "/usr/sbin/spctl", arguments: ["--status"],
+                      offAdvice: "Apps are not checked before they open. Turn it back on in Privacy & Security.",
+                      settings: securityPane, status: { readStatus($0, on: "assessments enabled", off: "assessments disabled") }),
+        SecurityCheck(id: "filevault", title: "FileVault", tool: "/usr/bin/fdesetup", arguments: ["status"],
+                      offAdvice: "Your disk is not encrypted. Turn it on in Privacy & Security.",
+                      settings: securityPane, status: { readStatus($0, on: "FileVault is On", off: "FileVault is Off") }),
+        SecurityCheck(id: "firewall", title: "Firewall", tool: "/usr/libexec/ApplicationFirewall/socketfilterfw", arguments: ["--getglobalstate"],
+                      offAdvice: "Incoming connections are not filtered. Turn it on in Network › Firewall.",
+                      settings: "x-apple.systempreferences:com.apple.Network-Settings.extension",
+                      status: { readStatus($0, on: "Firewall is enabled", off: "Firewall is disabled") }),
+        SecurityCheck(id: "sip", title: "System Integrity Protection", tool: "/usr/bin/csrutil", arguments: ["status"],
+                      offAdvice: "System files are not protected. It can only be turned back on from Recovery, with `csrutil enable`.",
+                      settings: securityPane, status: { readStatus($0, on: "status: enabled.", off: "status: disabled.") }),
+    ]
+
+    /// Anything else, such as a custom SIP configuration, stays unknown rather than being reported as fine.
+    static func readStatus(_ output: String, on: String, off: String) -> SecurityStatus {
+        output.contains(on) ? .on : output.contains(off) ? .off : .unknown
+    }
+
+    @Sendable static func securitySettings() -> ResultGroup {
+        securityGroup(results: Dictionary(uniqueKeysWithValues: securityChecks.map { ($0.id, Shell.run($0.tool, $0.arguments)) }))
+    }
+
+    /// Only what needs attention is listed. This reads settings; it says nothing about whether the Mac is infected.
+    static func securityGroup(results: [String: Shell.Result]) -> ResultGroup {
+        let items = securityChecks.compactMap { check -> ResultItem? in
+            let status = results[check.id].map { $0.status == 0 ? check.status($0.output) : .unknown } ?? .unknown
+            guard status != .on else { return nil }
+            return ResultItem(id: "security:\(check.id)", title: check.title,
+                              subtitle: status == .off ? check.offAdvice : "TidyMac could not read this setting.",
+                              action: .open(URL(string: check.settings)!), selectedByDefault: false,
+                              badge: status == .off ? "Off" : "Unknown")
+        }
+        return ResultGroup(id: "security-settings", title: "Security Settings",
+                           description: "Built-in protections of macOS that are turned off. This checks settings; it is not a virus scan.",
+                           symbol: "lock.shield", items: items, verb: "to review")
     }
 
     /// Not a signature engine: flags third-party launch items whose executable is missing,
