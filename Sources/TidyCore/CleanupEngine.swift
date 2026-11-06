@@ -31,7 +31,7 @@ public struct CleanupEngine: ScanEngine {
         Category(id: "trash", title: String(localized: "Trash Bins"), build: trashBins),
     ]
 
-    /// Categories safe to clean with nobody watching: Smart Care keeps their selection and Settings › Automations offers them.
+    /// Categories safe to clean with nobody watching: Quick Tidy keeps their selection and Settings › Automations offers them.
     public static let unattended: Set<String> = ["user-cache", "user-logs", "xcode", "broken-prefs", "broken-login", "ai-junk", "mail", "trash"]
 
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {

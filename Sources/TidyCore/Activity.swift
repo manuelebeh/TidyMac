@@ -1,6 +1,6 @@
 import Foundation
 
-/// What My Activity counts, one category per kind of work TidyMac does.
+/// What Insights counts, one category per kind of work TidyMac does.
 public enum ActivityCategory: String, CaseIterable, Codable, Sendable {
     case systemJunk, mailAttachments, trashBin, privacyItems, appPermissions, backgroundItems, loginItems,
          maintenanceTasks, leftovers, installers, applicationsUpdated, applicationsUninstalled,
@@ -52,7 +52,7 @@ public enum ActivityCategory: String, CaseIterable, Codable, Sendable {
         case .similarImages: String(localized: "Similar Images Removed")
         case .downloads: String(localized: "Downloads Removed")
         case .malwares: String(localized: "Malware Scan Run")
-        case .spaceLens: String(localized: "Space Lens Used")
+        case .spaceLens: String(localized: "Storage Map Used")
         }
     }
 
@@ -105,7 +105,7 @@ public enum ActivityCategory: String, CaseIterable, Codable, Sendable {
     public func minutesSaved(items: Int) -> Double { minutes.perRun + minutes.perItem * Double(items) }
 }
 
-/// Every run and scan My Activity adds up, persisted in user defaults.
+/// Every run and scan Insights adds up, persisted in user defaults.
 public enum History {
     static let key = "TidyMac.history"
 
@@ -157,7 +157,7 @@ public enum History {
     }
 }
 
-/// The figures on the My Activity dashboard, computed from `History` entries.
+/// The figures on the Insights dashboard, computed from `History` entries.
 public struct ActivitySummary: Sendable {
     public let since: Date?
     public let freed: Int64
@@ -293,10 +293,10 @@ public struct MacHealth: Sendable {
         }
         let cleanups = entries.filter { $0.freed > 0 }
         if cleanups.isEmpty {
-            out.append(Recommendation(id: "smartcare-first", title: String(localized: "Run Smart Care for the first time ever."),
+            out.append(Recommendation(id: "smartcare-first", title: String(localized: "Run Quick Tidy for the first time ever."),
                                       detail: String(localized: "Quick maintenance that takes care of the essentials."), target: .smartCare, severe: false))
         } else if let last = cleanups.last?.date, now.timeIntervalSince(last) > week {
-            out.append(Recommendation(id: "smartcare", title: String(localized: "It's time to care for your Mac! Run Smart Care."),
+            out.append(Recommendation(id: "smartcare", title: String(localized: "It's time to care for your Mac! Run Quick Tidy."),
                                       detail: String(localized: "Your last cleanup was \(RelativeDateTimeFormatter().localizedString(for: last, relativeTo: now))."),
                                       target: .smartCare, severe: false))
         }

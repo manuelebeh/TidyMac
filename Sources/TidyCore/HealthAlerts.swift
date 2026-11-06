@@ -28,7 +28,7 @@ public enum HealthAlerts {
         public var externalDrives = true
         public var bluetooth = true
         public var driveConnected = true
-        /// "Remind to run regular Smart Care", every `smartCareInterval` days.
+        /// "Remind to run regular Quick Tidy", every `smartCareInterval` days.
         public var smartCareReminder = true
         public var smartCareInterval = 7
         public var hungApps = true
@@ -74,7 +74,7 @@ public enum HealthAlerts {
         public var chromeMemory: Int64?
         /// Apps in the Trash; nil without Full Disk Access, which leaves the known list as it was.
         public var trashedApps: [String]?
-        /// The last run that freed space, for the Smart Care reminder.
+        /// The last run that freed space, for the Quick Tidy reminder.
         public var lastCleanup: Date?
         public init(storage: SystemMonitor.Storage, memory: SystemMonitor.Memory, trashSize: Int64? = nil, batteryHealth: Int? = nil,
                     threats: [(key: String, name: String)]? = nil, topConsumer: (name: String, bytes: Int64)? = nil,
@@ -171,7 +171,7 @@ public enum HealthAlerts {
         if s.externalDrives {
             for d in r.externalDrives where d.almostFull {
                 out.append(Alert(kind: .externalFull, key: "externalFull:\(d.name)", title: String(localized: "Connected disk is almost full"),
-                                 body: String(localized: "\(d.name) has \(FileSize.format(d.available)) available. Open Space Lens to see what takes up space on it."),
+                                 body: String(localized: "\(d.name) has \(FileSize.format(d.available)) available. Open Storage Map to see what takes up space on it."),
                                  target: "spaceLens"))
             }
         }
@@ -186,7 +186,7 @@ public enum HealthAlerts {
         if s.smartCareReminder, let last = r.lastCleanup, now.timeIntervalSince(last) >= Double(s.smartCareInterval) * 86_400 {
             let days = Int(now.timeIntervalSince(last) / 86_400)
             out.append(Alert(kind: .smartCare, key: "smartCare", title: String(localized: "It’s time to care for your Mac!"),
-                             body: String(localized: "Your last cleanup was \(days) days ago. Run Smart Care to keep your Mac clean, safe and fast."),
+                             body: String(localized: "Your last cleanup was \(days) days ago. Run Quick Tidy to keep your Mac clean, safe and fast."),
                              target: "smartCare"))
         }
         if s.hungApps, !r.hungApps.isEmpty {

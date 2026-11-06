@@ -1,7 +1,7 @@
 import SwiftUI
 import TidyCore
 
-/// My Tools: a searchable grid of single-purpose tools, with favorites pinned on top.
+/// Toolkit: a searchable grid of single-purpose tools, with favorites pinned on top.
 struct MyToolsScreen: View {
     @ObservedObject var screenCleaning: ScreenCleaningSession
     @AppStorage("TidyMac.favoriteTools") private var favoritesRaw = ""
@@ -21,7 +21,7 @@ struct MyToolsScreen: View {
             }
         }
         .animation(Motion.animation(.easeInOut(duration: 0.3)), value: running == nil)
-        .alert("Go back to My Tools?", isPresented: $confirmBack) {
+        .alert("Go back to Toolkit?", isPresented: $confirmBack) {
             Button("Cancel", role: .cancel) {}
             Button("OK") { running?.stop(); running = nil }
         } message: { Text("Your scan results and selections won’t be saved.") }
@@ -34,7 +34,7 @@ struct MyToolsScreen: View {
         return VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("My Tools").font(.system(size: 34, weight: .light)).foregroundStyle(.white)
+                    Text("Toolkit").font(.system(size: 34, weight: .light)).foregroundStyle(.white)
                     Text(Module.myTools.tagline).font(.system(size: 15)).foregroundStyle(.white.opacity(0.75)).frame(maxWidth: 440, alignment: .leading)
                 }
                 Spacer()
@@ -108,7 +108,7 @@ struct ToolRunView: View {
             ModuleBackground(module: controller.module)
             // Back at the intro means the tool is closing: skip the module's own intro screen.
             if controller.phase != .intro { ModuleScreen(controller: controller) }
-            Button(action: back) { Label("My Tools", systemImage: "chevron.left") }
+            Button(action: back) { Label("Toolkit", systemImage: "chevron.left") }
                 .buttonStyle(PillButtonStyle()).padding(.leading, 30).padding(.bottom, 52)
         }
         .onChange(of: controller.phase) { if $0 == .intro { close() } }

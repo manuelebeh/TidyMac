@@ -107,7 +107,7 @@ struct ScreenCleaningOverlay: View {
     private let message = [
         String(localized: "Thank you for this moment of care 🌱 Your Mac is in good hands — inside and out."),
         String(localized: "Every swipe counts ✨ When you're done, let us help you find and remove duplicate files too."),
-        String(localized: "While you clean the outside, Space Lens can show you what's taking up space inside 🌱"),
+        String(localized: "While you clean the outside, Storage Map can show you what's taking up space inside 🌱"),
         String(localized: "Files unopened for over a year are most of the clutter 🥰 Large and Old Files can help you take care of them."),
     ].randomElement()!
 

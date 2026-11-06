@@ -12,7 +12,7 @@
 "%@ available of %@. Click to show the drive in Finder." = "%1$@ disponibles sur %2$@. Cliquez pour afficher le disque dans le Finder.";
 "%@ could not be ejected." = "Impossible d’éjecter %@.";
 "%@ found" = "%@ trouvés";
-"%@ has %@ available. Open Space Lens to see what takes up space on it." = "Il reste %2$@ sur %1$@. Ouvrez Space Lens pour voir ce qui prend de la place.";
+"%@ has %@ available. Open Storage Map to see what takes up space on it." = "Il reste %2$@ sur %1$@. Ouvrez Storage Map pour voir ce qui prend de la place.";
 "%@ is in the Trash, but the files it created may still be on your Mac. Scan Applications to remove its leftovers." = "%@ est dans la Corbeille, mais les fichiers créés par cette app sont peut-être encore sur votre Mac. Analysez Applications pour supprimer ses résidus.";
 "%@ is not an application TidyMac can uninstall." = "%@ n’est pas une application que TidyMac peut désinstaller.";
 "%@ is not responding. Force quit it from TidyMac's menu, or wait until it responds." = "%@ ne répond pas. Forcez cette app à quitter depuis le menu de TidyMac ou attendez qu’elle réponde.";
@@ -273,10 +273,10 @@
 "Fully charged" = "Charge complète";
 "Gatekeeper" = "Gatekeeper";
 "General" = "Général";
-"Go back to My Tools?" = "Revenir à Mes outils ?";
-"Go to My Tools" = "Aller à Mes outils";
+"Go back to Toolkit?" = "Revenir à la boîte à outils ?";
+"Go to Toolkit" = "Aller à la boîte à outils";
 "Go to Protection" = "Aller à Protection";
-"Go to Smart Care" = "Aller à Smart Care";
+"Go to Quick Tidy" = "Aller à Quick Tidy";
 "Go" = "Lancer";
 "Going steady — let's save more time!" = "Bon rythme, continuons à gagner du temps !";
 "Good for:" = "Convient pour :";
@@ -312,12 +312,12 @@
 "Internet connection is missing" = "Pas de connexion à Internet";
 "Internet connection speed is very low. Try reconnecting to Wi-Fi or contact your service provider." = "La connexion à Internet est très lente. Essayez de vous reconnecter au Wi-Fi ou contactez votre fournisseur d’accès.";
 "It's been %lld days since your last restart. A restart clears memory and finishes pending updates." = "Votre dernier redémarrage date de %lld jours. Un redémarrage vide la mémoire et termine les mises à jour en attente.";
-"It's time to care for your Mac! Run Smart Care." = "Il est temps de prendre soin de votre Mac ! Lancez Smart Care.";
+"It's time to care for your Mac! Run Quick Tidy." = "Il est temps de prendre soin de votre Mac ! Lancez Quick Tidy.";
 "Items are moved to the Trash." = "Les éléments sont placés dans la Corbeille.";
 "Items go to the Trash." = "Les éléments vont dans la Corbeille.";
 "Items in the Trash are deleted permanently. This cannot be undone." = "Les éléments de la Corbeille sont supprimés définitivement. Cette action est irréversible.";
 "Items you already deleted. They are removed for good." = "Éléments que vous avez déjà supprimés. Ils seront effacés définitivement.";
-"Items you remove with Space Lens are listed here." = "Les éléments que vous supprimez avec Space Lens sont listés ici.";
+"Items you remove with Storage Map are listed here." = "Les éléments que vous supprimez avec Storage Map sont listés ici.";
 "It’s been over a week now. Restart your Mac once in a while." = "Cela fait plus d’une semaine. Redémarrez votre Mac de temps en temps.";
 "It’s time to care for your Mac!" = "Il est temps de prendre soin de votre Mac !";
 "It’s time to empty your Trash!" = "Il est temps de vider votre Corbeille !";
@@ -404,7 +404,7 @@
 "Missing: %@" = "Introuvable : %@";
 "Mode" = "Mode";
 "Models downloaded with Ollama and LM Studio. Removing one means downloading it again before use." = "Modèles téléchargés avec Ollama et LM Studio. Un modèle supprimé doit être téléchargé de nouveau avant utilisation.";
-"Modules to scan using Smart Care:" = "Modules à analyser avec Smart Care :";
+"Modules to scan using Quick Tidy:" = "Modules à analyser avec Quick Tidy :";
 "Monthly change" = "Évolution mensuelle";
 "Monthly on day %lld at %@" = "Tous les mois, le %1$lld à %2$@";
 "Monthly" = "Tous les mois";
@@ -412,9 +412,9 @@
 "Move to Applications Folder" = "Placer dans le dossier Applications";
 "Move to Applications folder?" = "Placer dans le dossier Applications ?";
 "Music streaming" = "Musique en streaming";
-"My Activity" = "Mon activité";
-"My Clutter" = "Mes fichiers";
-"My Tools" = "Mes outils";
+"Insights" = "Aperçus";
+"Declutter" = "Désencombrer";
+"Toolkit" = "Boîte à outils";
 "Name" = "Nom";
 "Network Volumes" = "Volumes réseau";
 "Network error" = "Erreur réseau";
@@ -517,7 +517,7 @@
 "Reduce Motion:" = "Réduire les animations :";
 "Refusing permanent delete outside a Trash" = "Suppression définitive refusée en dehors d’une Corbeille";
 "Reindex Spotlight" = "Réindexer Spotlight";
-"Remind to run regular Smart Care" = "Rappeler de lancer régulièrement Smart Care";
+"Remind to run regular Quick Tidy" = "Rappeler de lancer régulièrement Quick Tidy";
 "Reminders" = "Rappels";
 "Removable Volumes" = "Volumes amovibles";
 "Removal Log" = "Journal des suppressions";
@@ -558,7 +558,7 @@
 "Rules" = "Règles";
 "Run Maintenance Scripts" = "Exécuter les scripts d’entretien";
 "Run Now" = "Exécuter";
-"Run Smart Care for the first time ever." = "Lancez Smart Care pour la première fois.";
+"Run Quick Tidy for the first time ever." = "Lancez Quick Tidy pour la première fois.";
 "Run a deep Malware Scan to make sure you are fully safe and protected." = "Lancez une analyse approfondie des logiciels malveillants pour vous assurer que vous êtes bien protégé.";
 "Run a set of recommended maintenance tasks to bring your Mac to its max." = "Lancez une série de tâches d’entretien recommandées pour tirer le meilleur de votre Mac.";
 "Run performance tasks to optimize your Mac." = "Lancez des tâches de performances pour optimiser votre Mac.";
@@ -608,8 +608,8 @@
 "Size" = "Taille";
 "Skip for now" = "Ignorer pour l’instant";
 "Slack" = "Slack";
-"Smart Care" = "Smart Care";
-"Smart Care's cleanup uses these categories too. My Tools always runs the tool you pick." = "Le nettoyage de Smart Care utilise aussi ces catégories. Mes outils exécute toujours l’outil choisi.";
+"Quick Tidy" = "Quick Tidy";
+"Quick Tidy's cleanup uses these categories too. Toolkit always runs the tool you pick." = "Le nettoyage de Quick Tidy utilise aussi ces catégories. La boîte à outils exécute toujours l’outil choisi.";
 "Some applications should be quit." = "Certaines applications doivent être quittées.";
 "Some items were not processed" = "Certains éléments n’ont pas été traités";
 "Some of your devices are low on battery: %@. Connect them to a charger before they shut down." = "La batterie de certains appareils est faible : %@. Branchez-les à un chargeur avant leur extinction.";
@@ -618,8 +618,8 @@
 "Sort through your files and reduce the mess in just a few clicks." = "Triez vos fichiers et réduisez le désordre en quelques clics.";
 "Sorting through your files..." = "Tri de vos fichiers…";
 "Space Freed" = "Espace libéré";
-"Space Lens Used" = "Space Lens utilisé";
-"Space Lens" = "Space Lens";
+"Storage Map Used" = "Storage Map utilisé";
+"Storage Map" = "Storage Map";
 "Speech Recognition" = "Reconnaissance vocale";
 "Speed Up Mail" = "Accélérer Mail";
 "Stale" = "Inactif";
@@ -675,8 +675,8 @@
 "TidyMac cleans right away, then tells you how much it freed." = "TidyMac nettoie immédiatement, puis indique l’espace libéré.";
 "TidyMac could not be moved to Applications." = "Impossible de placer TidyMac dans Applications.";
 "TidyMac could not read this setting." = "TidyMac n’a pas pu lire ce réglage.";
-"TidyMac counts how many background items were checked and how many looked suspicious — whether through Smart Care, Protection or the Malware Finder tool." = "TidyMac compte les éléments d’arrière-plan vérifiés et ceux qui semblent suspects, que ce soit avec Smart Care, Protection ou l’outil Recherche de logiciels malveillants.";
-"TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Smart Care, adds to your total here." = "TidyMac estime le temps gagné en vous évitant l’entretien manuel du Mac : savoir quoi supprimer, où le trouver et le supprimer. Chaque nettoyage, y compris Smart Care, s’ajoute à ce total.";
+"TidyMac counts how many background items were checked and how many looked suspicious — whether through Quick Tidy, Protection or the Malware Finder tool." = "TidyMac compte les éléments d’arrière-plan vérifiés et ceux qui semblent suspects, que ce soit avec Quick Tidy, Protection ou l’outil Recherche de logiciels malveillants.";
+"TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Quick Tidy, adds to your total here." = "TidyMac estime le temps gagné en vous évitant l’entretien manuel du Mac : savoir quoi supprimer, où le trouver et le supprimer. Chaque nettoyage, y compris Quick Tidy, s’ajoute à ce total.";
 "TidyMac has detected a threat!" = "TidyMac a détecté une menace !";
 "TidyMac is up to date." = "TidyMac est à jour.";
 "TidyMac measures your download and upload speed with macOS’s networkQuality." = "TidyMac mesure votre débit descendant et montant avec l’outil networkQuality de macOS.";
@@ -755,7 +755,7 @@
 "When free space is below %@" = "Lorsque l’espace libre passe sous %@";
 "When the Trash exceeds %@" = "Lorsque la Corbeille dépasse %@";
 "When" = "Quand";
-"While you clean the outside, Space Lens can show you what's taking up space inside 🌱" = "Pendant que vous nettoyez l’extérieur, Space Lens peut vous montrer ce qui prend de la place à l’intérieur 🌱";
+"While you clean the outside, Storage Map can show you what's taking up space inside 🌱" = "Pendant que vous nettoyez l’extérieur, Storage Map peut vous montrer ce qui prend de la place à l’intérieur 🌱";
 "Wi-Fi connection" = "Connexion Wi-Fi";
 "Wired connection" = "Connexion filaire";
 "Wired" = "Filaire";
@@ -786,7 +786,7 @@
 "Your battery temperature is not optimal." = "La température de votre batterie n’est pas optimale.";
 "Your disk is not encrypted. Turn it on in Privacy & Security." = "Votre disque n’est pas chiffré. Activez cette protection dans Confidentialité et sécurité.";
 "Your last cleanup was %@." = "Votre dernier nettoyage date de %@.";
-"Your last cleanup was %lld days ago. Run Smart Care to keep your Mac clean, safe and fast." = "Votre dernier nettoyage date de %lld jours. Lancez Smart Care pour garder votre Mac propre, sûr et rapide.";
+"Your last cleanup was %lld days ago. Run Quick Tidy to keep your Mac clean, safe and fast." = "Votre dernier nettoyage date de %lld jours. Lancez Quick Tidy pour garder votre Mac propre, sûr et rapide.";
 "Your latest runs, with the time each one saved." = "Vos dernières exécutions, avec le temps gagné pour chacune.";
 "Your network security settings are rated as %@ (%@). You’re good!" = "Vos réglages de sécurité réseau sont évalués à un niveau %1$@ (%2$@). Tout va bien !";
 "Your network security settings use %@ and are rated as %@. Consider switching to a more secure setup." = "Vos réglages de sécurité réseau utilisent %1$@ et sont évalués à un niveau %2$@. Pensez à passer à une configuration plus sûre.";
@@ -801,7 +801,7 @@
 "You’re all good!" = "Tout va bien !";
 "You’re putting your data at risk by using an open Wi-Fi network. Use another network or reconfigure your connection for better security." = "Vous mettez vos données en danger en utilisant un réseau Wi-Fi ouvert. Utilisez un autre réseau ou reconfigurez votre connexion pour plus de sécurité.";
 "\"%@\" connected" = "« %@ » connecté";
-"\nClick to open Smart Care." = "\nCliquez pour ouvrir Smart Care.";
+"\nClick to open Quick Tidy." = "\nCliquez pour ouvrir Quick Tidy.";
 "charge cycles" = "cycles de charge";
 "iOS Device Backups" = "Sauvegardes d’appareils iOS";
 "iOS, watchOS, tvOS and visionOS simulator images installed for Xcode. A removed runtime has to be downloaded again from Xcode before its simulators can run." = "Images de simulateur iOS, watchOS, tvOS et visionOS installées pour Xcode. Un runtime supprimé doit être de nouveau téléchargé depuis Xcode avant que ses simulateurs puissent fonctionner.";

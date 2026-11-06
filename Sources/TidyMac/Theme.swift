@@ -14,15 +14,15 @@ enum Module: String, CaseIterable, Identifiable {
 
     var name: String {
         switch self {
-        case .smartCare: String(localized: "Smart Care")
+        case .smartCare: String(localized: "Quick Tidy")
         case .cleanup: String(localized: "Cleanup")
         case .protection: String(localized: "Protection")
         case .performance: String(localized: "Performance")
         case .applications: String(localized: "Applications")
-        case .clutter: String(localized: "My Clutter")
-        case .spaceLens: String(localized: "Space Lens")
-        case .myTools: String(localized: "My Tools")
-        case .activity: String(localized: "My Activity")
+        case .clutter: String(localized: "Declutter")
+        case .spaceLens: String(localized: "Storage Map")
+        case .myTools: String(localized: "Toolkit")
+        case .activity: String(localized: "Insights")
         }
     }
 

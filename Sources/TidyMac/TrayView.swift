@@ -362,7 +362,7 @@ struct TrayView: View {
 
     // MARK: Header
 
-    /// Mac Health with the Mac on a glow in the colour of its state; a click opens Smart Care.
+    /// Mac Health with the Mac on a glow in the colour of its state; a click opens Quick Tidy.
     var header: some View {
         let state = monitor.health?.state
         return HStack(spacing: 12) {
@@ -379,7 +379,7 @@ struct TrayView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { open(.smartCare) }
-        .help((monitor.health?.description ?? "") + String(localized: "\nClick to open Smart Care."))
+        .help((monitor.health?.description ?? "") + String(localized: "\nClick to open Quick Tidy."))
     }
 
     // MARK: Cards
@@ -796,7 +796,7 @@ struct TrayTextStyle: ButtonStyle {
     }
 }
 
-/// The Smart Care live background in Dark Mode, a pale version of it in Light Mode.
+/// The Quick Tidy live background in Dark Mode, a pale version of it in Light Mode.
 struct TrayBackground: View {
     @Environment(\.colorScheme) private var scheme
     var body: some View {
