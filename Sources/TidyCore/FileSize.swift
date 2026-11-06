@@ -17,6 +17,17 @@ public enum FileSize {
         return total
     }
 
+    /// Sizes of several folders, measured side by side: big trees can hold hundreds of thousands of files.
+    public static func allocated(all urls: [URL]) -> [Int64] {
+        var sizes = [Int64](repeating: 0, count: urls.count)
+        let lock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: urls.count) { i in
+            let size = allocated(urls[i])
+            lock.lock(); sizes[i] = size; lock.unlock()
+        }
+        return sizes
+    }
+
     public static func format(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }

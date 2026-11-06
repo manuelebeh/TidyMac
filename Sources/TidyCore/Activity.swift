@@ -9,7 +9,8 @@ public enum ActivityCategory: String, CaseIterable, Codable, Sendable {
     /// Result group IDs from the engines (see `ResultItem.category`).
     public init?(group: String) {
         switch group {
-        case "user-cache", "system-cache", "user-logs", "system-logs", "xcode", "dev-tools", "ios-backups", "broken-prefs",
+        case "user-cache", "system-cache", "user-logs", "system-logs", "xcode", "dev-tools", "sim-runtimes", "docker",
+             "project-artifacts", "ios-backups", "broken-prefs",
              "broken-login", "deleted-users", "ai-junk", "local-models", "snapshots": self = .systemJunk
         case "mail": self = .mailAttachments
         case "trash": self = .trashBin

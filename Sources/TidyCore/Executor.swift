@@ -49,6 +49,7 @@ public enum Executor {
                 report.succeeded.append(item)
             } catch {
                 report.failed.append((item, error.localizedDescription))
+                if blockedByMacOS(error) { report.needsAccess.append(item) }
             }
         }
 
@@ -65,6 +66,13 @@ public enum Executor {
         }
         History.record(report)
         return report
+    }
+
+    /// A file operation refused for lack of permission. The message is localized, so the error code is what counts.
+    static func blockedByMacOS(_ error: Error) -> Bool {
+        let e = error as NSError
+        if e.domain == NSCocoaErrorDomain, e.code == NSFileReadNoPermissionError || e.code == NSFileWriteNoPermissionError { return true }
+        return e.domain == NSPOSIXErrorDomain && e.code == Int(EPERM)
     }
 
     static func allow(_ url: URL, permanent: Bool) throws {
@@ -104,7 +112,16 @@ public enum Executor {
 }
 
 public enum Shell {
-    public struct Result: Sendable { public let status: Int32; public let output: String }
+    public struct Result: Sendable {
+        public let status: Int32
+        public let output: String
+
+        /// The JSON object in `output`. Errors share the pipe, so a tool's warnings can surround it.
+        var jsonObject: Data {
+            guard let start = output.firstIndex(of: "{"), let end = output.lastIndex(of: "}"), start < end else { return Data() }
+            return Data(output[start...end].utf8)
+        }
+    }
 
     /// An app opened from the Finder only gets the system folders in its PATH, so tools installed with Homebrew or their
     /// own installer (such as `ollama`) would not be found. They go last, so system tools keep priority.
