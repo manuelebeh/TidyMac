@@ -14,7 +14,7 @@ enum Module: String, CaseIterable, Identifiable {
 
     var name: String {
         switch self {
-        case .smartCare: String(localized: "Quick Tidy")
+        case .smartCare: String(localized: "Full Scan")
         case .cleanup: String(localized: "Cleanup")
         case .protection: String(localized: "Protection")
         case .performance: String(localized: "Performance")
@@ -22,7 +22,7 @@ enum Module: String, CaseIterable, Identifiable {
         case .clutter: String(localized: "Declutter")
         case .spaceLens: String(localized: "Storage Map")
         case .myTools: String(localized: "Toolkit")
-        case .activity: String(localized: "Insights")
+        case .activity: String(localized: "History")
         }
     }
 

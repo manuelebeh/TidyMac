@@ -1,7 +1,7 @@
 import Foundation
 
 /// Items the user excluded from scan results (Settings › Ignore List). Matching is by `ResultItem.id`,
-/// so an item ignored in Quick Tidy is also hidden in Cleanup or Toolkit. Changes apply on the next scan.
+/// so an item ignored in Full Scan is also hidden in Cleanup or Toolkit. Changes apply on the next scan.
 public enum IgnoreList {
     static let key = "TidyMac.ignoreList"
 
@@ -83,7 +83,7 @@ public enum IgnoreList {
         save(section.map { s in entries(defaults: defaults).filter { $0.section != s } } ?? [], defaults)
     }
 
-    /// Drops ignored items from scan results. Groups are kept even when emptied, so Quick Tidy keeps its tiles.
+    /// Drops ignored items from scan results. Groups are kept even when emptied, so Full Scan keeps its tiles.
     public static func apply(_ groups: [ResultGroup], defaults: UserDefaults = .standard) -> [ResultGroup] {
         let ignored = Set(entries(defaults: defaults).map(\.id))
         guard !ignored.isEmpty else { return groups }

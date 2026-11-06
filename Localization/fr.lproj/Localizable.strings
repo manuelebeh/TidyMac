@@ -276,7 +276,7 @@
 "Go back to Toolkit?" = "Revenir à la boîte à outils ?";
 "Go to Toolkit" = "Aller à la boîte à outils";
 "Go to Protection" = "Aller à Protection";
-"Go to Quick Tidy" = "Aller à Quick Tidy";
+"Go to Full Scan" = "Aller à l’Analyse complète";
 "Go" = "Lancer";
 "Going steady — let's save more time!" = "Bon rythme, continuons à gagner du temps !";
 "Good for:" = "Convient pour :";
@@ -312,7 +312,7 @@
 "Internet connection is missing" = "Pas de connexion à Internet";
 "Internet connection speed is very low. Try reconnecting to Wi-Fi or contact your service provider." = "La connexion à Internet est très lente. Essayez de vous reconnecter au Wi-Fi ou contactez votre fournisseur d’accès.";
 "It's been %lld days since your last restart. A restart clears memory and finishes pending updates." = "Votre dernier redémarrage date de %lld jours. Un redémarrage vide la mémoire et termine les mises à jour en attente.";
-"It's time to care for your Mac! Run Quick Tidy." = "Il est temps de prendre soin de votre Mac ! Lancez Quick Tidy.";
+"It's time to care for your Mac! Run Full Scan." = "Il est temps de prendre soin de votre Mac ! Lancez l’Analyse complète.";
 "Items are moved to the Trash." = "Les éléments sont placés dans la Corbeille.";
 "Items go to the Trash." = "Les éléments vont dans la Corbeille.";
 "Items in the Trash are deleted permanently. This cannot be undone." = "Les éléments de la Corbeille sont supprimés définitivement. Cette action est irréversible.";
@@ -404,7 +404,7 @@
 "Missing: %@" = "Introuvable : %@";
 "Mode" = "Mode";
 "Models downloaded with Ollama and LM Studio. Removing one means downloading it again before use." = "Modèles téléchargés avec Ollama et LM Studio. Un modèle supprimé doit être téléchargé de nouveau avant utilisation.";
-"Modules to scan using Quick Tidy:" = "Modules à analyser avec Quick Tidy :";
+"Modules to scan using Full Scan:" = "Modules à analyser avec Analyse complète :";
 "Monthly change" = "Évolution mensuelle";
 "Monthly on day %lld at %@" = "Tous les mois, le %1$lld à %2$@";
 "Monthly" = "Tous les mois";
@@ -412,7 +412,7 @@
 "Move to Applications Folder" = "Placer dans le dossier Applications";
 "Move to Applications folder?" = "Placer dans le dossier Applications ?";
 "Music streaming" = "Musique en streaming";
-"Insights" = "Aperçus";
+"History" = "Historique";
 "Declutter" = "Désencombrer";
 "Toolkit" = "Boîte à outils";
 "Name" = "Nom";
@@ -517,7 +517,7 @@
 "Reduce Motion:" = "Réduire les animations :";
 "Refusing permanent delete outside a Trash" = "Suppression définitive refusée en dehors d’une Corbeille";
 "Reindex Spotlight" = "Réindexer Spotlight";
-"Remind to run regular Quick Tidy" = "Rappeler de lancer régulièrement Quick Tidy";
+"Remind to run regular Full Scan" = "Rappeler de lancer régulièrement l’Analyse complète";
 "Reminders" = "Rappels";
 "Removable Volumes" = "Volumes amovibles";
 "Removal Log" = "Journal des suppressions";
@@ -558,7 +558,7 @@
 "Rules" = "Règles";
 "Run Maintenance Scripts" = "Exécuter les scripts d’entretien";
 "Run Now" = "Exécuter";
-"Run Quick Tidy for the first time ever." = "Lancez Quick Tidy pour la première fois.";
+"Run Full Scan for the first time ever." = "Lancez l’Analyse complète pour la première fois.";
 "Run a deep Malware Scan to make sure you are fully safe and protected." = "Lancez une analyse approfondie des logiciels malveillants pour vous assurer que vous êtes bien protégé.";
 "Run a set of recommended maintenance tasks to bring your Mac to its max." = "Lancez une série de tâches d’entretien recommandées pour tirer le meilleur de votre Mac.";
 "Run performance tasks to optimize your Mac." = "Lancez des tâches de performances pour optimiser votre Mac.";
@@ -608,8 +608,8 @@
 "Size" = "Taille";
 "Skip for now" = "Ignorer pour l’instant";
 "Slack" = "Slack";
-"Quick Tidy" = "Quick Tidy";
-"Quick Tidy's cleanup uses these categories too. Toolkit always runs the tool you pick." = "Le nettoyage de Quick Tidy utilise aussi ces catégories. La boîte à outils exécute toujours l’outil choisi.";
+"Full Scan" = "Analyse complète";
+"Full Scan's cleanup uses these categories too. Toolkit always runs the tool you pick." = "Le nettoyage de l’Analyse complète utilise aussi ces catégories. La boîte à outils exécute toujours l’outil choisi.";
 "Some applications should be quit." = "Certaines applications doivent être quittées.";
 "Some items were not processed" = "Certains éléments n’ont pas été traités";
 "Some of your devices are low on battery: %@. Connect them to a charger before they shut down." = "La batterie de certains appareils est faible : %@. Branchez-les à un chargeur avant leur extinction.";
@@ -675,8 +675,8 @@
 "TidyMac cleans right away, then tells you how much it freed." = "TidyMac nettoie immédiatement, puis indique l’espace libéré.";
 "TidyMac could not be moved to Applications." = "Impossible de placer TidyMac dans Applications.";
 "TidyMac could not read this setting." = "TidyMac n’a pas pu lire ce réglage.";
-"TidyMac counts how many background items were checked and how many looked suspicious — whether through Quick Tidy, Protection or the Malware Finder tool." = "TidyMac compte les éléments d’arrière-plan vérifiés et ceux qui semblent suspects, que ce soit avec Quick Tidy, Protection ou l’outil Recherche de logiciels malveillants.";
-"TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Quick Tidy, adds to your total here." = "TidyMac estime le temps gagné en vous évitant l’entretien manuel du Mac : savoir quoi supprimer, où le trouver et le supprimer. Chaque nettoyage, y compris Quick Tidy, s’ajoute à ce total.";
+"TidyMac counts how many background items were checked and how many looked suspicious — whether through Full Scan, Protection or the Malware Finder tool." = "TidyMac compte les éléments d’arrière-plan vérifiés et ceux qui semblent suspects, que ce soit avec Analyse complète, Protection ou l’outil Recherche de logiciels malveillants.";
+"TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Full Scan, adds to your total here." = "TidyMac estime le temps gagné en vous évitant l’entretien manuel du Mac : savoir quoi supprimer, où le trouver et le supprimer. Chaque nettoyage, y compris Full Scan, s’ajoute à ce total.";
 "TidyMac has detected a threat!" = "TidyMac a détecté une menace !";
 "TidyMac is up to date." = "TidyMac est à jour.";
 "TidyMac measures your download and upload speed with macOS’s networkQuality." = "TidyMac mesure votre débit descendant et montant avec l’outil networkQuality de macOS.";
@@ -786,7 +786,7 @@
 "Your battery temperature is not optimal." = "La température de votre batterie n’est pas optimale.";
 "Your disk is not encrypted. Turn it on in Privacy & Security." = "Votre disque n’est pas chiffré. Activez cette protection dans Confidentialité et sécurité.";
 "Your last cleanup was %@." = "Votre dernier nettoyage date de %@.";
-"Your last cleanup was %lld days ago. Run Quick Tidy to keep your Mac clean, safe and fast." = "Votre dernier nettoyage date de %lld jours. Lancez Quick Tidy pour garder votre Mac propre, sûr et rapide.";
+"Your last cleanup was %lld days ago. Run Full Scan to keep your Mac clean, safe and fast." = "Votre dernier nettoyage date de %lld jours. Lancez l’Analyse complète pour garder votre Mac propre, sûr et rapide.";
 "Your latest runs, with the time each one saved." = "Vos dernières exécutions, avec le temps gagné pour chacune.";
 "Your network security settings are rated as %@ (%@). You’re good!" = "Vos réglages de sécurité réseau sont évalués à un niveau %1$@ (%2$@). Tout va bien !";
 "Your network security settings use %@ and are rated as %@. Consider switching to a more secure setup." = "Vos réglages de sécurité réseau utilisent %1$@ et sont évalués à un niveau %2$@. Pensez à passer à une configuration plus sûre.";
@@ -801,7 +801,7 @@
 "You’re all good!" = "Tout va bien !";
 "You’re putting your data at risk by using an open Wi-Fi network. Use another network or reconfigure your connection for better security." = "Vous mettez vos données en danger en utilisant un réseau Wi-Fi ouvert. Utilisez un autre réseau ou reconfigurez votre connexion pour plus de sécurité.";
 "\"%@\" connected" = "« %@ » connecté";
-"\nClick to open Quick Tidy." = "\nCliquez pour ouvrir Quick Tidy.";
+"\nClick to open Full Scan." = "\nCliquez pour ouvrir l’Analyse complète.";
 "charge cycles" = "cycles de charge";
 "iOS Device Backups" = "Sauvegardes d’appareils iOS";
 "iOS, watchOS, tvOS and visionOS simulator images installed for Xcode. A removed runtime has to be downloaded again from Xcode before its simulators can run." = "Images de simulateur iOS, watchOS, tvOS et visionOS installées pour Xcode. Un runtime supprimé doit être de nouveau téléchargé depuis Xcode avant que ses simulateurs puissent fonctionner.";

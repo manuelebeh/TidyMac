@@ -1,6 +1,6 @@
 import Foundation
 
-/// Quick Tidy: one scan across modules, one tile per module, one Run for all.
+/// Full Scan: one scan across modules, one tile per module, one Run for all.
 public struct SmartCareEngine: ScanEngine {
     let settings: ScanSettings
     public init(settings: ScanSettings = .load()) { self.settings = settings }

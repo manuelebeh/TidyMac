@@ -95,7 +95,7 @@ final class TidyCoreTests: XCTestCase {
     func testItemsTakeTheirGroupAsCategory() {
         let g = ResultGroup(id: "duplicates", title: "D", description: "", symbol: "", items: [ResultItem(title: "a", action: .open(URL(fileURLWithPath: "/")))])
         XCTAssertEqual(g.items[0].category, "duplicates")
-        // Quick Tidy regroups items; they keep the group they were found in.
+        // Full Scan regroups items; they keep the group they were found in.
         let sc = ResultGroup(id: "clutter", title: "C", description: "", symbol: "", items: g.items)
         XCTAssertEqual(sc.items[0].category, "duplicates")
     }
@@ -342,7 +342,7 @@ final class TidyCoreTests: XCTestCase {
         IgnoreList.add([cache.items[0]], defaults: d)
         XCTAssertEqual(IgnoreList.entries(defaults: d).count, 1)
         XCTAssertEqual(IgnoreList.entries(defaults: d)[0].section, .systemJunk)
-        // Quick Tidy regroups the same item under another group: it is still hidden, and emptied groups stay.
+        // Full Scan regroups the same item under another group: it is still hidden, and emptied groups stay.
         let smartCare = ResultGroup(id: "cleanup", title: "Cleanup", description: "", symbol: "", items: [cache.items[0]])
         let out = IgnoreList.apply([cache, smartCare], defaults: d)
         XCTAssertEqual(out.map { $0.items.map(\.id) }, [["/b"], []])

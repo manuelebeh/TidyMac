@@ -28,7 +28,7 @@ public enum HealthAlerts {
         public var externalDrives = true
         public var bluetooth = true
         public var driveConnected = true
-        /// "Remind to run regular Quick Tidy", every `smartCareInterval` days.
+        /// "Remind to run regular Full Scan", every `smartCareInterval` days.
         public var smartCareReminder = true
         public var smartCareInterval = 7
         public var hungApps = true
@@ -74,7 +74,7 @@ public enum HealthAlerts {
         public var chromeMemory: Int64?
         /// Apps in the Trash; nil without Full Disk Access, which leaves the known list as it was.
         public var trashedApps: [String]?
-        /// The last run that freed space, for the Quick Tidy reminder.
+        /// The last run that freed space, for the Full Scan reminder.
         public var lastCleanup: Date?
         public init(storage: SystemMonitor.Storage, memory: SystemMonitor.Memory, trashSize: Int64? = nil, batteryHealth: Int? = nil,
                     threats: [(key: String, name: String)]? = nil, topConsumer: (name: String, bytes: Int64)? = nil,
@@ -186,7 +186,7 @@ public enum HealthAlerts {
         if s.smartCareReminder, let last = r.lastCleanup, now.timeIntervalSince(last) >= Double(s.smartCareInterval) * 86_400 {
             let days = Int(now.timeIntervalSince(last) / 86_400)
             out.append(Alert(kind: .smartCare, key: "smartCare", title: String(localized: "It’s time to care for your Mac!"),
-                             body: String(localized: "Your last cleanup was \(days) days ago. Run Quick Tidy to keep your Mac clean, safe and fast."),
+                             body: String(localized: "Your last cleanup was \(days) days ago. Run Full Scan to keep your Mac clean, safe and fast."),
                              target: "smartCare"))
         }
         if s.hungApps, !r.hungApps.isEmpty {

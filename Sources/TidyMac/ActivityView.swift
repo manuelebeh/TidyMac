@@ -1,7 +1,7 @@
 import SwiftUI
 import TidyCore
 
-/// Insights: Mac Health with today's recommendations on the left, and what TidyMac has done
+/// History: Mac Health with today's recommendations on the left, and what TidyMac has done
 /// so far in four cards on the right.
 struct ActivityScreen: View {
     @ObservedObject var app: AppState
@@ -17,7 +17,7 @@ struct ActivityScreen: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Insights").font(.system(size: 34, weight: .light)).foregroundStyle(.white)
+                Text("History").font(.system(size: 34, weight: .light)).foregroundStyle(.white)
                 if let since = summary.since {
                     Text("From \(since.formatted(date: .abbreviated, time: .omitted))").foregroundStyle(.white.opacity(0.6))
                 }
@@ -110,7 +110,7 @@ struct ActivityScreen: View {
 
     var storageCard: some View {
         StatCard(info: String(localized: "Everything you remove on this Mac with TidyMac adds up here. From junk files and clutter to uninstalled apps — the total local storage cleanup is shown in MB or GB."),
-                 symbol: "internaldrive.fill", empty: summary.freed == 0 ? (String(localized: "Clean up storage and watch your free gigabytes add up."), String(localized: "Go to Quick Tidy"), .smartCare) : nil,
+                 symbol: "internaldrive.fill", empty: summary.freed == 0 ? (String(localized: "Clean up storage and watch your free gigabytes add up."), String(localized: "Go to Full Scan"), .smartCare) : nil,
                  go: go) {
             Text("Local Storage Cleaned").font(.callout).foregroundStyle(.white.opacity(0.7))
             Text(formatSize(summary.freed)).font(.system(size: 30, weight: .light)).foregroundStyle(.white)
@@ -127,8 +127,8 @@ struct ActivityScreen: View {
     }
 
     var timeCard: some View {
-        StatCard(info: String(localized: "TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Quick Tidy, adds to your total here."),
-                 symbol: "stopwatch.fill", empty: summary.minutesSaved == 0 ? (String(localized: "Start using TidyMac to see your recent time saved."), String(localized: "Go to Quick Tidy"), .smartCare) : nil,
+        StatCard(info: String(localized: "TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Full Scan, adds to your total here."),
+                 symbol: "stopwatch.fill", empty: summary.minutesSaved == 0 ? (String(localized: "Start using TidyMac to see your recent time saved."), String(localized: "Go to Full Scan"), .smartCare) : nil,
                  go: go) {
             Text("Total Time Saved").font(.callout).foregroundStyle(.white.opacity(0.7))
             Text(ActivitySummary.format(minutes: summary.minutesSaved)).font(.system(size: 30, weight: .light)).foregroundStyle(.white)
@@ -143,7 +143,7 @@ struct ActivityScreen: View {
     }
 
     var malwareCard: some View {
-        StatCard(info: String(localized: "TidyMac counts how many background items were checked and how many looked suspicious — whether through Quick Tidy, Protection or the Malware Finder tool."),
+        StatCard(info: String(localized: "TidyMac counts how many background items were checked and how many looked suspicious — whether through Full Scan, Protection or the Malware Finder tool."),
                  symbol: "hand.raised.fill", empty: summary.malwareScans == 0 ? (String(localized: "No scans yet. It’s time to protect your Mac."), String(localized: "Go to Protection"), .protection) : nil,
                  go: go) {
             Text("Scanned for Malware").font(.callout).foregroundStyle(.white.opacity(0.7))

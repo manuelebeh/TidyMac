@@ -1,7 +1,7 @@
 import Foundation
 
 /// What the Assistant knows about installed apps: pending updates and apps not opened for six months.
-/// Both are slow to read (network, Spotlight), so every update check records them and Insights reads the copy.
+/// Both are slow to read (network, Spotlight), so every update check records them and History reads the copy.
 public struct AppFacts: Codable, Sendable, Equatable {
     static let key = "TidyMac.appFacts"
 

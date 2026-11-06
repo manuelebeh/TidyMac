@@ -145,7 +145,7 @@ public struct ClutterEngine: ScanEngine {
                 for (digest, set) in byFull {
                     let sorted = set.sorted { $0.modified > $1.modified }
                     let keep = sorted[0].url
-                    // Only copies in Downloads are preselected ("Duplicate Downloads" in Quick Tidy).
+                    // Only copies in Downloads are preselected ("Duplicate Downloads" in Full Scan).
                     let downloads = Paths.home("Downloads").path + "/"
                     for f in sorted.dropFirst() {
                         items.append(.file(f.url, size: f.size, subtitle: String(localized: "Copy of \(Paths.abbreviate(keep))"),

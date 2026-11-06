@@ -49,7 +49,7 @@ final class ModuleController: ObservableObject {
 
     func stop() { task?.cancel(); phase = .intro }
 
-    /// Protection, Quick Tidy and the Malware Finder tool all check launch items; Insights counts those checks.
+    /// Protection, Full Scan and the Malware Finder tool all check launch items; History counts those checks.
     private func recordMalwareScan(_ result: [ResultGroup]) {
         let checksMalware = module == .protection || module == .smartCare || tool?.id == "malwareFinder"
         guard checksMalware else { return }
