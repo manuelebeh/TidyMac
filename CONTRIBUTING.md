@@ -52,6 +52,7 @@ Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `chore`. Scop
 - Match the style of the surrounding code: naming, comment density and idioms.
 - `TidyCore` holds logic and has no UI. `TidyMac` holds SwiftUI views and system integration.
 - Comments explain why, not what.
+- A command that only reads uses `Shell.run`'s default time limit, so a hung tool cannot freeze a scan. Pass `timeout: nil` only for what the user asked for. Log with `Log` (the system log), never `print`, and keep names of files and apps `privacy: .private`.
 
 ## Translations
 
