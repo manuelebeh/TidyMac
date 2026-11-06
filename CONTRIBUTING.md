@@ -91,7 +91,9 @@ By contributing, you agree that your contribution is released under the same lic
 
 Running the workflow by hand from the Actions tab builds the same files as an artifact and publishes nothing. `Packaging/package.sh` does the same locally, into `dist/`.
 
-Signing and notarization need a paid Apple Developer account and a Developer ID Application certificate. The workflow uses them once these repository secrets exist. Without them, the app is signed ad hoc and people have to approve it by hand in System Settings.
+Signing and notarization need a paid Apple Developer account and a Developer ID Application certificate. The workflow uses them once these secrets exist. Without them, the app is signed ad hoc and people have to approve it by hand in System Settings.
+
+Create them as secrets of an environment named `release` (Settings › Environments), not as repository secrets, and limit that environment to tags matching `v*` so no other branch can reach them. Only a tag build uses them: running the workflow by hand always signs ad hoc. The tag build also attaches a build provenance attestation to the ZIP and the DMG.
 
 | Secret | Value |
 | --- | --- |

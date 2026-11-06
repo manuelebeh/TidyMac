@@ -3,7 +3,8 @@ name: Release
 # A tag such as v1.2.3 builds the release and leaves it as a draft to review and publish by hand.
 # Running the workflow by hand builds the same files as a downloadable artifact and publishes nothing.
 #
-# Signing and notarization need these repository secrets. Without them the app is signed ad hoc.
+# Signing and notarization need these secrets, kept in the `release` environment, and only a tag build uses them: a
+# manual run is always signed ad hoc, whatever branch it runs on. Without them the app is signed ad hoc too.
 #   DEVELOPER_ID_CERT_P12      the Developer ID Application certificate and key, base64-encoded
 #   DEVELOPER_ID_CERT_PASSWORD the password of that .p12
 #   APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD   for notarytool (an app-specific password)
@@ -22,12 +23,16 @@ jobs:
   package:
     runs-on: macos-26
     timeout-minutes: 60
+    environment: release
     permissions:
       contents: write # creates the draft release
+      id-token: write # signs the build provenance
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the build number is the commit count
+          persist-credentials: false
 
       - name: Check the tag matches the VERSION file
         if: github.event_name == 'push'
@@ -43,6 +48,7 @@ jobs:
         run: swift test
 
       - name: Import the signing certificate
+        if: github.ref_type == 'tag'
         env:
           CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
           CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
@@ -70,10 +76,19 @@ jobs:
 
       - name: Package
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_ID: ${{ github.ref_type == 'tag' && secrets.APPLE_ID || '' }}
+          APPLE_TEAM_ID: ${{ github.ref_type == 'tag' && secrets.APPLE_TEAM_ID || '' }}
+          APPLE_APP_PASSWORD: ${{ github.ref_type == 'tag' && secrets.APPLE_APP_PASSWORD || '' }}
         run: Packaging/package.sh
+
+      # Lets anyone check a download came from this workflow: `gh attestation verify <file> -R manuelebeh/TidyMac`.
+      - name: Attest the build provenance
+        if: github.event_name == 'push'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/TidyMac-*.zip
+            dist/TidyMac-*.dmg
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

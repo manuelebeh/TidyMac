@@ -8,10 +8,11 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same branch makes the running check pointless.
+# A newer push to the same pull request makes the running check pointless. On main every merge keeps its own run,
+# so a result is never lost to the next merge.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -26,6 +27,8 @@ jobs:
         os: [macos-15, macos-26]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Show the toolchain
         run: |
@@ -61,6 +64,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Package
         run: Packaging/package.sh
