@@ -1,5 +1,7 @@
 # TidyMac
 
+[![CI](https://github.com/manuelebeh/TidyMac/actions/workflows/ci.yml/badge.svg)](https://github.com/manuelebeh/TidyMac/actions/workflows/ci.yml)
+
 A native macOS app to clean, protect and speed up your Mac, built with SwiftUI. Everything runs locally, with no account and no telemetry.
 
 TidyMac is an independent project. It is not affiliated with or endorsed by any other Mac utility vendor.

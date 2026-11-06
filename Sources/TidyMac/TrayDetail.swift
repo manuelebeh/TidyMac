@@ -543,26 +543,30 @@ struct TickRing<Center: View>: View {
     var body: some View {
         ZStack {
             Circle().fill(.primary.opacity(0.07))
-            Canvas { ctx, s in
-                let r = s.width / 2, inner = r - line
-                let lit = Int((min(max(fraction, 0), 1) * Double(ticks)).rounded())
-                let half = Double.pi / Double(ticks) * 0.5
-                for i in 0..<lit {
-                    let a = Double(i) / Double(ticks) * 2 * .pi - .pi / 2 + half * 1.2
-                    var p = Path()
-                    p.move(to: point(a - half * 0.7, inner, s)); p.addLine(to: point(a - half, r, s))
-                    p.addLine(to: point(a + half, r, s)); p.addLine(to: point(a + half * 0.7, inner, s)); p.closeSubpath()
-                    ctx.fill(p, with: .color(color))
-                }
-            }
+            Canvas { ctx, s in drawTicks(ctx, s) }
             .shadow(color: color.opacity(0.45), radius: 8)
             center
         }
         .frame(width: size, height: size)
     }
 
+    // Outside `body` and with its types spelled out: older compilers give up on this much arithmetic inside a view builder.
+    private func drawTicks(_ ctx: GraphicsContext, _ s: CGSize) {
+        let r: CGFloat = s.width / 2
+        let inner: CGFloat = r - line
+        let lit = Int((min(max(fraction, 0), 1) * Double(ticks)).rounded())
+        let half: Double = Double.pi / Double(ticks) * 0.5
+        for i in 0..<lit {
+            let a: Double = Double(i) / Double(ticks) * 2 * Double.pi - Double.pi / 2 + half * 1.2
+            var p = Path()
+            p.move(to: point(a - half * 0.7, inner, s)); p.addLine(to: point(a - half, r, s))
+            p.addLine(to: point(a + half, r, s)); p.addLine(to: point(a + half * 0.7, inner, s)); p.closeSubpath()
+            ctx.fill(p, with: .color(color))
+        }
+    }
+
     func point(_ angle: Double, _ radius: CGFloat, _ s: CGSize) -> CGPoint {
-        CGPoint(x: s.width / 2 + radius * cos(angle), y: s.height / 2 + radius * sin(angle))
+        CGPoint(x: s.width / 2 + radius * CGFloat(cos(angle)), y: s.height / 2 + radius * CGFloat(sin(angle)))
     }
 }
 
