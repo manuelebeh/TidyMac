@@ -107,7 +107,7 @@ public struct CleanupEngine: ScanEngine {
         if Paths.exists(URL(fileURLWithPath: "/usr/bin/xcrun")) {
             items.append(ResultItem(id: "simctl-unavailable", title: String(localized: "Unavailable Simulators"),
                                     subtitle: String(localized: "Simulators for runtimes that are no longer installed"),
-                                    action: .shell("xcrun simctl delete unavailable", admin: false)))
+                                    action: .run(Command("/usr/bin/xcrun", "simctl", "delete", "unavailable"), admin: false)))
         }
         return group("xcode", String(localized: "Xcode Junk"),
                      String(localized: "Derived data, device support files and simulator caches. Xcode recreates what it needs."),
@@ -175,7 +175,7 @@ public struct CleanupEngine: ScanEngine {
             return ResultItem(id: "sim-runtime:\(id)", title: "\(name) \(r["version"] as? String ?? "")",
                               subtitle: String(localized: "Build \(r["build"] as? String ?? "?") · \(usage)"),
                               size: (r["sizeBytes"] as? NSNumber)?.int64Value,
-                              action: .shell("xcrun simctl runtime delete \(id)", admin: false),
+                              action: .run(Command("/usr/bin/xcrun", "simctl", "runtime", "delete", id), admin: false),
                               selectedByDefault: false, badge: used == nil ? String(localized: "Never Used") : nil)
         }
     }
@@ -188,7 +188,7 @@ public struct CleanupEngine: ScanEngine {
         let items = reclaimable == 0 ? [] : [
             ResultItem(id: "docker-prune", title: String(localized: "Unused Docker Data"),
                        subtitle: String(localized: "Stopped containers, dangling images, unused networks and build cache. Up to \(FileSize.format(reclaimable))."),
-                       action: .shell("docker system prune -f", admin: false), selectedByDefault: false),
+                       action: .run(.tool("docker", "system", "prune", "-f"), admin: false), selectedByDefault: false),
         ]
         return group("docker", String(localized: "Docker"), String(localized: "What `docker system prune` removes. Running containers, tagged images and volumes stay."), "shippingbox.circle", items)
     }
@@ -302,7 +302,7 @@ public struct CleanupEngine: ScanEngine {
                     .reduce(0, +)
                 let name = "\(m.deletingLastPathComponent().lastPathComponent):\(m.lastPathComponent)"
                 items.append(ResultItem(id: "ollama:\(name)", title: name, subtitle: "Ollama", size: size, url: m,
-                                        action: .shell("ollama rm \(Executor.quote(name))", admin: false), selectedByDefault: false))
+                                        action: .run(.tool("ollama", "rm", name), admin: false), selectedByDefault: false))
             }
         }
         // LM Studio: <root>/<publisher>/<model>

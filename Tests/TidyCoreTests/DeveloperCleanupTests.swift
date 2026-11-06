@@ -19,7 +19,7 @@ extension TidyCoreTests {
         let items = CleanupEngine.simulatorRuntimeItems(json: Data(json.utf8)).sorted { ($0.size ?? 0) > ($1.size ?? 0) }
         XCTAssertEqual(items.map(\.title), ["iOS 27.2", "watchOS 11.0"])
         XCTAssertEqual(items[0].size, 8_315_434_484)
-        XCTAssertEqual(items[0].action, .shell("xcrun simctl runtime delete 857A3F94-58AF-4EBD-AA4C-418526F656D5", admin: false))
+        XCTAssertEqual(items[0].action, .run(Command("/usr/bin/xcrun", "simctl", "runtime", "delete", "857A3F94-58AF-4EBD-AA4C-418526F656D5"), admin: false))
         XCTAssertNil(items[0].badge)
         XCTAssertEqual(items[1].badge, "Never Used")
         XCTAssertTrue(items.allSatisfy { !$0.selectedByDefault })
@@ -149,7 +149,7 @@ extension TidyCoreTests {
     func testHomebrewUpdateItemUpgradesOnlyWhenAsked() {
         let u = ApplicationsEngine.HomebrewUpdate(token: "visual-studio-code", current: "1", latest: "2")
         XCTAssertFalse(u.item.selectedByDefault)
-        XCTAssertEqual(u.item.action, .shell("HOMEBREW_NO_ANALYTICS=1 brew upgrade --cask 'visual-studio-code'", admin: false))
+        XCTAssertEqual(u.item.action, .run(Command("/usr/bin/env", "HOMEBREW_NO_ANALYTICS=1", "brew", "upgrade", "--cask", "visual-studio-code"), admin: false))
         XCTAssertTrue(u.isSameApp(as: InstalledApp(url: URL(fileURLWithPath: "/Applications/Visual Studio Code.app"),
                                                    name: "Visual Studio Code", bundleID: nil, size: 0)))
         XCTAssertFalse(u.isSameApp(as: InstalledApp(url: URL(fileURLWithPath: "/Applications/Xcode.app"), name: "Xcode", bundleID: nil, size: 0)))
@@ -172,7 +172,7 @@ extension TidyCoreTests {
     }
 
     func testRetryReportKeepsEarlierResultsAndNeverRetriesTwice() {
-        func item(_ name: String) -> ResultItem { ResultItem(title: name, size: 10, action: .shell("true", admin: false)) }
+        func item(_ name: String) -> ResultItem { ResultItem(title: name, size: 10, action: .run(Command("/usr/bin/true"), admin: false)) }
         var first = ActionReport()
         first.succeeded = [item("done")]
         first.failed = [(item("blocked"), "No permission"), (item("still-blocked"), "No permission"), (item("in-use"), "In use")]

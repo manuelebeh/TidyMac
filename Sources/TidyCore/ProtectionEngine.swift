@@ -169,7 +169,7 @@ public struct ProtectionEngine: ScanEngine {
                 guard parts.count == 2, let name = tccServices[parts[0]], !parts[1].hasPrefix("com.apple.") else { continue }
                 let service = parts[0].replacingOccurrences(of: "kTCCService", with: "")
                 items.append(ResultItem(id: "tcc:\(parts[0]):\(parts[1])", title: parts[1], subtitle: name,
-                                        action: .shell("tccutil reset \(service) \(Executor.quote(parts[1]))", admin: false),
+                                        action: .run(Command("/usr/bin/tccutil", "reset", service, parts[1]), admin: false),
                                         selectedByDefault: false))
             }
         }

@@ -39,7 +39,8 @@ public struct PerformanceEngine: ScanEngine {
     public init() {}
 
     public struct Task: Sendable {
-        public let id, title, detail, symbol, command: String
+        public let id, title, detail, symbol: String
+        public let command: Command
         public let admin: Bool
         /// Long-running or disruptive tasks are offered but never preselected.
         public var heavy = false
@@ -47,24 +48,32 @@ public struct PerformanceEngine: ScanEngine {
 
     public static let tasks: [Task] = [
         Task(id: "freeUpRAM", title: String(localized: "Free Up RAM"), detail: String(localized: "Flushes inactive memory so apps get room to work."),
-             symbol: "memorychip", command: "purge", admin: true),
+             symbol: "memorychip", command: Command("/usr/sbin/purge"), admin: true),
         Task(id: "flushDNSCache", title: String(localized: "Flush DNS Cache"), detail: String(localized: "Clears cached domain lookups that may be stale."),
-             symbol: "network", command: "dscacheutil -flushcache; killall -HUP mDNSResponder", admin: true),
+             symbol: "network", command: .script("/usr/bin/dscacheutil -flushcache; /usr/bin/killall -HUP mDNSResponder"), admin: true),
         Task(id: "speedUpMail", title: String(localized: "Speed Up Mail"), detail: String(localized: "Rebuilds Mail's envelope index. Mail must be closed."),
-             symbol: "envelope", command: "for f in ~/Library/Mail/V*/MailData/Envelope\\ Index; do /usr/bin/sqlite3 \"$f\" vacuum; done",
+             symbol: "envelope", command: .script("for f in ~/Library/Mail/V*/MailData/Envelope\\ Index; do /usr/bin/sqlite3 \"$f\" vacuum; done"),
              admin: false),
         Task(id: "reindexSpotlight", title: String(localized: "Reindex Spotlight"), detail: String(localized: "Rebuilds the Spotlight index for the startup disk."),
-             symbol: "magnifyingglass", command: "mdutil -E /", admin: true, heavy: true),
+             symbol: "magnifyingglass", command: Command("/usr/bin/mdutil", "-E", "/"), admin: true, heavy: true),
         Task(id: "repairDiskPermissions", title: String(localized: "Repair Disk Permissions"),
              detail: String(localized: "Resets permissions on your home folder files."),
-             symbol: "lock.shield", command: "diskutil resetUserPermissions / \(getuid())", admin: true, heavy: true),
+             symbol: "lock.shield", command: Command("/usr/sbin/diskutil", "resetUserPermissions", "/", String(getuid())), admin: true, heavy: true),
         Task(id: "periodicScripts", title: String(localized: "Run Maintenance Scripts"),
              detail: String(localized: "Runs the daily, weekly and monthly system scripts."),
-             symbol: "clock.arrow.circlepath", command: "periodic daily weekly monthly", admin: true),
+             symbol: "clock.arrow.circlepath", command: Command("/usr/sbin/periodic", "daily", "weekly", "monthly"), admin: true),
         Task(id: "thinLocalSnapshots", title: String(localized: "Thin Time Machine Snapshots"),
              detail: String(localized: "Removes local Time Machine snapshots. Backups on your drive are not affected."),
-             symbol: "clock.badge.xmark", command: "tmutil thinlocalsnapshots / 999999999999 4", admin: true, heavy: true),
+             symbol: "clock.badge.xmark", command: Command("/usr/bin/tmutil", "thinlocalsnapshots", "/", "999999999999", "4"), admin: true, heavy: true),
     ]
+
+    /// The date `tmutil deletelocalsnapshots` takes, from a line of `tmutil listlocalsnapshots` such as
+    /// "com.apple.TimeMachine.2026-11-06-101500.local". nil for any other line.
+    static func snapshotDate(_ line: Substring) -> String? {
+        guard line.hasPrefix("com.apple.TimeMachine."), let date = line.split(separator: ".").dropFirst(3).first,
+              date.allSatisfy({ $0.isNumber || $0 == "-" }) else { return nil }
+        return String(date)
+    }
 
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {
         progress(String(localized: "Maintenance tasks"))
@@ -75,7 +84,7 @@ public struct PerformanceEngine: ScanEngine {
             let due = last.map { Date().timeIntervalSince($0) > 7 * 86_400 } ?? true
             return ResultItem(id: "task:\(t.id)", title: t.title,
                               subtitle: t.detail + (last.map { String(localized: " Last run \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date())).") } ?? ""),
-                              action: .shell(t.command, admin: t.admin), selectedByDefault: due && !t.heavy)
+                              action: .run(t.command, admin: t.admin), selectedByDefault: due && !t.heavy)
         }
 
         progress(String(localized: "Login items"))
@@ -96,10 +105,13 @@ public struct PerformanceEngine: ScanEngine {
         }
 
         let snapshots = Shell.run("/usr/bin/tmutil", ["listlocalsnapshots", "/"]).output
-            .split(separator: "\n").filter { $0.contains("com.apple.TimeMachine") }
-            .map { s in ResultItem(id: "snap:\(s)", title: String(s), subtitle: String(localized: "Local Time Machine snapshot"),
-                                   action: .shell("tmutil deletelocalsnapshots \(s.split(separator: ".").dropFirst(3).first ?? "")", admin: true),
-                                   selectedByDefault: false) }
+            .split(separator: "\n")
+            .compactMap { s -> ResultItem? in
+                guard let date = Self.snapshotDate(s) else { return nil }
+                return ResultItem(id: "snap:\(s)", title: String(s), subtitle: String(localized: "Local Time Machine snapshot"),
+                                  action: .run(Command("/usr/bin/tmutil", "deletelocalsnapshots", date), admin: true),
+                                  selectedByDefault: false)
+            }
 
         return [
             ResultGroup(id: "maintenance", title: String(localized: "Maintenance Tasks"),

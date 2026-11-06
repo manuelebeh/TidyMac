@@ -137,6 +137,70 @@ extension TidyCoreTests {
         XCTAssertTrue(FileManager.default.fileExists(atPath: u.path))
     }
 
+    /// Names that have broken out of a quote somewhere in the past.
+    static let awkwardNames = ["it's", "say \"hi\"", "back\\slash", "$(touch x)", "`touch x`", "a; rm -rf b", "-dash", "new\nline", "é ü"]
+
+    func testCommandsReachProgramsAndShellsWordForWord() {
+        for name in Self.awkwardNames {
+            let command = Command("/usr/bin/printf", "%s", name)
+            XCTAssertEqual(Shell.run(command.executable, command.arguments).output, name)
+            XCTAssertEqual(Shell.run("/bin/sh", ["-c", command.shellText]).output, name)
+        }
+        let tool = Command.tool("sh", "-c", "echo found")
+        XCTAssertEqual(Shell.run(tool.executable, tool.arguments).output, "found")
+        let script = Command.script("echo one; echo two")
+        XCTAssertEqual(Shell.run(script.executable, script.arguments).output, "one\ntwo")
+    }
+
+    func testAppleScriptStringsSurviveAnyName() throws {
+        for name in Self.awkwardNames {
+            XCTAssertEqual(Shell.osascript("return " + Shell.appleScriptString(name)).output, name)
+            // Compiled, never run: running it is what asks for the password.
+            let script = MoveToApplications.administratorScript(from: URL(fileURLWithPath: "/tmp/\(name)/TidyMac.app"),
+                                                                to: URL(fileURLWithPath: "/Applications/\(name).app"))
+            var error: NSDictionary?
+            let compiled = try XCTUnwrap(NSAppleScript(source: Shell.administratorScript(script))).compileAndReturnError(&error)
+            XCTAssertTrue(compiled, "\(name): \(String(describing: error))")
+        }
+    }
+
+    func testAdministratorMoveCopiesAndReplacesWhateverTheName() throws {
+        for (i, name) in Self.awkwardNames.enumerated() {
+            let source = try write("\(i)/\(name).app/Contents/Info", 3, byte: 7)
+            let bundle = source.deletingLastPathComponent().deletingLastPathComponent()
+            let destination = try write("to\(i)/\(name).app/old", 1).deletingLastPathComponent()
+            // Same script as the prompt runs, here without root.
+            let r = Shell.run("/bin/sh", ["-c", MoveToApplications.administratorScript(from: bundle, to: destination)])
+            XCTAssertEqual(r.status, 0, r.output)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: destination.appendingPathComponent("Contents/Info").path), name)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.appendingPathComponent("old").path), name)
+        }
+    }
+
+    func testAdministratorMoveRefusesAProtectedDestinationWithoutAskingForAPassword() {
+        let bundle = URL(fileURLWithPath: "/tmp/TidyMac.app")
+        XCTAssertThrowsError(try MoveToApplications.moveAsAdministrator(bundle, to: URL(fileURLWithPath: "/Library/Keychains")))
+    }
+
+    func testAdministratorOutcomesMatchWholeLines() {
+        // `do shell script` separates lines with a return.
+        let lines = Executor.outputLines("KO:1\rOK:10\rOK:2")
+        XCTAssertFalse(lines.contains("OK:1"), "item 10 must not report item 1 as done")
+        XCTAssertTrue(lines.contains("OK:10"))
+        XCTAssertTrue(lines.contains("OK:2"))
+    }
+
+    func testSnapshotDateOnlyComesFromASnapshotLine() {
+        XCTAssertEqual(PerformanceEngine.snapshotDate("com.apple.TimeMachine.2026-11-06-101500.local"), "2026-11-06-101500")
+        XCTAssertNil(PerformanceEngine.snapshotDate("Snapshots for disk /:"))
+        XCTAssertNil(PerformanceEngine.snapshotDate("com.apple.TimeMachine"))
+        XCTAssertNil(PerformanceEngine.snapshotDate("com.apple.TimeMachine.$(touch x).local"))
+    }
+
+    func testANewAutomationRuleAsksFirst() {
+        XCTAssertEqual(Automations.Rule(name: "A", trigger: .driveConnected, categories: ["trash"]).mode, .ask)
+    }
+
     func testDuplicatesIgnoreHardLinks() throws {
         let fm = FileManager.default
         let a = try write("a/one.bin", 200_000, byte: 7)

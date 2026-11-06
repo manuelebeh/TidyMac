@@ -26,4 +26,19 @@ public enum MoveToApplications {
         if fm.isDeletableFile(atPath: bundle.path) { try? trash(bundle) }
         return destination
     }
+
+    /// The same for a standard account: /Applications belongs to admin users, so the copy goes through the administrator
+    /// prompt. It has no Trash to send an older copy to, so the destination gets the check of any removal that skips it.
+    @discardableResult
+    public static func moveAsAdministrator(_ bundle: URL, to applications: URL = URL(fileURLWithPath: "/Applications")) throws -> URL {
+        let destination = applications.appendingPathComponent(bundle.lastPathComponent)
+        if let reason = RemovalGuard.refusal(for: destination, permanent: true) { throw Executor.Failure(reason) }
+        let r = Shell.runAsAdministrator(administratorScript(from: bundle, to: destination))
+        if r.status != 0 { throw Executor.Failure(r.output) }
+        return destination
+    }
+
+    static func administratorScript(from bundle: URL, to destination: URL) -> String {
+        Command("/bin/rm", "-rf", destination.path).shellText + " && " + Command("/usr/bin/ditto", bundle.path, destination.path).shellText
+    }
 }

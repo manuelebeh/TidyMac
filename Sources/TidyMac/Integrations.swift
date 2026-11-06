@@ -36,10 +36,7 @@ enum MoveOffer {
         do {
             relaunch(from: try MoveToApplications.move(bundle))
         } catch MoveToApplications.Failure.needsAdministrator {
-            // /Applications belongs to admin users; a standard account copies with the administrator prompt.
-            let dest = "/Applications/\(bundle.lastPathComponent)"
-            let r = Shell.osascript("do shell script \"rm -rf \(Executor.quote(dest)) && /usr/bin/ditto \(Executor.quote(bundle.path)) \(Executor.quote(dest))\" with administrator privileges")
-            if r.status == 0 { relaunch(from: URL(fileURLWithPath: dest)) } else { fail(r.output) }
+            do { relaunch(from: try MoveToApplications.moveAsAdministrator(bundle)) } catch { fail(error.localizedDescription) }
         } catch {
             fail(error.localizedDescription)
         }
