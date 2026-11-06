@@ -40,7 +40,7 @@ public enum IgnoreList {
 
         init(group: String?) {
             switch group {
-            case "user-cache", "system-cache", "user-logs", "system-logs", "xcode", "ios-backups",
+            case "user-cache", "system-cache", "user-logs", "system-logs", "xcode", "dev-tools", "ios-backups",
                  "broken-prefs", "broken-login", "deleted-users": self = .systemJunk
             case "ai-junk", "local-models": self = .aiClutter
             case "mail": self = .mail
