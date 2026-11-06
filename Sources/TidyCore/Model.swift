@@ -57,7 +57,7 @@ public struct ResultGroup: Identifiable, Sendable {
     /// Optional sub-heading shown on the module's result tile, e.g. "3 tasks to run".
     public var verb: String
 
-    public init(id: String, title: String, description: String, symbol: String, items: [ResultItem], verb: String = "to clean") {
+    public init(id: String, title: String, description: String, symbol: String, items: [ResultItem], verb: String = String(localized: "to clean")) {
         self.id = id; self.title = title; self.description = description; self.symbol = symbol
         self.items = items.map { var i = $0; if i.category == nil { i.category = id }; return i }
         self.verb = verb

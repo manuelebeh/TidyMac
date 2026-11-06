@@ -154,16 +154,16 @@ struct ModuleScreen: View {
 
     @ViewBuilder var bottomButton: some View {
         switch controller.phase {
-        case .intro: ScanButton(title: "Scan", module: module) { controller.scan() }
-        case .scanning: ScanButton(title: "Stop", module: module, busy: true) { controller.stop() }
+        case .intro: ScanButton(title: String(localized: "Scan"), module: module) { controller.scan() }
+        case .scanning: ScanButton(title: String(localized: "Stop"), module: module, busy: true) { controller.stop() }
         case .running: ScanButton(title: "", module: module, busy: true, dimmed: true) {}
         case .results:
-            ScanButton(title: controller.selected.isEmpty ? "Scan" : module.actionTitle, module: module,
-                       subtitle: controller.selected.isEmpty ? "Nothing selected" :
-                           controller.selectedSize > 0 ? formatSize(controller.selectedSize) : "\(controller.selected.count) items") {
+            ScanButton(title: controller.selected.isEmpty ? String(localized: "Scan") : module.actionTitle, module: module,
+                       subtitle: controller.selected.isEmpty ? String(localized: "Nothing selected") :
+                           controller.selectedSize > 0 ? formatSize(controller.selectedSize) : String(localized: "\(controller.selected.count) items")) {
                 controller.selected.isEmpty ? controller.scan() : controller.run()
             }
-        case .done: ScanButton(title: "Done", module: module) { controller.phase = .intro }
+        case .done: ScanButton(title: String(localized: "Done"), module: module) { controller.phase = .intro }
         }
     }
 }
@@ -215,7 +215,7 @@ struct ProgressScreen: View {
     var body: some View {
         VStack(spacing: 28) {
             GlassIcon(module: controller.module, size: 200, pulsing: true)
-            Text(controller.phase == .running ? "Working on it..." : controller.progressTitle)
+            Text(controller.phase == .running ? String(localized: "Working on it...") : controller.progressTitle)
                 .font(.system(size: 26, weight: .light)).foregroundStyle(.white)
                 .id(controller.phase)
                 .transition(.opacity)
@@ -232,11 +232,11 @@ struct ResultsView: View {
     var module: Module { controller.module }
 
     var header: String {
-        if controller.groups.allSatisfy(\.isEmpty) { return "Your Mac is in great shape!" }
+        if controller.groups.allSatisfy(\.isEmpty) { return String(localized: "Your Mac is in great shape!") }
         switch module {
-        case .smartCare: return "Your tasks are ready to run. Look what we found:"
-        case .cleanup: return "There are \(formatSize(controller.totalSize)) of junk files on your Mac."
-        default: return "Here is what we found."
+        case .smartCare: return String(localized: "Your tasks are ready to run. Look what we found:")
+        case .cleanup: return String(localized: "There are \(formatSize(controller.totalSize)) of junk files on your Mac.")
+        default: return String(localized: "Here is what we found.")
         }
     }
 
@@ -251,10 +251,10 @@ struct ResultsView: View {
             }
             if controller.scannedWithoutAccess {
                 if access.granted {
-                    FullDiskAccessBanner(message: "Full Disk Access is on. Scan again to include protected folders.",
-                                         symbol: "checkmark.shield.fill", actionTitle: "Scan Again") { controller.scan() }
+                    FullDiskAccessBanner(message: String(localized: "Full Disk Access is on. Scan again to include protected folders."),
+                                         symbol: "checkmark.shield.fill", actionTitle: String(localized: "Scan Again")) { controller.scan() }
                 } else {
-                    FullDiskAccessBanner(message: "Protected folders were skipped. Grant Full Disk Access to include them.")
+                    FullDiskAccessBanner(message: String(localized: "Protected folders were skipped. Grant Full Disk Access to include them."))
                 }
             }
             ScrollView {
@@ -276,10 +276,10 @@ struct Tile: View {
     @State private var hover = false
 
     var value: String {
-        if group.isEmpty { return "Nothing found" }
-        guard group.totalSize > 0 else { return "\(controller.selectedCount(of: group)) of \(group.items.count)" }
+        if group.isEmpty { return String(localized: "Nothing found") }
+        guard group.totalSize > 0 else { return String(localized: "\(controller.selectedCount(of: group)) of \(group.items.count)") }
         let size = controller.selectedSize(of: group)
-        return size > 0 ? formatSize(size) : "\(formatSize(group.totalSize)) found"
+        return size > 0 ? formatSize(size) : String(localized: "\(formatSize(group.totalSize)) found")
     }
 
     var body: some View {
@@ -400,14 +400,14 @@ struct DoneView: View {
                         .appear(delay: 0.35, offset: .zero, scale: 0.2)
                 }
                 .appear(scale: 0.85)
-            Text(r.failed.isEmpty ? "Well done!" : "Some items were not processed")
+            Text(r.failed.isEmpty ? String(localized: "Well done!") : String(localized: "Some items were not processed"))
                 .font(.system(size: 30, weight: .light)).foregroundStyle(.white)
                 .appear(delay: 0.15)
-            Text(r.freed > 0 ? "\(formatSize(r.freed)) freed · \(r.succeeded.count) items" : "\(r.succeeded.count) items done")
+            Text(r.freed > 0 ? String(localized: "\(formatSize(r.freed)) freed · \(r.succeeded.count) items") : String(localized: "\(r.succeeded.count) items done"))
                 .font(.title3).foregroundStyle(.white.opacity(0.8))
                 .appear(delay: 0.22)
             if !r.needsAccess.isEmpty && !access.granted {
-                FullDiskAccessBanner(message: "macOS blocked \(r.needsAccess.count) of these items. Stay on this screen and grant Full Disk Access: they will be removed as soon as you do.")
+                FullDiskAccessBanner(message: String(localized: "macOS blocked \(r.needsAccess.count) of these items. Stay on this screen and grant Full Disk Access: they will be removed as soon as you do."))
                     .frame(maxWidth: 640)
             }
             if !r.failed.isEmpty {

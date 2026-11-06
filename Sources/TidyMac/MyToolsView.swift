@@ -52,10 +52,10 @@ struct MyToolsScreen: View {
                         Text("No tools match your search.\nTry a different keyword.")
                             .multilineTextAlignment(.center).foregroundStyle(.white.opacity(0.7)).frame(maxWidth: .infinity).padding(.top, 80)
                     } else if !query.isEmpty {
-                        section("\(shown.count) results found", shown)
+                        section(String(localized: "\(shown.count) results found"), shown)
                     } else {
-                        if !pinned.isEmpty { section("Favorites", pinned) }
-                        section(pinned.isEmpty ? "" : "Other Tools", others)
+                        if !pinned.isEmpty { section(String(localized: "Favorites"), pinned) }
+                        section(pinned.isEmpty ? "" : String(localized: "Other Tools"), others)
                     }
                 }
                 .padding(.bottom, 30)
@@ -136,14 +136,14 @@ struct ToolCard: View {
 
     var lastScan: String? {
         guard let d = ToolHistory.lastScan(tool.id) else { return nil }
-        if Calendar.current.isDateInToday(d) { return "Last Scan: Today" }
-        return "Last Scan: " + RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date())
+        if Calendar.current.isDateInToday(d) { return String(localized: "Last Scan: Today") }
+        return String(localized: "Last Scan: \(RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date()))")
     }
 
     var buttonTitle: String {
         switch tool.kind {
-        case .scan: "Scan"
-        case .uninstaller, .screenCleaning: "Open"
+        case .scan: String(localized: "Scan")
+        case .uninstaller, .screenCleaning: String(localized: "Open")
         }
     }
 
@@ -160,7 +160,7 @@ struct ToolCard: View {
                     Button(action: toggleFavorite) {
                         Image(systemName: favorite ? "star.fill" : "star").foregroundStyle(favorite ? .yellow : .white.opacity(0.7))
                     }
-                    .buttonStyle(.plain).help(favorite ? "Saved" : "Save")
+                    .buttonStyle(.plain).help(favorite ? String(localized: "Saved") : String(localized: "Save"))
                 }
             }
             Text(tool.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white).padding(.top, 6)

@@ -24,17 +24,17 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         guard timer == nil else { return }
         if let center {
             center.delegate = self
-            let review = UNNotificationAction(identifier: "review", title: "Review", options: [.foreground])
-            let ignoreDay = UNNotificationAction(identifier: "ignoreDay", title: "Ignore for a Day")
-            let ignore = UNNotificationAction(identifier: "ignore", title: "Ignore")
+            let review = UNNotificationAction(identifier: "review", title: String(localized: "Review"), options: [.foreground])
+            let ignoreDay = UNNotificationAction(identifier: "ignoreDay", title: String(localized: "Ignore for a Day"))
+            let ignore = UNNotificationAction(identifier: "ignore", title: String(localized: "Ignore"))
             center.setNotificationCategories([
                 UNNotificationCategory(identifier: "issue", actions: [review, ignoreDay], intentIdentifiers: []),
                 UNNotificationCategory(identifier: "threat", actions: [review, ignore], intentIdentifiers: []),
-                UNNotificationCategory(identifier: "hung", actions: [UNNotificationAction(identifier: "forceQuit", title: "Force Quit All"),
-                                                                     UNNotificationAction(identifier: "ignoreDay", title: "Wait")], intentIdentifiers: []),
-                UNNotificationCategory(identifier: "drive", actions: [UNNotificationAction(identifier: "show", title: "Show")], intentIdentifiers: []),
-                UNNotificationCategory(identifier: "automation", actions: [UNNotificationAction(identifier: "clean", title: "Clean"),
-                                                                           UNNotificationAction(identifier: "later", title: "Later")], intentIdentifiers: []),
+                UNNotificationCategory(identifier: "hung", actions: [UNNotificationAction(identifier: "forceQuit", title: String(localized: "Force Quit All")),
+                                                                     UNNotificationAction(identifier: "ignoreDay", title: String(localized: "Wait"))], intentIdentifiers: []),
+                UNNotificationCategory(identifier: "drive", actions: [UNNotificationAction(identifier: "show", title: String(localized: "Show"))], intentIdentifiers: []),
+                UNNotificationCategory(identifier: "automation", actions: [UNNotificationAction(identifier: "clean", title: String(localized: "Clean")),
+                                                                           UNNotificationAction(identifier: "later", title: String(localized: "Later"))], intentIdentifiers: []),
             ])
             center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
@@ -97,8 +97,8 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
     private func announceUpdate() async {
         guard case .available(let release)? = try? await SelfUpdate.check(), SelfUpdate.shouldAnnounce(release) else { return }
         let content = UNMutableNotificationContent()
-        content.title = "TidyMac \(release.version) is available"
-        content.body = "Click to open the download page."
+        content.title = String(localized: "TidyMac \(release.version) is available")
+        content.body = String(localized: "Click to open the download page.")
         content.userInfo = ["open": release.page.absoluteString]
         guard let center else { print("alert: \(content.title) — \(content.body)"); return }
         try? await center.add(UNNotificationRequest(identifier: "update:\(release.version)", content: content, trigger: nil))
@@ -110,8 +110,8 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         for rule in Automations.onDriveConnected(Automations.load()) { Task { await AutomationRunner.shared.run(rule) } }
         guard HealthAlerts.Settings.load().driveConnected else { return }
         let content = UNMutableNotificationContent()
-        content.title = "\"\(drive.name)\" connected"
-        content.body = "\(FileSize.format(drive.available)) available of \(FileSize.format(drive.total)). Click to show the drive in Finder."
+        content.title = String(localized: "\"\(drive.name)\" connected")
+        content.body = String(localized: "\(FileSize.format(drive.available)) available of \(FileSize.format(drive.total)). Click to show the drive in Finder.")
         content.categoryIdentifier = "drive"
         content.userInfo = ["reveal": drive.url.path]
         guard let center else { print("alert: \(content.title) — \(content.body)"); return }

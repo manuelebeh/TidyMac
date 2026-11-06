@@ -96,7 +96,20 @@ extension SystemMonitor {
         public let kind: String?
         /// e.g. [("Left", 80), ("Right", 75), ("Case", 40)] for AirPods, [("", 60)] for a mouse. Empty: no battery data.
         public let batteries: [Battery]
-        public struct Battery: Sendable, Equatable { public let label: String; public let percent: Int }
+        public struct Battery: Sendable, Equatable {
+            /// Fixed English, since `lowest` tells the charging case apart with it. Show `title`.
+            public let label: String
+            public let percent: Int
+
+            public var title: String {
+                switch label {
+                case "Left": String(localized: "Left")
+                case "Right": String(localized: "Right")
+                case "Case": String(localized: "Case")
+                default: label
+                }
+            }
+        }
         /// The level that matters for "Time to juice up!": the lowest one, not counting a charging case.
         public var lowest: Int? { batteries.filter { $0.label != "Case" }.map(\.percent).min() }
     }
@@ -133,9 +146,9 @@ extension SystemMonitor {
     public enum DriveHealth: Sendable { case good, failing, unknown
         public var text: String {
             switch self {
-            case .good: "This drive is in good condition."
-            case .failing: "Back up immediately. This drive is in bad condition and should be replaced."
-            case .unknown: "Drive health could not be read."
+            case .good: String(localized: "This drive is in good condition.")
+            case .failing: String(localized: "Back up immediately. This drive is in bad condition and should be replaced.")
+            case .unknown: String(localized: "Drive health could not be read.")
             }
         }
     }

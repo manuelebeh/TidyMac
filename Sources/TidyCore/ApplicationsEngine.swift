@@ -8,11 +8,11 @@ public struct ApplicationsEngine: ScanEngine {
 
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {
         let apps = Uninstaller.installedApps()
-        progress("Checking for updates")
+        progress(String(localized: "Checking for updates"))
         let updates = await Self.updates(for: apps)
-        progress("Looking for leftovers")
+        progress(String(localized: "Looking for leftovers"))
         let leftovers = Self.leftovers(installed: apps)
-        progress("Looking for installers")
+        progress(String(localized: "Looking for installers"))
         let installers = Self.unusedInstallers()
         return [updates, leftovers, installers].filter { !$0.isEmpty }
     }
@@ -20,7 +20,11 @@ public struct ApplicationsEngine: ScanEngine {
     // MARK: Updater
 
     /// Where an update comes from: the developer's Sparkle feed or the App Store.
-    public enum UpdateSource: String, Sendable { case developer = "Developer", appStore = "App Store" }
+    public enum UpdateSource: String, Sendable {
+        case developer = "Developer", appStore = "App Store"
+
+        public var title: String { self == .developer ? String(localized: "Developer") : "App Store" }
+    }
 
     public struct Update: Sendable {
         public let app: InstalledApp
@@ -47,13 +51,13 @@ public struct ApplicationsEngine: ScanEngine {
             let target = u.source == .appStore ? u.download ?? u.app.url : u.app.url
             let size = u.size.map { " · " + FileSize.format($0) } ?? ""
             return ResultItem(id: "update:\(u.app.url.path)", title: u.app.name,
-                              subtitle: "\(u.current) → \(u.latest) · \(u.source.rawValue)\(size)",
+                              subtitle: "\(u.current) → \(u.latest) · \(u.source.title)\(size)",
                               url: u.app.url, action: .open(target), selectedByDefault: false, badge: u.latest)
         }
         items += casks.sorted { $0.token < $1.token }.map(\.item)
-        return ResultGroup(id: "updates", title: "App Updater",
-                           description: "Apps with a newer version from their developer, the App Store or Homebrew.",
-                           symbol: "arrow.down.app", items: items, verb: "to update")
+        return ResultGroup(id: "updates", title: String(localized: "App Updater"),
+                           description: String(localized: "Apps with a newer version from their developer, the App Store or Homebrew."),
+                           symbol: "arrow.down.app", items: items, verb: String(localized: "to update"))
     }
 
     /// A cask Homebrew would upgrade. Casks that update themselves are left to their own updater, as `brew` does.
@@ -172,13 +176,13 @@ public struct ApplicationsEngine: ScanEngine {
                 // Helpers and extensions use the parent app's ID as prefix.
                 if ids.contains(where: { id == $0 || id.hasPrefix($0 + ".") || $0.hasPrefix(id + ".") }) { continue }
                 if vendors.contains(id.split(separator: ".").prefix(2).joined(separator: ".")) { continue }
-                items.append(.file(u, subtitle: "\(dir) · no matching app", selected: false))
+                items.append(.file(u, subtitle: String(localized: "\(dir) · no matching app"), selected: false))
             }
         }
-        return ResultGroup(id: "leftovers", title: "File Leftovers",
-                           description: "Support files of apps that are no longer installed.",
+        return ResultGroup(id: "leftovers", title: String(localized: "File Leftovers"),
+                           description: String(localized: "Support files of apps that are no longer installed."),
                            symbol: "shippingbox", items: items.filter { ($0.size ?? 0) > 0 }.sorted { ($0.size ?? 0) > ($1.size ?? 0) },
-                           verb: "to remove")
+                           verb: String(localized: "to remove"))
     }
 
     /// Frameworks and developer tools that store data under their own ID without being an app.
@@ -196,9 +200,9 @@ public struct ApplicationsEngine: ScanEngine {
         let items = Paths.children(Paths.home("Downloads"))
             .filter { ["dmg", "pkg", "mpkg"].contains($0.pathExtension.lowercased()) }
             .map { ResultItem.file($0) }
-        return ResultGroup(id: "installers", title: "Unused DMG Files",
-                           description: "Installers left in Downloads after the app was installed.",
-                           symbol: "opticaldiscdrive", items: items, verb: "to remove")
+        return ResultGroup(id: "installers", title: String(localized: "Unused DMG Files"),
+                           description: String(localized: "Installers left in Downloads after the app was installed."),
+                           symbol: "opticaldiscdrive", items: items, verb: String(localized: "to remove"))
     }
 }
 

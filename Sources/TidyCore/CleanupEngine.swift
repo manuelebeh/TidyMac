@@ -13,22 +13,22 @@ public struct CleanupEngine: ScanEngine {
     }
 
     public static let categories: [Category] = [
-        Category(id: "user-cache", title: "User Cache Files", build: userCache),
-        Category(id: "system-cache", title: "System Cache Files", build: systemCache),
-        Category(id: "user-logs", title: "User Log Files", build: userLogs),
-        Category(id: "system-logs", title: "System Log Files", build: systemLogs),
-        Category(id: "xcode", title: "Xcode Junk", build: xcodeJunk),
-        Category(id: "dev-tools", title: "Developer Tool Caches", build: { devToolCaches() }),
-        Category(id: "sim-runtimes", title: "Simulator Runtimes", build: simulatorRuntimes),
-        Category(id: "docker", title: "Docker", build: docker),
-        Category(id: "ios-backups", title: "iOS Device Backups", build: iosBackups),
-        Category(id: "broken-prefs", title: "Broken Preferences", build: brokenPreferences),
-        Category(id: "broken-login", title: "Broken Login Items", build: brokenLoginItems),
-        Category(id: "deleted-users", title: "Deleted Users", build: deletedUsers),
-        Category(id: "ai-junk", title: "AI Junk Files", build: aiClutter),
-        Category(id: "local-models", title: "Local Models", build: localModels),
-        Category(id: "mail", title: "Mail Attachments", build: mailAttachments),
-        Category(id: "trash", title: "Trash Bins", build: trashBins),
+        Category(id: "user-cache", title: String(localized: "User Cache Files"), build: userCache),
+        Category(id: "system-cache", title: String(localized: "System Cache Files"), build: systemCache),
+        Category(id: "user-logs", title: String(localized: "User Log Files"), build: userLogs),
+        Category(id: "system-logs", title: String(localized: "System Log Files"), build: systemLogs),
+        Category(id: "xcode", title: String(localized: "Xcode Junk"), build: xcodeJunk),
+        Category(id: "dev-tools", title: String(localized: "Developer Tool Caches"), build: { devToolCaches() }),
+        Category(id: "sim-runtimes", title: String(localized: "Simulator Runtimes"), build: simulatorRuntimes),
+        Category(id: "docker", title: String(localized: "Docker"), build: docker),
+        Category(id: "ios-backups", title: String(localized: "iOS Device Backups"), build: iosBackups),
+        Category(id: "broken-prefs", title: String(localized: "Broken Preferences"), build: brokenPreferences),
+        Category(id: "broken-login", title: String(localized: "Broken Login Items"), build: brokenLoginItems),
+        Category(id: "deleted-users", title: String(localized: "Deleted Users"), build: deletedUsers),
+        Category(id: "ai-junk", title: String(localized: "AI Junk Files"), build: aiClutter),
+        Category(id: "local-models", title: String(localized: "Local Models"), build: localModels),
+        Category(id: "mail", title: String(localized: "Mail Attachments"), build: mailAttachments),
+        Category(id: "trash", title: String(localized: "Trash Bins"), build: trashBins),
     ]
 
     /// Categories safe to clean with nobody watching: Smart Care keeps their selection and Settings › Automations offers them.
@@ -61,22 +61,22 @@ public struct CleanupEngine: ScanEngine {
         let items = Paths.children(Paths.library.appendingPathComponent("Caches"))
             .filter { !protectedCaches.contains($0.lastPathComponent) && $0.lastPathComponent != ownID }
             .map { ResultItem.file($0) }
-        return group("user-cache", "User Cache Files",
-                     "Temporary data apps keep to load faster. It is rebuilt automatically.", "archivebox", items)
+        return group("user-cache", String(localized: "User Cache Files"),
+                     String(localized: "Temporary data apps keep to load faster. It is rebuilt automatically."), "archivebox", items)
     }
 
     @Sendable static func systemCache() -> ResultGroup {
         let items = Paths.children(URL(fileURLWithPath: "/Library/Caches"))
             .filter { !$0.lastPathComponent.hasPrefix("com.apple.") && !RemovalGuard.isProtectedByMacOS($0) }
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
-        return group("system-cache", "System Cache Files",
-                     "Caches of system-wide services and installers. Removal needs your administrator password.",
+        return group("system-cache", String(localized: "System Cache Files"),
+                     String(localized: "Caches of system-wide services and installers. Removal needs your administrator password."),
                      "gearshape.2", items)
     }
 
     @Sendable static func userLogs() -> ResultGroup {
         let items = Paths.children(Paths.library.appendingPathComponent("Logs")).map { ResultItem.file($0) }
-        return group("user-logs", "User Log Files", "Activity and crash logs written by your apps.", "doc.text", items)
+        return group("user-logs", String(localized: "User Log Files"), String(localized: "Activity and crash logs written by your apps."), "doc.text", items)
     }
 
     @Sendable static func systemLogs() -> ResultGroup {
@@ -87,8 +87,8 @@ public struct CleanupEngine: ScanEngine {
         items += Paths.children(URL(fileURLWithPath: "/private/var/log"))
             .filter { ["gz", "bz2"].contains($0.pathExtension) && !RemovalGuard.isProtectedByMacOS($0) }
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
-        return group("system-logs", "System Log Files",
-                     "Logs of system services. Useful for debugging only. Needs your administrator password.",
+        return group("system-logs", String(localized: "System Log Files"),
+                     String(localized: "Logs of system services. Useful for debugging only. Needs your administrator password."),
                      "doc.text.magnifyingglass", items)
     }
 
@@ -105,12 +105,12 @@ public struct CleanupEngine: ScanEngine {
         items += Paths.children(dev.appendingPathComponent("CoreSimulator/Caches"))
             .map { ResultItem.file($0, subtitle: "CoreSimulator › Caches") }
         if Paths.exists(URL(fileURLWithPath: "/usr/bin/xcrun")) {
-            items.append(ResultItem(id: "simctl-unavailable", title: "Unavailable Simulators",
-                                    subtitle: "Simulators for runtimes that are no longer installed",
+            items.append(ResultItem(id: "simctl-unavailable", title: String(localized: "Unavailable Simulators"),
+                                    subtitle: String(localized: "Simulators for runtimes that are no longer installed"),
                                     action: .shell("xcrun simctl delete unavailable", admin: false)))
         }
-        return group("xcode", "Xcode Junk",
-                     "Derived data, device support files and simulator caches. Xcode recreates what it needs.",
+        return group("xcode", String(localized: "Xcode Junk"),
+                     String(localized: "Derived data, device support files and simulator caches. Xcode recreates what it needs."),
                      "hammer", items.filter { ($0.size ?? 1) > 0 })
     }
 
@@ -145,8 +145,8 @@ public struct CleanupEngine: ScanEngine {
             ResultItem.file(found[i].url, size: sizes[i], selected: found[i].selected)
                 .with(title: "\(found[i].tool): \(found[i].url.lastPathComponent)")
         }
-        return group("dev-tools", "Developer Tool Caches",
-                     "Packages and build files kept by npm, pnpm, Cargo, Gradle and similar tools. They are downloaded again when a project needs them.",
+        return group("dev-tools", String(localized: "Developer Tool Caches"),
+                     String(localized: "Packages and build files kept by npm, pnpm, Cargo, Gradle and similar tools. They are downloaded again when a project needs them."),
                      "terminal", items)
     }
 
@@ -157,8 +157,8 @@ public struct CleanupEngine: ScanEngine {
             let r = Shell.run("/usr/bin/xcrun", ["simctl", "runtime", "list", "-j"])
             if r.status == 0 { items = simulatorRuntimeItems(json: r.jsonObject) }
         }
-        return group("sim-runtimes", "Simulator Runtimes",
-                     "iOS, watchOS, tvOS and visionOS simulator images installed for Xcode. A removed runtime has to be downloaded again from Xcode before its simulators can run.",
+        return group("sim-runtimes", String(localized: "Simulator Runtimes"),
+                     String(localized: "iOS, watchOS, tvOS and visionOS simulator images installed for Xcode. A removed runtime has to be downloaded again from Xcode before its simulators can run."),
                      "iphone.gen3", items)
     }
 
@@ -169,14 +169,14 @@ public struct CleanupEngine: ScanEngine {
         return all.compactMap { id, r -> ResultItem? in
             guard UUID(uuidString: id) != nil, r["deletable"] as? Bool == true else { return nil }
             let platform = r["platformIdentifier"] as? String ?? ""
-            let name = platforms.first { platform.contains($0.key + "simulator") }?.value ?? "Simulator"
+            let name = platforms.first { platform.contains($0.key + "simulator") }?.value ?? String(localized: "Simulator")
             let used = (r["lastUsedAt"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
-            let usage = used.map { "used \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: now))" } ?? "never used"
+            let usage = used.map { String(localized: "used \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: now))") } ?? String(localized: "never used")
             return ResultItem(id: "sim-runtime:\(id)", title: "\(name) \(r["version"] as? String ?? "")",
-                              subtitle: "Build \(r["build"] as? String ?? "?") · \(usage)",
+                              subtitle: String(localized: "Build \(r["build"] as? String ?? "?") · \(usage)"),
                               size: (r["sizeBytes"] as? NSNumber)?.int64Value,
                               action: .shell("xcrun simctl runtime delete \(id)", admin: false),
-                              selectedByDefault: false, badge: used == nil ? "Never Used" : nil)
+                              selectedByDefault: false, badge: used == nil ? String(localized: "Never Used") : nil)
         }
     }
 
@@ -186,11 +186,11 @@ public struct CleanupEngine: ScanEngine {
         let r = Shell.run("/usr/bin/env", ["docker", "system", "df", "--format", "{{json .}}"])
         let reclaimable = r.status == 0 ? dockerReclaimable(r.output) : 0
         let items = reclaimable == 0 ? [] : [
-            ResultItem(id: "docker-prune", title: "Unused Docker Data",
-                       subtitle: "Stopped containers, dangling images, unused networks and build cache. Up to \(FileSize.format(reclaimable)).",
+            ResultItem(id: "docker-prune", title: String(localized: "Unused Docker Data"),
+                       subtitle: String(localized: "Stopped containers, dangling images, unused networks and build cache. Up to \(FileSize.format(reclaimable))."),
                        action: .shell("docker system prune -f", admin: false), selectedByDefault: false),
         ]
-        return group("docker", "Docker", "What `docker system prune` removes. Running containers, tagged images and volumes stay.", "shippingbox.circle", items)
+        return group("docker", String(localized: "Docker"), String(localized: "What `docker system prune` removes. Running containers, tagged images and volumes stay."), "shippingbox.circle", items)
     }
 
     /// Adds up the "Reclaimable" column of `docker system df --format '{{json .}}'`, without volumes, which a prune keeps.
@@ -228,9 +228,9 @@ public struct CleanupEngine: ScanEngine {
             let (name, date) = info[b] ?? (b.lastPathComponent, .distantPast)
             return ResultItem(title: name, subtitle: date == .distantPast ? nil : DateFormatter.localizedString(from: date, dateStyle: .medium, timeStyle: .short),
                               size: FileSize.allocated(b), url: b, action: .trash(b),
-                              selectedByDefault: false, badge: latest.contains(b) ? "Latest" : nil)
+                              selectedByDefault: false, badge: latest.contains(b) ? String(localized: "Latest") : nil)
         }
-        return group("ios-backups", "iOS Device Backups", "Local backups of your iPhone and iPad.", "iphone", items)
+        return group("ios-backups", String(localized: "iOS Device Backups"), String(localized: "Local backups of your iPhone and iPad."), "iphone", items)
     }
 
     @Sendable static func brokenPreferences() -> ResultGroup {
@@ -240,22 +240,22 @@ public struct CleanupEngine: ScanEngine {
                   let data = try? Data(contentsOf: url) else { return false }
             return (try? PropertyListSerialization.propertyList(from: data, format: nil)) == nil
         }.map { ResultItem.file($0) }
-        return group("broken-prefs", "Broken Preferences",
-                     "Preference files that can no longer be read and may make apps misbehave.", "wrench.adjustable", items)
+        return group("broken-prefs", String(localized: "Broken Preferences"),
+                     String(localized: "Preference files that can no longer be read and may make apps misbehave."), "wrench.adjustable", items)
     }
 
     @Sendable static func brokenLoginItems() -> ResultGroup {
         let items = LaunchItems.all().filter { $0.isBroken && !$0.isSystemWide }
-            .map { ResultItem.file($0.plist, subtitle: "Missing: \($0.executable ?? "?")", action: .removeLaunchItem($0.plist, admin: false)) }
-        return group("broken-login", "Broken Login Items",
-                     "Launch agents pointing to apps that are no longer installed.", "bolt.slash", items)
+            .map { ResultItem.file($0.plist, subtitle: String(localized: "Missing: \($0.executable ?? "?")"), action: .removeLaunchItem($0.plist, admin: false)) }
+        return group("broken-login", String(localized: "Broken Login Items"),
+                     String(localized: "Launch agents pointing to apps that are no longer installed."), "bolt.slash", items)
     }
 
     @Sendable static func deletedUsers() -> ResultGroup {
         let items = Paths.children(URL(fileURLWithPath: "/Users/Deleted Users"))
             .filter { !RemovalGuard.isProtectedByMacOS($0) }
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
-        return group("deleted-users", "Deleted Users", "Data left over from user accounts that were removed.", "person.crop.circle.badge.xmark", items)
+        return group("deleted-users", String(localized: "Deleted Users"), String(localized: "Data left over from user accounts that were removed."), "person.crop.circle.badge.xmark", items)
     }
 
     // MARK: AI Clutter
@@ -283,8 +283,8 @@ public struct CleanupEngine: ScanEngine {
         let items = aiPaths.map { (Paths.home($0.0), $0.1) }.filter { Paths.exists($0.0) }
             .map { ResultItem.file($0.0, subtitle: "\($0.1) · \(Paths.abbreviate($0.0.deletingLastPathComponent()))") }
             .filter { ($0.size ?? 0) > 0 }
-        return group("ai-junk", "AI Junk Files",
-                     "Caches, logs and temporary files created by AI tools such as Claude, Codex, Gemini and Cursor.",
+        return group("ai-junk", String(localized: "AI Junk Files"),
+                     String(localized: "Caches, logs and temporary files created by AI tools such as Claude, Codex, Gemini and Cursor."),
                      "sparkles", items)
     }
 
@@ -313,8 +313,8 @@ public struct CleanupEngine: ScanEngine {
                 }
             }
         }
-        return group("local-models", "Local Models",
-                     "Models downloaded with Ollama and LM Studio. Removing one means downloading it again before use.",
+        return group("local-models", String(localized: "Local Models"),
+                     String(localized: "Models downloaded with Ollama and LM Studio. Removing one means downloading it again before use."),
                      "cpu", items)
     }
 
@@ -323,20 +323,20 @@ public struct CleanupEngine: ScanEngine {
     @Sendable static func mailAttachments() -> ResultGroup {
         let dl = Paths.library.appendingPathComponent("Containers/com.apple.mail/Data/Library/Mail Downloads")
         let items = Paths.children(dl).map { ResultItem.file($0) }
-        return group("mail", "Mail Attachments",
-                     "Copies of attachments you opened in Mail. The originals stay on the mail server.", "paperclip", items)
+        return group("mail", String(localized: "Mail Attachments"),
+                     String(localized: "Copies of attachments you opened in Mail. The originals stay on the mail server."), "paperclip", items)
     }
 
     @Sendable static func trashBins() -> ResultGroup {
         var items = Paths.children(Paths.home(".Trash"), hidden: true)
             .filter { $0.lastPathComponent != ".DS_Store" }
-            .map { ResultItem.file($0, subtitle: "Trash", action: .delete($0)) }
+            .map { ResultItem.file($0, subtitle: String(localized: "Trash"), action: .delete($0)) }
         for vol in Paths.children(URL(fileURLWithPath: "/Volumes")) {
             let t = vol.appendingPathComponent(".Trashes/\(getuid())")
             items += Paths.children(t, hidden: true).filter { $0.lastPathComponent != ".DS_Store" }
-                .map { ResultItem.file($0, subtitle: "Trash on \(vol.lastPathComponent)", action: .delete($0)) }
+                .map { ResultItem.file($0, subtitle: String(localized: "Trash on \(vol.lastPathComponent)"), action: .delete($0)) }
         }
-        return group("trash", "Trash Bins", "Items you already deleted. They are removed for good.", "trash", items)
+        return group("trash", String(localized: "Trash Bins"), String(localized: "Items you already deleted. They are removed for good."), "trash", items)
     }
 
     static func group(_ id: String, _ title: String, _ desc: String, _ symbol: String, _ items: [ResultItem]) -> ResultGroup {

@@ -14,45 +14,45 @@ enum Module: String, CaseIterable, Identifiable {
 
     var name: String {
         switch self {
-        case .smartCare: "Smart Care"
-        case .cleanup: "Cleanup"
-        case .protection: "Protection"
-        case .performance: "Performance"
-        case .applications: "Applications"
-        case .clutter: "My Clutter"
-        case .spaceLens: "Space Lens"
-        case .myTools: "My Tools"
-        case .activity: "My Activity"
+        case .smartCare: String(localized: "Smart Care")
+        case .cleanup: String(localized: "Cleanup")
+        case .protection: String(localized: "Protection")
+        case .performance: String(localized: "Performance")
+        case .applications: String(localized: "Applications")
+        case .clutter: String(localized: "My Clutter")
+        case .spaceLens: String(localized: "Space Lens")
+        case .myTools: String(localized: "My Tools")
+        case .activity: String(localized: "My Activity")
         }
     }
 
-    var headline: String { self == .cleanup ? "Junk Cleanup" : name }
+    var headline: String { self == .cleanup ? String(localized: "Junk Cleanup") : name }
 
     var tagline: String {
         switch self {
-        case .smartCare: "Quick maintenance that takes care of the essentials."
-        case .cleanup: "Clean your system to achieve maximum performance and reclaim more free space."
-        case .protection: "Check your Mac for all kind of threats and vulnerabilities."
-        case .performance: "Keep your Mac in top shape with recommended maintenance."
-        case .applications: "Take control of your applications. Uninstall, update or remove old application leftovers."
-        case .clutter: "Sort through your files and reduce the mess in just a few clicks."
-        case .spaceLens: "Visualize what's taking up the most disk space and clean up your storage quickly."
-        case .myTools: "Quick tools for focused tasks — clean up, protect, and maintain your Mac in just a few clicks."
-        case .activity: "See how much space TidyMac has freed and how your disk is used."
+        case .smartCare: String(localized: "Quick maintenance that takes care of the essentials.")
+        case .cleanup: String(localized: "Clean your system to achieve maximum performance and reclaim more free space.")
+        case .protection: String(localized: "Check your Mac for all kind of threats and vulnerabilities.")
+        case .performance: String(localized: "Keep your Mac in top shape with recommended maintenance.")
+        case .applications: String(localized: "Take control of your applications. Uninstall, update or remove old application leftovers.")
+        case .clutter: String(localized: "Sort through your files and reduce the mess in just a few clicks.")
+        case .spaceLens: String(localized: "Visualize what's taking up the most disk space and clean up your storage quickly.")
+        case .myTools: String(localized: "Quick tools for focused tasks — clean up, protect, and maintain your Mac in just a few clicks.")
+        case .activity: String(localized: "See how much space TidyMac has freed and how your disk is used.")
         }
     }
 
     var features: [(String, String)] {
         switch self {
-        case .smartCare: [("magnifyingglass", "Quick Scan"), ("gearshape.fill", "System Tune-up"), ("checkmark.shield.fill", "Security Check")]
-        case .cleanup: [("archivebox.fill", "System Junk"), ("sparkles", "AI Clutter"), ("paperclip", "Mail Attachments"), ("trash.fill", "Trash Bins")]
-        case .protection: [("ladybug.fill", "Malware Removal"), ("hand.raised.fill", "Privacy Check"), ("lock.shield.fill", "Application Permissions")]
-        case .performance: [("wrench.and.screwdriver.fill", "Maintenance Tasks"), ("person.badge.clock.fill", "Login Items"), ("gearshape.2.fill", "Background Items")]
-        case .applications: [("xmark.app.fill", "App Uninstaller"), ("arrow.up.circle.fill", "App Updater"), ("shippingbox.fill", "File Leftovers")]
-        case .clutter: [("doc.fill", "Large Files"), ("doc.on.doc.fill", "Duplicates"), ("photo.on.rectangle", "Similar Images"), ("arrow.down.circle.fill", "Downloads")]
-        case .spaceLens: [("circle.hexagongrid.fill", "Visual Storage Map"), ("eye.fill", "Hidden Files Uncovered"), ("folder.fill", "Large Folders Overview")]
+        case .smartCare: [("magnifyingglass", String(localized: "Quick Scan")), ("gearshape.fill", String(localized: "System Tune-up")), ("checkmark.shield.fill", String(localized: "Security Check"))]
+        case .cleanup: [("archivebox.fill", String(localized: "System Junk")), ("sparkles", String(localized: "AI Clutter")), ("paperclip", String(localized: "Mail Attachments")), ("trash.fill", String(localized: "Trash Bins"))]
+        case .protection: [("ladybug.fill", String(localized: "Malware Removal")), ("hand.raised.fill", String(localized: "Privacy Check")), ("lock.shield.fill", String(localized: "Application Permissions"))]
+        case .performance: [("wrench.and.screwdriver.fill", String(localized: "Maintenance Tasks")), ("person.badge.clock.fill", String(localized: "Login Items")), ("gearshape.2.fill", String(localized: "Background Items"))]
+        case .applications: [("xmark.app.fill", String(localized: "App Uninstaller")), ("arrow.up.circle.fill", String(localized: "App Updater")), ("shippingbox.fill", String(localized: "File Leftovers"))]
+        case .clutter: [("doc.fill", String(localized: "Large Files")), ("doc.on.doc.fill", String(localized: "Duplicates")), ("photo.on.rectangle", String(localized: "Similar Images")), ("arrow.down.circle.fill", String(localized: "Downloads"))]
+        case .spaceLens: [("circle.hexagongrid.fill", String(localized: "Visual Storage Map")), ("eye.fill", String(localized: "Hidden Files Uncovered")), ("folder.fill", String(localized: "Large Folders Overview"))]
         case .myTools: []
-        case .activity: [("chart.bar.fill", "Space Freed"), ("internaldrive.fill", "Disk Usage")]
+        case .activity: [("chart.bar.fill", String(localized: "Space Freed")), ("internaldrive.fill", String(localized: "Disk Usage"))]
         }
     }
 
@@ -126,20 +126,20 @@ enum Module: String, CaseIterable, Identifiable {
 
     var progressTitle: String {
         switch self {
-        case .cleanup: "Looking for junk..."
-        case .protection: "Checking for threats..."
-        case .performance: "Analyzing your Mac..."
-        case .applications: "Looking at your apps..."
-        case .clutter: "Sorting through your files..."
-        default: "Scanning your Mac..."
+        case .cleanup: String(localized: "Looking for junk...")
+        case .protection: String(localized: "Checking for threats...")
+        case .performance: String(localized: "Analyzing your Mac...")
+        case .applications: String(localized: "Looking at your apps...")
+        case .clutter: String(localized: "Sorting through your files...")
+        default: String(localized: "Scanning your Mac...")
         }
     }
 
     var actionTitle: String {
         switch self {
-        case .cleanup: "Clean"
-        case .clutter, .applications, .protection: "Remove"
-        default: "Run"
+        case .cleanup: String(localized: "Clean")
+        case .clutter, .applications, .protection: String(localized: "Remove")
+        default: String(localized: "Run")
         }
     }
 

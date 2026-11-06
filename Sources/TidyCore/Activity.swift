@@ -35,29 +35,39 @@ public enum ActivityCategory: String, CaseIterable, Codable, Sendable {
 
     public var title: String {
         switch self {
-        case .systemJunk: "System Junk Cleaned"
-        case .mailAttachments: "Mail Attachments Cleaned"
-        case .trashBin: "Trash Bin Cleaned"
-        case .privacyItems: "Privacy Items Removed"
-        case .appPermissions: "App Permissions Revoked"
-        case .backgroundItems: "Background Items Removed"
-        case .loginItems: "Login Items Removed"
-        case .maintenanceTasks: "Maintenance Tasks Run"
-        case .leftovers: "Leftovers Removed"
-        case .installers: "Installers Removed"
-        case .applicationsUpdated: "Applications Updated"
-        case .applicationsUninstalled: "Applications Uninstalled"
-        case .duplicates: "Duplicates Removed"
-        case .largeFiles: "Large Files Removed"
-        case .similarImages: "Similar Images Removed"
-        case .downloads: "Downloads Removed"
-        case .malwares: "Malware Scan Run"
-        case .spaceLens: "Space Lens Used"
+        case .systemJunk: String(localized: "System Junk Cleaned")
+        case .mailAttachments: String(localized: "Mail Attachments Cleaned")
+        case .trashBin: String(localized: "Trash Bin Cleaned")
+        case .privacyItems: String(localized: "Privacy Items Removed")
+        case .appPermissions: String(localized: "App Permissions Revoked")
+        case .backgroundItems: String(localized: "Background Items Removed")
+        case .loginItems: String(localized: "Login Items Removed")
+        case .maintenanceTasks: String(localized: "Maintenance Tasks Run")
+        case .leftovers: String(localized: "Leftovers Removed")
+        case .installers: String(localized: "Installers Removed")
+        case .applicationsUpdated: String(localized: "Applications Updated")
+        case .applicationsUninstalled: String(localized: "Applications Uninstalled")
+        case .duplicates: String(localized: "Duplicates Removed")
+        case .largeFiles: String(localized: "Large Files Removed")
+        case .similarImages: String(localized: "Similar Images Removed")
+        case .downloads: String(localized: "Downloads Removed")
+        case .malwares: String(localized: "Malware Scan Run")
+        case .spaceLens: String(localized: "Space Lens Used")
         }
     }
 
     /// The three parts of "Local Storage Cleaned".
-    public enum Storage: String, CaseIterable, Sendable { case systemJunk = "System Junk", applications = "Applications", personalFiles = "Personal Files" }
+    public enum Storage: String, CaseIterable, Sendable {
+        case systemJunk = "System Junk", applications = "Applications", personalFiles = "Personal Files"
+
+        public var title: String {
+            switch self {
+            case .systemJunk: String(localized: "System Junk")
+            case .applications: String(localized: "Applications")
+            case .personalFiles: String(localized: "Personal Files")
+            }
+        }
+    }
 
     public var storage: Storage {
         switch self {
@@ -191,22 +201,34 @@ public struct ActivitySummary: Sendable {
     /// A line of encouragement, chosen by this month's total.
     public var timeSavedHint: String {
         switch minutesThisMonth {
-        case 0: "Time savings dipped. Easy to improve!"
-        case ..<60: "Going steady — let's save more time!"
-        case ..<420: "Good progress on time saved!"
-        default: "That’s a solid time-saving win!"
+        case 0: String(localized: "Time savings dipped. Easy to improve!")
+        case ..<60: String(localized: "Going steady — let's save more time!")
+        case ..<420: String(localized: "Good progress on time saved!")
+        default: String(localized: "That’s a solid time-saving win!")
         }
     }
 
     public static func format(minutes: Double) -> String {
         let m = Int(minutes.rounded())
-        return m < 60 ? "\(m) min" : m % 60 == 0 ? "\(m / 60) h" : "\(m / 60) h \(m % 60) min"
+        return m < 60 ? String(localized: "\(m) min") : m % 60 == 0 ? String(localized: "\(m / 60) h") : String(localized: "\(m / 60) h \(m % 60) min")
     }
 }
 
 /// "Mac Health" with the recommendations that make it up .
 public struct MacHealth: Sendable {
-    public enum State: String, Sendable { case excellent = "Excellent", good = "Good", normal = "Fair", requiresAttention = "Requires Attention", critical = "Critical" }
+    public enum State: String, Sendable {
+        case excellent = "Excellent", good = "Good", normal = "Fair", requiresAttention = "Requires Attention", critical = "Critical"
+
+        public var title: String {
+            switch self {
+            case .excellent: String(localized: "Excellent")
+            case .good: String(localized: "Good")
+            case .normal: String(localized: "Fair")
+            case .requiresAttention: String(localized: "Requires Attention")
+            case .critical: String(localized: "Critical")
+            }
+        }
+    }
 
     public struct Recommendation: Identifiable, Sendable {
         public enum Target: Sendable { case smartCare, cleanup, protection, performance, applications, uninstaller, clutter, fullDiskAccess, screenCleaning, restart, backup }
@@ -223,11 +245,11 @@ public struct MacHealth: Sendable {
 
     public var description: String {
         switch state {
-        case .excellent: "Your Mac is doing great. Run regular maintenance to keep it this way."
-        case .good: "Your Mac is in good shape. Run some maintenance to make it perform even better."
-        case .normal: "Your Mac is OK, but some maintenance activities are recommended to avoid performance degradation."
-        case .requiresAttention: "Your Mac is not doing well. Run some maintenance to bring it back into shape."
-        case .critical: "We strongly recommend to take action and bring your Mac back to normal."
+        case .excellent: String(localized: "Your Mac is doing great. Run regular maintenance to keep it this way.")
+        case .good: String(localized: "Your Mac is in good shape. Run some maintenance to make it perform even better.")
+        case .normal: String(localized: "Your Mac is OK, but some maintenance activities are recommended to avoid performance degradation.")
+        case .requiresAttention: String(localized: "Your Mac is not doing well. Run some maintenance to bring it back into shape.")
+        case .critical: String(localized: "We strongly recommend to take action and bring your Mac back to normal.")
         }
     }
 
@@ -257,48 +279,48 @@ public struct MacHealth: Sendable {
         let week: TimeInterval = 7 * 86_400
         let storage = SystemMonitor.storage()
         if storage.total > 0, storage.available < max(storage.total / 10, 15_000_000_000) {
-            out.append(Recommendation(id: "space", title: "You are low on space.",
-                                      detail: "Only \(FileSize.format(storage.available)) left. Remove unneeded items to reclaim space.",
+            out.append(Recommendation(id: "space", title: String(localized: "You are low on space."),
+                                      detail: String(localized: "Only \(FileSize.format(storage.available)) left. Remove unneeded items to reclaim space."),
                                       target: .clutter, severe: storage.available < storage.total / 50))
         }
         if let b = SystemMonitor.battery(), let h = b.healthPercent, h < 70 {
-            out.append(Recommendation(id: "battery", title: "Critical battery health.",
-                                      detail: "Your battery is in bad condition and should be replaced soon.", target: .smartCare, severe: true))
+            out.append(Recommendation(id: "battery", title: String(localized: "Critical battery health."),
+                                      detail: String(localized: "Your battery is in bad condition and should be replaced soon."), target: .smartCare, severe: true))
         }
         if !hasFullDiskAccess {
-            out.append(Recommendation(id: "fda", title: "Allow Full Disk Access",
-                                      detail: "TidyMac needs it to scan protected folders without repeated prompts.", target: .fullDiskAccess, severe: false))
+            out.append(Recommendation(id: "fda", title: String(localized: "Allow Full Disk Access"),
+                                      detail: String(localized: "TidyMac needs it to scan protected folders without repeated prompts."), target: .fullDiskAccess, severe: false))
         }
         let cleanups = entries.filter { $0.freed > 0 }
         if cleanups.isEmpty {
-            out.append(Recommendation(id: "smartcare-first", title: "Run Smart Care for the first time ever.",
-                                      detail: "Quick maintenance that takes care of the essentials.", target: .smartCare, severe: false))
+            out.append(Recommendation(id: "smartcare-first", title: String(localized: "Run Smart Care for the first time ever."),
+                                      detail: String(localized: "Quick maintenance that takes care of the essentials."), target: .smartCare, severe: false))
         } else if let last = cleanups.last?.date, now.timeIntervalSince(last) > week {
-            out.append(Recommendation(id: "smartcare", title: "It's time to care for your Mac! Run Smart Care.",
-                                      detail: "Your last cleanup was \(RelativeDateTimeFormatter().localizedString(for: last, relativeTo: now)).",
+            out.append(Recommendation(id: "smartcare", title: String(localized: "It's time to care for your Mac! Run Smart Care."),
+                                      detail: String(localized: "Your last cleanup was \(RelativeDateTimeFormatter().localizedString(for: last, relativeTo: now))."),
                                       target: .smartCare, severe: false))
         }
         let lastScan = entries.last { $0.scanned != nil }?.date
         if lastScan.map({ now.timeIntervalSince($0) > week }) ?? true {
-            out.append(Recommendation(id: "malware", title: "Run a deep Malware Scan to make sure you are fully safe and protected.",
-                                      detail: lastScan == nil ? "No scans yet." : "Last scan was over a week ago.", target: .protection, severe: false))
+            out.append(Recommendation(id: "malware", title: String(localized: "Run a deep Malware Scan to make sure you are fully safe and protected."),
+                                      detail: lastScan == nil ? String(localized: "No scans yet.") : String(localized: "Last scan was over a week ago."), target: .protection, severe: false))
         }
         if let t = SystemMonitor.trash(), t.size > 1_000_000_000 {
-            out.append(Recommendation(id: "trash", title: "Empty the contents of your Trash Bins.",
-                                      detail: "Your Trash holds \(FileSize.format(t.size)).", target: .cleanup, severe: false))
+            out.append(Recommendation(id: "trash", title: String(localized: "Empty the contents of your Trash Bins."),
+                                      detail: String(localized: "Your Trash holds \(FileSize.format(t.size))."), target: .cleanup, severe: false))
         }
         let lastTasks = entries.last { ($0.categories?[ActivityCategory.maintenanceTasks.rawValue]?.items ?? 0) > 0 }?.date
         if lastTasks.map({ now.timeIntervalSince($0) > week }) ?? true {
-            out.append(Recommendation(id: "performance", title: "Run performance tasks to optimize your Mac.",
-                                      detail: "Maintenance tasks have not run this week.", target: .performance, severe: false))
+            out.append(Recommendation(id: "performance", title: String(localized: "Run performance tasks to optimize your Mac."),
+                                      detail: String(localized: "Maintenance tasks have not run this week."), target: .performance, severe: false))
         }
         if SystemMonitor.memory().pressureLevel >= 4 {
-            out.append(Recommendation(id: "memory", title: "Heavy memory usage",
-                                      detail: "Quitting unused apps can help.", target: .performance, severe: false))
+            out.append(Recommendation(id: "memory", title: String(localized: "Heavy memory usage"),
+                                      detail: String(localized: "Quitting unused apps can help."), target: .performance, severe: false))
         }
         if screenCleaningDue {
-            out.append(Recommendation(id: "screen", title: "Your screen deserves some care",
-                                      detail: "Keep your Mac clean inside and out with Screen Cleaning Mode.", target: .screenCleaning, severe: false))
+            out.append(Recommendation(id: "screen", title: String(localized: "Your screen deserves some care"),
+                                      detail: String(localized: "Keep your Mac clean inside and out with Screen Cleaning Mode."), target: .screenCleaning, severe: false))
         }
         return MacHealth(recommendations: skipped.visible(out, now: now))
     }
@@ -307,25 +329,27 @@ public struct MacHealth: Sendable {
     public static func assistant(uptime: TimeInterval, driveHealth: SystemMonitor.DriveHealth?, apps: AppFacts?) -> [Recommendation] {
         var out: [Recommendation] = []
         if driveHealth == .failing {
-            out.append(Recommendation(id: "drive", title: "Critical drive health",
-                                      detail: "Avoid data loss by backing up your storage. This drive is in bad condition and should be replaced.",
+            out.append(Recommendation(id: "drive", title: String(localized: "Critical drive health"),
+                                      detail: String(localized: "Avoid data loss by backing up your storage. This drive is in bad condition and should be replaced."),
                                       target: .backup, severe: true))
         }
         if let updates = apps?.updates, !updates.isEmpty {
-            let what = updates.count == 1 ? updates[0] + " is" : "\(updates.count) apps are"
-            out.append(Recommendation(id: "updates", title: "Install application updates",
-                                      detail: "\(what) ready to be updated. Get the latest features and security fixes.",
+            let detail = updates.count == 1
+                ? String(localized: "\(updates[0]) is ready to be updated. Get the latest features and security fixes.")
+                : String(localized: "\(updates.count) apps are ready to be updated. Get the latest features and security fixes.")
+            out.append(Recommendation(id: "updates", title: String(localized: "Install application updates"),
+                                      detail: detail,
                                       target: .applications, severe: false))
         }
         if let n = apps?.unusedCount, n > 0 {
-            out.append(Recommendation(id: "unused-apps", title: "Uninstall unused apps",
-                                      detail: "You haven't used \(n) of your applications for a very long time. Remove them to free up space.",
+            out.append(Recommendation(id: "unused-apps", title: String(localized: "Uninstall unused apps"),
+                                      detail: String(localized: "You haven't used \(n) of your applications for a very long time. Remove them to free up space."),
                                       target: .uninstaller, severe: false))
         }
         // Same week-long cut-off as the menu's Uptime reading.
         if uptime > 7 * 86_400 {
-            out.append(Recommendation(id: "restart", title: "Restart your Mac once in a while",
-                                      detail: "It's been \(Int(uptime / 86_400)) days since your last restart. A restart clears memory and finishes pending updates.",
+            out.append(Recommendation(id: "restart", title: String(localized: "Restart your Mac once in a while"),
+                                      detail: String(localized: "It's been \(Int(uptime / 86_400)) days since your last restart. A restart clears memory and finishes pending updates."),
                                       target: .restart, severe: false))
         }
         return out

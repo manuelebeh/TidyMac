@@ -8,17 +8,17 @@ public struct ClutterEngine: ScanEngine {
     public init(root: URL = Paths.home) { self.root = root }
 
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {
-        progress("Indexing \(Paths.abbreviate(root))")
+        progress(String(localized: "Indexing \(Paths.abbreviate(root))"))
         let files = Self.index(root)
-        progress("Large and old files")
+        progress(String(localized: "Large and old files"))
         let large = Self.largeAndOld(files)
-        progress("Duplicates")
+        progress(String(localized: "Duplicates"))
         let dups = Self.duplicates(files)
-        progress("Similar images")
+        progress(String(localized: "Similar images"))
         let similar = Self.similarImages(files)
-        progress("Downloads")
+        progress(String(localized: "Downloads"))
         let downloads = Self.downloads()
-        progress("Project build folders")
+        progress(String(localized: "Project build folders"))
         let artifacts = Self.projectArtifacts(root: root)
         return [large, dups, similar, downloads, artifacts].filter { !$0.isEmpty }
     }
@@ -61,12 +61,12 @@ public struct ClutterEngine: ScanEngine {
         let items = files.filter { $0.size >= minSize }.sorted { $0.size > $1.size }.prefix(300).map { f in
             let old = f.accessed < yearAgo
             return ResultItem.file(f.url, size: f.size,
-                                   subtitle: "\(Paths.abbreviate(f.url.deletingLastPathComponent())) · opened \(RelativeDateTimeFormatter().localizedString(for: f.accessed, relativeTo: Date()))",
-                                   selected: false, badge: old ? "Old" : nil)
+                                   subtitle: String(localized: "\(Paths.abbreviate(f.url.deletingLastPathComponent())) · opened \(RelativeDateTimeFormatter().localizedString(for: f.accessed, relativeTo: Date()))"),
+                                   selected: false, badge: old ? String(localized: "Old") : nil)
         }
-        return ResultGroup(id: "large-old", title: "Large & Old Files",
-                           description: "Files over 50 MB, the biggest first. Files not opened for a year are marked Old.",
-                           symbol: "doc.badge.ellipsis", items: Array(items), verb: "to review")
+        return ResultGroup(id: "large-old", title: String(localized: "Large & Old Files"),
+                           description: String(localized: "Files over 50 MB, the biggest first. Files not opened for a year are marked Old."),
+                           symbol: "doc.badge.ellipsis", items: Array(items), verb: String(localized: "to review"))
     }
 
     /// Folders a project can regenerate, and the files next to them that show they belong to one: a folder named `target`
@@ -119,17 +119,17 @@ public struct ClutterEngine: ScanEngine {
             }.max() ?? .distantPast
             let stale = changed < staleBefore
             return ResultItem.file(dir, size: sizes[i],
-                                   subtitle: "\(Paths.abbreviate(project)) · changed \(RelativeDateTimeFormatter().localizedString(for: changed, relativeTo: now))",
-                                   selected: stale, badge: stale ? "Stale" : nil)
+                                   subtitle: String(localized: "\(Paths.abbreviate(project)) · changed \(RelativeDateTimeFormatter().localizedString(for: changed, relativeTo: now))"),
+                                   selected: stale, badge: stale ? String(localized: "Stale") : nil)
                 .with(title: "\(project.lastPathComponent): \(dir.lastPathComponent)")
         }
         return projectArtifactsGroup(items)
     }
 
     private static func projectArtifactsGroup(_ items: [ResultItem]) -> ResultGroup {
-        ResultGroup(id: "project-artifacts", title: "Project Build Folders",
-                    description: "Dependencies and build output a project can recreate, such as node_modules, target and .venv. Those of projects untouched for three months are preselected. Getting them back takes a reinstall or a rebuild.",
-                    symbol: "cube.box", items: items.sorted { ($0.size ?? 0) > ($1.size ?? 0) }, verb: "to review")
+        ResultGroup(id: "project-artifacts", title: String(localized: "Project Build Folders"),
+                    description: String(localized: "Dependencies and build output a project can recreate, such as node_modules, target and .venv. Those of projects untouched for three months are preselected. Getting them back takes a reinstall or a rebuild."),
+                    symbol: "cube.box", items: items.sorted { ($0.size ?? 0) > ($1.size ?? 0) }, verb: String(localized: "to review"))
     }
 
     /// Same size → same hash of the first 64 KB → same full SHA-256. The newest copy is kept.
@@ -148,16 +148,16 @@ public struct ClutterEngine: ScanEngine {
                     // Only copies in Downloads are preselected ("Duplicate Downloads" in Smart Care).
                     let downloads = Paths.home("Downloads").path + "/"
                     for f in sorted.dropFirst() {
-                        items.append(.file(f.url, size: f.size, subtitle: "Copy of \(Paths.abbreviate(keep))",
+                        items.append(.file(f.url, size: f.size, subtitle: String(localized: "Copy of \(Paths.abbreviate(keep))"),
                                            selected: f.url.path.hasPrefix(downloads),
                                            action: .trashDuplicate(f.url, keeping: keep, digest: digest)))
                     }
                 }
             }
         }
-        return ResultGroup(id: "duplicates", title: "Duplicates",
-                           description: "Identical copies of the same file. The most recent copy is kept.",
-                           symbol: "doc.on.doc", items: items.sorted { ($0.size ?? 0) > ($1.size ?? 0) }, verb: "to remove")
+        return ResultGroup(id: "duplicates", title: String(localized: "Duplicates"),
+                           description: String(localized: "Identical copies of the same file. The most recent copy is kept."),
+                           symbol: "doc.on.doc", items: items.sorted { ($0.size ?? 0) > ($1.size ?? 0) }, verb: String(localized: "to remove"))
     }
 
     /// A regular file's identity on disk and how many names it has; nil for a symbolic link or anything missing.
@@ -204,12 +204,12 @@ public struct ClutterEngine: ScanEngine {
             let keep = prints[ordered[0]].0.url
             for k in ordered.dropFirst() {
                 let f = prints[k].0
-                items.append(.file(f.url, size: f.size, subtitle: "Similar to \(keep.lastPathComponent)", selected: false))
+                items.append(.file(f.url, size: f.size, subtitle: String(localized: "Similar to \(keep.lastPathComponent)"), selected: false))
             }
         }
-        return ResultGroup(id: "similar", title: "Similar Images",
-                           description: "Photos that look nearly the same, such as bursts and edits. The largest one is kept.",
-                           symbol: "photo.on.rectangle", items: items, verb: "to review")
+        return ResultGroup(id: "similar", title: String(localized: "Similar Images"),
+                           description: String(localized: "Photos that look nearly the same, such as bursts and edits. The largest one is kept."),
+                           symbol: "photo.on.rectangle", items: items, verb: String(localized: "to review"))
     }
 
     /// Downloads grouped by the app they came from (Spotlight `kMDItemWhereFroms`), older than 30 days.
@@ -221,15 +221,15 @@ public struct ClutterEngine: ScanEngine {
             guard date < monthAgo else { return nil }
             return .file(u, subtitle: "\(source(of: u)) · \(RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date()))", selected: false)
         }
-        return ResultGroup(id: "downloads", title: "Downloads",
-                           description: "Files downloaded more than a month ago.", symbol: "arrow.down.circle",
-                           items: items.sorted { ($0.size ?? 0) > ($1.size ?? 0) }, verb: "to review")
+        return ResultGroup(id: "downloads", title: String(localized: "Downloads"),
+                           description: String(localized: "Files downloaded more than a month ago."), symbol: "arrow.down.circle",
+                           items: items.sorted { ($0.size ?? 0) > ($1.size ?? 0) }, verb: String(localized: "to review"))
     }
 
     static func source(of url: URL) -> String {
         guard let md = MDItemCreateWithURL(nil, url as CFURL),
-              let froms = MDItemCopyAttribute(md, kMDItemWhereFroms) as? [String], let first = froms.first else { return "Downloads" }
-        if first.contains("slack") { return "Slack" }
-        return URL(string: first)?.host ?? "Downloads"
+              let froms = MDItemCopyAttribute(md, kMDItemWhereFroms) as? [String], let first = froms.first else { return String(localized: "Downloads") }
+        if first.contains("slack") { return String(localized: "Slack") }
+        return URL(string: first)?.host ?? String(localized: "Downloads")
     }
 }

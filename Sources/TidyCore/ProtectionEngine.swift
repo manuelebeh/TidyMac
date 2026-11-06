@@ -5,13 +5,13 @@ public struct ProtectionEngine: ScanEngine {
     public init() {}
 
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {
-        progress("Launch agents and daemons")
+        progress(String(localized: "Launch agents and daemons"))
         let threats = Self.suspiciousLaunchItems()
-        progress("Browsers")
+        progress(String(localized: "Browsers"))
         let privacy = Self.privacyItems()
-        progress("Application permissions")
+        progress(String(localized: "Application permissions"))
         let perms = Self.permissions()
-        progress("Security settings")
+        progress(String(localized: "Security settings"))
         let security = Self.securitySettings()
         return [threats, security, privacy, perms].filter { !$0.isEmpty }
     }
@@ -34,18 +34,18 @@ public struct ProtectionEngine: ScanEngine {
     static let securityPane = "x-apple.systempreferences:com.apple.preference.security"
 
     static let securityChecks: [SecurityCheck] = [
-        SecurityCheck(id: "gatekeeper", title: "Gatekeeper", tool: "/usr/sbin/spctl", arguments: ["--status"],
-                      offAdvice: "Apps are not checked before they open. Turn it back on in Privacy & Security.",
+        SecurityCheck(id: "gatekeeper", title: String(localized: "Gatekeeper"), tool: "/usr/sbin/spctl", arguments: ["--status"],
+                      offAdvice: String(localized: "Apps are not checked before they open. Turn it back on in Privacy & Security."),
                       settings: securityPane, status: { readStatus($0, on: "assessments enabled", off: "assessments disabled") }),
         SecurityCheck(id: "filevault", title: "FileVault", tool: "/usr/bin/fdesetup", arguments: ["status"],
-                      offAdvice: "Your disk is not encrypted. Turn it on in Privacy & Security.",
+                      offAdvice: String(localized: "Your disk is not encrypted. Turn it on in Privacy & Security."),
                       settings: securityPane, status: { readStatus($0, on: "FileVault is On", off: "FileVault is Off") }),
-        SecurityCheck(id: "firewall", title: "Firewall", tool: "/usr/libexec/ApplicationFirewall/socketfilterfw", arguments: ["--getglobalstate"],
-                      offAdvice: "Incoming connections are not filtered. Turn it on in Network › Firewall.",
+        SecurityCheck(id: "firewall", title: String(localized: "Firewall"), tool: "/usr/libexec/ApplicationFirewall/socketfilterfw", arguments: ["--getglobalstate"],
+                      offAdvice: String(localized: "Incoming connections are not filtered. Turn it on in Network › Firewall."),
                       settings: "x-apple.systempreferences:com.apple.Network-Settings.extension",
                       status: { readStatus($0, on: "Firewall is enabled", off: "Firewall is disabled") }),
-        SecurityCheck(id: "sip", title: "System Integrity Protection", tool: "/usr/bin/csrutil", arguments: ["status"],
-                      offAdvice: "System files are not protected. It can only be turned back on from Recovery, with `csrutil enable`.",
+        SecurityCheck(id: "sip", title: String(localized: "System Integrity Protection"), tool: "/usr/bin/csrutil", arguments: ["status"],
+                      offAdvice: String(localized: "System files are not protected. It can only be turned back on from Recovery, with `csrutil enable`."),
                       settings: securityPane, status: { readStatus($0, on: "status: enabled.", off: "status: disabled.") }),
     ]
 
@@ -64,13 +64,13 @@ public struct ProtectionEngine: ScanEngine {
             let status = results[check.id].map { $0.status == 0 ? check.status($0.output) : .unknown } ?? .unknown
             guard status != .on else { return nil }
             return ResultItem(id: "security:\(check.id)", title: check.title,
-                              subtitle: status == .off ? check.offAdvice : "TidyMac could not read this setting.",
+                              subtitle: status == .off ? check.offAdvice : String(localized: "TidyMac could not read this setting."),
                               action: .open(URL(string: check.settings)!), selectedByDefault: false,
-                              badge: status == .off ? "Off" : "Unknown")
+                              badge: status == .off ? String(localized: "Off") : String(localized: "Unknown"))
         }
-        return ResultGroup(id: "security-settings", title: "Security Settings",
-                           description: "Built-in protections of macOS that are turned off. This checks settings; it is not a virus scan.",
-                           symbol: "lock.shield", items: items, verb: "to review")
+        return ResultGroup(id: "security-settings", title: String(localized: "Security Settings"),
+                           description: String(localized: "Built-in protections of macOS that are turned off. This checks settings; it is not a virus scan."),
+                           symbol: "lock.shield", items: items, verb: String(localized: "to review"))
     }
 
     /// Not a signature engine: flags third-party launch items whose executable is missing,
@@ -87,20 +87,20 @@ public struct ProtectionEngine: ScanEngine {
             if !isSystemTool, FileManager.default.isReadableFile(atPath: exe) {
                 // Root-only helpers cannot be read without privileges: unknown, not suspicious.
                 let check = Shell.run("/usr/bin/codesign", ["--verify", exe])
-                if check.status != 0 { reasons.append("unsigned or invalid signature") }
+                if check.status != 0 { reasons.append(String(localized: "unsigned or invalid signature")) }
             }
             if paths.contains(where: { $0.contains("/tmp/") || $0.contains("/private/var/folders/") || $0.split(separator: "/").contains(where: { $0.hasPrefix(".") }) }) {
-                reasons.append("runs from a hidden or temporary folder")
+                reasons.append(String(localized: "runs from a hidden or temporary folder"))
             }
             guard !reasons.isEmpty else { continue }
             items.append(ResultItem(id: "threat:\(li.plist.path)", title: li.label,
                                     subtitle: "\(exe) — \(reasons.joined(separator: ", "))", url: li.plist,
                                     action: .removeLaunchItem(li.plist, admin: li.isSystemWide),
-                                    selectedByDefault: false, badge: "Suspicious"))
+                                    selectedByDefault: false, badge: String(localized: "Suspicious")))
         }
-        return ResultGroup(id: "malware", title: "Malware Removal",
-                           description: "Background items with traits common to adware and malware. Review before removing.",
-                           symbol: "ladybug", items: items, verb: "to remove")
+        return ResultGroup(id: "malware", title: String(localized: "Malware Removal"),
+                           description: String(localized: "Background items with traits common to adware and malware. Review before removing."),
+                           symbol: "ladybug", items: items, verb: String(localized: "to remove"))
     }
 
     @Sendable static func privacyItems() -> ResultGroup {
@@ -115,35 +115,35 @@ public struct ProtectionEngine: ScanEngine {
             .filter { $0.lastPathComponent == "Default" || $0.lastPathComponent.hasPrefix("Profile ") }
         for p in chromeProfiles {
             let rel = "Application Support/Google/Chrome/\(p.lastPathComponent)"
-            add("\(rel)/History", "Browsing & Downloads History", "Chrome")
-            add("\(rel)/Cookies", "Cookies", "Chrome")
+            add("\(rel)/History", String(localized: "Browsing & Downloads History"), String(localized: "Chrome"))
+            add("\(rel)/Cookies", String(localized: "Cookies"), String(localized: "Chrome"))
         }
         for p in Paths.children(lib.appendingPathComponent("Application Support/Firefox/Profiles")) {
             let rel = "Application Support/Firefox/Profiles/\(p.lastPathComponent)"
-            add("\(rel)/places.sqlite", "Browsing History", "Firefox")
-            add("\(rel)/cookies.sqlite", "Cookies", "Firefox")
+            add("\(rel)/places.sqlite", String(localized: "Browsing History"), String(localized: "Firefox"))
+            add("\(rel)/cookies.sqlite", String(localized: "Cookies"), String(localized: "Firefox"))
         }
-        add("Safari/History.db", "Browsing History", "Safari")
-        add("Cookies/Cookies.binarycookies", "Cookies", "Safari")
+        add("Safari/History.db", String(localized: "Browsing History"), String(localized: "Safari"))
+        add("Cookies/Cookies.binarycookies", String(localized: "Cookies"), String(localized: "Safari"))
         for f in Paths.children(lib.appendingPathComponent("Application Support/com.apple.sharedfilelist"))
             where f.pathExtension.hasPrefix("sfl") {
-            items.append(.file(f, subtitle: "Recent Items Lists", selected: false))
+            items.append(.file(f, subtitle: String(localized: "Recent Items Lists"), selected: false))
         }
-        return ResultGroup(id: "privacy", title: "Privacy",
-                           description: "Browsing history, cookies and recent items lists. Quit the browser before removing its data.",
-                           symbol: "hand.raised", items: items, verb: "to remove")
+        return ResultGroup(id: "privacy", title: String(localized: "Privacy"),
+                           description: String(localized: "Browsing history, cookies and recent items lists. Quit the browser before removing its data."),
+                           symbol: "hand.raised", items: items, verb: String(localized: "to remove"))
     }
 
     /// TCC service → user-facing name, from the Application Permissions strings.
     static let tccServices: [String: String] = [
-        "kTCCServiceAccessibility": "Accessibility", "kTCCServiceAppleEvents": "Automation",
-        "kTCCServiceCalendar": "Calendar", "kTCCServiceCamera": "Camera", "kTCCServiceAddressBook": "Contacts",
-        "kTCCServiceSystemPolicyDesktopFolder": "Desktop Folder", "kTCCServiceSystemPolicyDocumentsFolder": "Documents Folder",
-        "kTCCServiceSystemPolicyDownloadsFolder": "Downloads Folder", "kTCCServiceSystemPolicyAllFiles": "Full Disk Access",
-        "kTCCServiceListenEvent": "Input Monitoring", "kTCCServiceMicrophone": "Microphone",
-        "kTCCServiceSystemPolicyNetworkVolumes": "Network Volumes", "kTCCServicePhotos": "Photos",
-        "kTCCServiceReminders": "Reminders", "kTCCServiceSystemPolicyRemovableVolumes": "Removable Volumes",
-        "kTCCServiceScreenCapture": "Screen Recording", "kTCCServiceSpeechRecognition": "Speech Recognition",
+        "kTCCServiceAccessibility": String(localized: "Accessibility"), "kTCCServiceAppleEvents": String(localized: "Automation"),
+        "kTCCServiceCalendar": String(localized: "Calendar"), "kTCCServiceCamera": String(localized: "Camera"), "kTCCServiceAddressBook": String(localized: "Contacts"),
+        "kTCCServiceSystemPolicyDesktopFolder": String(localized: "Desktop Folder"), "kTCCServiceSystemPolicyDocumentsFolder": String(localized: "Documents Folder"),
+        "kTCCServiceSystemPolicyDownloadsFolder": String(localized: "Downloads Folder"), "kTCCServiceSystemPolicyAllFiles": String(localized: "Full Disk Access"),
+        "kTCCServiceListenEvent": String(localized: "Input Monitoring"), "kTCCServiceMicrophone": String(localized: "Microphone"),
+        "kTCCServiceSystemPolicyNetworkVolumes": String(localized: "Network Volumes"), "kTCCServicePhotos": String(localized: "Photos"),
+        "kTCCServiceReminders": String(localized: "Reminders"), "kTCCServiceSystemPolicyRemovableVolumes": String(localized: "Removable Volumes"),
+        "kTCCServiceScreenCapture": String(localized: "Screen Recording"), "kTCCServiceSpeechRecognition": String(localized: "Speech Recognition"),
     ]
 
     @Sendable static func permissions() -> ResultGroup {
@@ -159,8 +159,8 @@ public struct ProtectionEngine: ScanEngine {
                              output: results.map(\.output).joined(separator: "\n"))
         var items: [ResultItem] = []
         if r.status != 0 {
-            items.append(ResultItem(id: "tcc-fda", title: "Full Disk Access needed",
-                                    subtitle: "Allow TidyMac in Privacy & Security to list app permissions.",
+            items.append(ResultItem(id: "tcc-fda", title: String(localized: "Full Disk Access needed"),
+                                    subtitle: String(localized: "Allow TidyMac in Privacy & Security to list app permissions."),
                                     action: .open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!),
                                     selectedByDefault: false))
         } else {
@@ -173,9 +173,9 @@ public struct ProtectionEngine: ScanEngine {
                                         selectedByDefault: false))
             }
         }
-        return ResultGroup(id: "permissions", title: "Application Permissions",
-                           description: "Apps you allowed to use your camera, files, screen and more. Revoking asks again next time.",
-                           symbol: "checkmark.shield", items: items.sorted { $0.subtitle ?? "" < $1.subtitle ?? "" }, verb: "to review")
+        return ResultGroup(id: "permissions", title: String(localized: "Application Permissions"),
+                           description: String(localized: "Apps you allowed to use your camera, files, screen and more. Revoking asks again next time."),
+                           symbol: "checkmark.shield", items: items.sorted { $0.subtitle ?? "" < $1.subtitle ?? "" }, verb: String(localized: "to review"))
     }
 }
 

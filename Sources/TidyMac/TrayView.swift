@@ -182,8 +182,8 @@ final class MonitorModel: ObservableObject {
                 if !ok { failed.append(d.name) }
                 ejecting.remove(d.id)
             }
-            ejectMessage = failed.isEmpty ? "Successfully ejected!" : "\(failed.joined(separator: ", ")) could not be ejected."
-            if cleaned > 0 { ejectMessage! += " \(FileSize.format(cleaned)) of junk cleaned." }
+            ejectMessage = failed.isEmpty ? String(localized: "Successfully ejected!") : String(localized: "\(failed.joined(separator: ", ")) could not be ejected.")
+            if cleaned > 0 { ejectMessage! += String(localized: " \(FileSize.format(cleaned)) of junk cleaned.") }
             drives = await Task.detached { SystemMonitor.externalDrives() }.value
             updateIssues()
         }
@@ -193,7 +193,7 @@ final class MonitorModel: ObservableObject {
     func freeUpMemory() {
         freeingMemory = true
         Task {
-            var item = ResultItem(title: "Free Up RAM", action: .shell("purge", admin: true))
+            var item = ResultItem(title: String(localized: "Free Up RAM"), action: .shell("purge", admin: true))
             item.category = "maintenance"
             _ = await Task.detached { [item] in await Executor.run([item]) }.value
             freeingMemory = false
@@ -207,7 +207,7 @@ final class MonitorModel: ObservableObject {
         Task {
             _ = await Task.detached {
                 let items = Paths.children(Paths.home(".Trash"), hidden: true).map { url -> ResultItem in
-                    var i = ResultItem.file(url, subtitle: "Trash", action: .delete(url)); i.category = "trash"; return i
+                    var i = ResultItem.file(url, subtitle: String(localized: "Trash"), action: .delete(url)); i.category = "trash"; return i
                 }
                 return await Executor.run(items)
             }.value
@@ -272,7 +272,7 @@ enum MenuBarIcon {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "TidyMac, needs attention"
+        image.accessibilityDescription = String(localized: "TidyMac, needs attention")
         return image
     }
 }
@@ -369,7 +369,7 @@ struct TrayView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Text("Mac Health:")
-                    Text(state?.rawValue ?? "…").foregroundStyle(state?.color(scheme) ?? .secondary)
+                    Text(state?.title ?? "…").foregroundStyle(state?.color(scheme) ?? .secondary)
                 }
                 .font(.system(size: 18, weight: .semibold))
                 Text(monitor.machine).font(.system(size: 11)).foregroundStyle(.secondary)
@@ -379,7 +379,7 @@ struct TrayView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { open(.smartCare) }
-        .help((monitor.health?.description ?? "") + "\nClick to open Smart Care.")
+        .help((monitor.health?.description ?? "") + String(localized: "\nClick to open Smart Care."))
     }
 
     // MARK: Cards
@@ -399,13 +399,13 @@ struct TrayView: View {
                 if last == nil {
                     Button("Scan") { open(.protection) }.buttonStyle(TrayLinkStyle())
                 } else {
-                    Label(threats > 0 ? "\(threats) to review" : "No threats", systemImage: threats > 0 ? "exclamationmark.triangle" : "checkmark")
+                    Label(threats > 0 ? String(localized: "\(threats) to review") : String(localized: "No threats"), systemImage: threats > 0 ? "exclamationmark.triangle" : "checkmark")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(threats > 0 ? TrayStyle.warning : .primary)
                 }
             }
             Text("On-demand malware check").font(.system(size: 13, weight: .medium)).padding(.top, 16)
-            Text(last.map { "Last scan: \(RelativeDateTimeFormatter().localizedString(for: $0.date, relativeTo: Date()))" } ?? "No scan yet")
+            Text(last.map { String(localized: "Last scan: \(RelativeDateTimeFormatter().localizedString(for: $0.date, relativeTo: Date()))") } ?? String(localized: "No scan yet"))
                 .font(.system(size: 11)).foregroundStyle(.secondary).padding(.top, 4)
         }
         .padding(14)
@@ -419,44 +419,44 @@ struct TrayView: View {
     var storageCard: some View {
         let s = monitor.storage
         let low = monitor.issues.contains { $0.kind == .lowDiskSpace } || (s.total > 0 && s.available < s.total / 50)
-        return TrayTile(title: s.name, symbol: "internaldrive.fill", subtitle: "Available: \(formatSize(s.available))",
-                        subtitleColor: low ? TrayStyle.warning : .secondary, selected: detail == .storage, hint: "Click for Storage details",
-                        action: ("Free Up", false, { open(.cleanup) })) { toggle(.storage) }
+        return TrayTile(title: s.name, symbol: "internaldrive.fill", subtitle: String(localized: "Available: \(formatSize(s.available))"),
+                        subtitleColor: low ? TrayStyle.warning : .secondary, selected: detail == .storage, hint: String(localized: "Click for Storage details"),
+                        action: (String(localized: "Free Up"), false, { open(.cleanup) })) { toggle(.storage) }
     }
 
     var memoryCard: some View {
         let m = monitor.memory
         let tight = Metric.memoryPressure(m).severity > .normal
-        return TrayTile(title: "Memory", symbol: "memorychip", subtitle: "Pressure: \(m.pressure)",
-                        subtitleColor: tight ? TrayStyle.warning : .secondary, selected: detail == .memory, hint: "Click for Memory details",
-                        action: (monitor.freeingMemory ? "Freeing Up..." : "Free Up", monitor.freeingMemory, { monitor.freeUpMemory() })) { toggle(.memory) }
+        return TrayTile(title: String(localized: "Memory"), symbol: "memorychip", subtitle: String(localized: "Pressure: \(m.pressure)"),
+                        subtitleColor: tight ? TrayStyle.warning : .secondary, selected: detail == .memory, hint: String(localized: "Click for Memory details"),
+                        action: (monitor.freeingMemory ? String(localized: "Freeing Up...") : String(localized: "Free Up"), monitor.freeingMemory, { monitor.freeUpMemory() })) { toggle(.memory) }
     }
 
     func batteryCard(_ b: SystemMonitor.Battery) -> some View {
-        TrayTile(title: "Battery", symbol: b.isCharging ? "battery.100percent.bolt" : "battery.50percent", trailing: "\(b.percent)%",
+        TrayTile(title: String(localized: "Battery"), symbol: b.isCharging ? "battery.100percent.bolt" : "battery.50percent", trailing: "\(b.percent)%",
                  trailingColor: b.percent <= 20 && !b.isPluggedIn ? TrayStyle.warning : .primary,
-                 subtitle: Self.batteryLine(b), selected: detail == .battery, hint: "Click for Battery details") { toggle(.battery) }
+                 subtitle: Self.batteryLine(b), selected: detail == .battery, hint: String(localized: "Click for Battery details")) { toggle(.battery) }
     }
 
     /// "4h 3m remaining", like the menu's other durations.
     static func batteryLine(_ b: SystemMonitor.Battery) -> String {
         guard !b.isCharging, !b.isPluggedIn, let m = b.minutesRemaining else { return b.status }
-        return "\(m / 60)h \(m % 60)m remaining"
+        return String(localized: "\(m / 60)h \(m % 60)m remaining")
     }
 
     var cpuCard: some View {
-        TrayTile(title: "CPU", symbol: "cpu", subtitle: "Load: \(Int(monitor.cpu.load * 100))%",
+        TrayTile(title: "CPU", symbol: "cpu", subtitle: String(localized: "Load: \(Int(monitor.cpu.load * 100))%"),
                  subtitleColor: monitor.cpu.load > 0.8 ? TrayStyle.warning : .secondary,
-                 selected: detail == .cpu, hint: "Click for CPU details") { toggle(.cpu) }
+                 selected: detail == .cpu, hint: String(localized: "Click for CPU details")) { toggle(.cpu) }
     }
 
     var networkCard: some View {
         let n = monitor.network
         let wired = monitor.networkInfo?.kind == .wired
-        return TrayTile(title: n.connected ? monitor.networkInfo?.name ?? "Network" : "Network", symbol: wired ? "cable.connector" : "wifi",
-                        subtitle: n.connected ? nil : "Internet connection is missing", subtitleColor: TrayStyle.warning,
-                        selected: detail == .network, hint: "Click for Network details",
-                        action: (monitor.testingSpeed ? "Testing..." : "Test Speed", monitor.testingSpeed, { monitor.runSpeedTest(); detail = .network })) {
+        return TrayTile(title: n.connected ? monitor.networkInfo?.name ?? String(localized: "Network") : String(localized: "Network"), symbol: wired ? "cable.connector" : "wifi",
+                        subtitle: n.connected ? nil : String(localized: "Internet connection is missing"), subtitleColor: TrayStyle.warning,
+                        selected: detail == .network, hint: String(localized: "Click for Network details"),
+                        action: (monitor.testingSpeed ? "Testing..." : String(localized: "Test Speed"), monitor.testingSpeed, { monitor.runSpeedTest(); detail = .network })) {
             toggle(.network)
         } extra: {
             if n.connected {
@@ -473,20 +473,20 @@ struct TrayView: View {
 
     var devicesCard: some View {
         let b = monitor.bluetooth
-        let value = b.isEmpty ? "No devices connected"
-            : b.count == 1 ? "\(b[0].name)\(b[0].lowest.map { " · \($0)%" } ?? "")" : "\(b.count) connected"
+        let value = b.isEmpty ? String(localized: "No devices connected")
+            : b.count == 1 ? "\(b[0].name)\(b[0].lowest.map { " · \($0)%" } ?? "")" : String(localized: "\(b.count) connected")
         let low = b.contains { ($0.lowest ?? 100) <= HealthAlerts.bluetoothLowLevel }
-        return TrayTile(title: "Connected Devices", symbol: nil, subtitle: value, subtitleColor: low ? TrayStyle.warning : .secondary,
-                        selected: detail == .devices, hint: "Click for Connected Devices details") { toggle(.devices) }
+        return TrayTile(title: String(localized: "Connected Devices"), symbol: nil, subtitle: value, subtitleColor: low ? TrayStyle.warning : .secondary,
+                        selected: detail == .devices, hint: String(localized: "Click for Connected Devices details")) { toggle(.devices) }
     }
 
     var drivesCard: some View {
         let d = monitor.drives
-        return TrayTile(title: "External Drives", symbol: "externaldrive.fill",
-                        subtitle: d.count == 1 ? "\(d[0].name) · \(formatSize(d[0].available)) free" : "\(d.count) connected",
+        return TrayTile(title: String(localized: "External Drives"), symbol: "externaldrive.fill",
+                        subtitle: d.count == 1 ? String(localized: "\(d[0].name) · \(formatSize(d[0].available)) free") : String(localized: "\(d.count) connected"),
                         subtitleColor: d.contains(where: \.almostFull) ? TrayStyle.warning : .secondary,
-                        selected: detail == .drives, hint: "Click for External Drives details",
-                        action: (monitor.ejecting.isEmpty ? "Eject All" : "Ejecting...", !monitor.ejecting.isEmpty, { monitor.eject(d) })) { toggle(.drives) }
+                        selected: detail == .drives, hint: String(localized: "Click for External Drives details"),
+                        action: (monitor.ejecting.isEmpty ? String(localized: "Eject All") : "Ejecting...", !monitor.ejecting.isEmpty, { monitor.eject(d) })) { toggle(.drives) }
     }
 
     func toggle(_ c: Card) { detail = detail == c ? nil : c }
@@ -521,7 +521,7 @@ struct TrayView: View {
                         Text(issue.detail).font(.system(size: 13)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         HStack(spacing: 14) {
                             Spacer()
-                            Menu("Ignore") {
+                            Menu(String(localized: "Ignore")) {
                                 ForEach(SystemMonitor.IgnoreOption.allCases, id: \.self) { o in
                                     Button(o.title) { monitor.ignore(issue.kind, o) }
                                 }
@@ -541,14 +541,14 @@ struct TrayView: View {
     /// Icon, module colour and button for each issue.
     static func look(_ kind: SystemMonitor.Issue.Kind) -> (symbol: String, module: Module, action: String) {
         switch kind {
-        case .lowDiskSpace: ("internaldrive.fill", .cleanup, "Free Up")
-        case .trashSize: ("trash.fill", .cleanup, "Review Trash")
-        case .trashedApps: ("app.badge.checkmark", .applications, "Uninstall...")
-        case .heavyMemory: ("memorychip.fill", .performance, "Free Up")
-        case .hungApps: ("hourglass", .performance, "Force Quit All")
-        case .bluetoothLow: ("battery.25", .myTools, "See All Devices")
-        case .externalFull: ("externaldrive.fill", .spaceLens, "Free Up")
-        case .screenCleaning: ("sparkles.tv", .protection, "Try Screen Cleaning Mode")
+        case .lowDiskSpace: ("internaldrive.fill", .cleanup, String(localized: "Free Up"))
+        case .trashSize: ("trash.fill", .cleanup, String(localized: "Review Trash"))
+        case .trashedApps: ("app.badge.checkmark", .applications, String(localized: "Uninstall..."))
+        case .heavyMemory: ("memorychip.fill", .performance, String(localized: "Free Up"))
+        case .hungApps: ("hourglass", .performance, String(localized: "Force Quit All"))
+        case .bluetoothLow: ("battery.25", .myTools, String(localized: "See All Devices"))
+        case .externalFull: ("externaldrive.fill", .spaceLens, String(localized: "Free Up"))
+        case .screenCleaning: ("sparkles.tv", .protection, String(localized: "Try Screen Cleaning Mode"))
         }
     }
 
@@ -604,7 +604,7 @@ struct TrayView: View {
     }
 
     static func speed(_ bytesPerSecond: Double) -> String {
-        bytesPerSecond < 1_000 ? "0 KB/sec" : "\(formatSize(Int64(bytesPerSecond)))/sec"
+        bytesPerSecond < 1_000 ? String(localized: "0 KB/sec") : String(localized: "\(formatSize(Int64(bytesPerSecond)))/sec")
     }
 }
 

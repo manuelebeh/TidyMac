@@ -7,11 +7,11 @@ enum UninstallerFilter: Hashable {
 
     var title: String {
         switch self {
-        case .all: "All Applications"
-        case .unused: "Unused"
-        case .store(let s): s.rawValue
-        case .vendor(let v): v.rawValue
-        case .audioPlugins: "Audio Plugins"
+        case .all: String(localized: "All Applications")
+        case .unused: String(localized: "Unused")
+        case .store(let s): s.title
+        case .vendor(let v): v.title
+        case .audioPlugins: String(localized: "Audio Plugins")
         }
     }
 
@@ -27,7 +27,17 @@ enum UninstallerFilter: Hashable {
     }
 }
 
-enum UninstallerSort: String, CaseIterable { case name = "Name", size = "Size", lastOpened = "Last Opened" }
+enum UninstallerSort: String, CaseIterable {
+    case name = "Name", size = "Size", lastOpened = "Last Opened"
+
+    var title: String {
+        switch self {
+        case .name: String(localized: "Name")
+        case .size: String(localized: "Size")
+        case .lastOpened: String(localized: "Last Opened")
+        }
+    }
+}
 
 struct UninstallerSheet: View {
     let module: Module
@@ -84,7 +94,7 @@ struct UninstallerSheet: View {
                 }
                 .fixedSize()
                 Picker("Sort by", selection: $sort) {
-                    ForEach(UninstallerSort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    ForEach(UninstallerSort.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .fixedSize()
                 Spacer()
@@ -128,7 +138,7 @@ struct UninstallerSheet: View {
                     if !apps.contains(where: { $0.id == app.id }) { apps.insert(app, at: 0) }
                     select(app)
                 } else {
-                    message = "\(target.lastPathComponent) is not an application TidyMac can uninstall."
+                    message = String(localized: "\(target.lastPathComponent) is not an application TidyMac can uninstall.")
                 }
             }
             for i in apps.indices {
@@ -146,7 +156,7 @@ struct UninstallerSheet: View {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: a.url.path)).resizable().frame(width: 48, height: 48)
                     VStack(alignment: .leading) {
                         Text(a.name).font(.title2.bold())
-                        Text([a.bundleID ?? "no bundle id", a.store == .other ? nil : a.store.rawValue].compactMap { $0 }.joined(separator: " · "))
+                        Text([a.bundleID ?? String(localized: "no bundle id"), a.store == .other ? nil : a.store.title].compactMap { $0 }.joined(separator: " · "))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -158,13 +168,13 @@ struct UninstallerSheet: View {
                 }
                 .padding(.top, 8)
                 List {
-                    Section(a.kind == .audioPlugin ? "Plugins" : "Applications") {
+                    Section(a.kind == .audioPlugin ? String(localized: "Plugins") : String(localized: "Applications")) {
                         fileRow(a.url, size: a.size, toggle: nil)
                     }
                     ForEach(Leftover.Kind.allCases, id: \.self) { kind in
                         let files = leftovers.filter { $0.kind == kind }
                         if !files.isEmpty {
-                            Section(kind.rawValue) {
+                            Section(kind.title) {
                                 ForEach(files) { l in
                                     fileRow(l.url, size: l.size, toggle: Binding(get: { !kept.contains(l.url) },
                                                                                  set: { if $0 { kept.remove(l.url) } else { kept.insert(l.url) } }))
@@ -192,15 +202,15 @@ struct UninstallerSheet: View {
 
     private var emptyText: String {
         switch filter {
-        case .unused: "There are no applications you haven’t used in over six months."
-        case .audioPlugins: "Third party audio plugins will appear here."
-        default: "No applications match."
+        case .unused: String(localized: "There are no applications you haven’t used in over six months.")
+        case .audioPlugins: String(localized: "Third party audio plugins will appear here.")
+        default: String(localized: "No applications match.")
         }
     }
 
     private func caption(_ a: InstalledApp) -> String? {
-        guard let d = a.lastUsed else { return a.kind == .audioPlugin ? "Audio plugin" : nil }
-        return "Opened " + RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date())
+        guard let d = a.lastUsed else { return a.kind == .audioPlugin ? String(localized: "Audio plugin") : nil }
+        return String(localized: "Opened \(RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date()))")
     }
 
     /// Leftover search reads many folders and sizes them, so it runs off the main thread.
@@ -231,7 +241,7 @@ struct UninstallerSheet: View {
         }
         Task {
             let r = await Task.detached { await Executor.run([bundle] + files) }.value
-            message = r.failed.isEmpty ? "\(a.name) removed, \(formatSize(r.freed)) freed" : "\(r.failed.count) items could not be removed"
+            message = r.failed.isEmpty ? String(localized: "\(a.name) removed, \(formatSize(r.freed)) freed") : String(localized: "\(r.failed.count) items could not be removed")
             if r.succeeded.contains(where: { $0.url == a.url }) { apps.removeAll { $0.id == a.id }; select(nil) }
         }
     }

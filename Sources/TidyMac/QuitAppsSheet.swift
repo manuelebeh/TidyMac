@@ -38,7 +38,7 @@ struct QuitAppsSheet: View {
                 ForEach(apps, id: \.processIdentifier) { app in
                     HStack {
                         Image(nsImage: app.icon ?? NSImage()).resizable().frame(width: 28, height: 28)
-                        Text(app.localizedName ?? "Application")
+                        Text(app.localizedName ?? String(localized: "Application"))
                         Spacer()
                         if stuck(app) {
                             Text("Can't be quit").font(.caption).foregroundStyle(.secondary)

@@ -22,9 +22,9 @@ final class FullDiskAccessWatcher: ObservableObject {
 
 /// Explains what Full Disk Access changes at this point, with the one action that helps.
 struct FullDiskAccessBanner: View {
-    var message = "Grant Full Disk Access so TidyMac can scan protected folders without repeated prompts."
+    var message = String(localized: "Grant Full Disk Access so TidyMac can scan protected folders without repeated prompts.")
     var symbol = "lock.shield.fill"
-    var actionTitle = "Open Settings"
+    var actionTitle = String(localized: "Open Settings")
     var action: () -> Void = { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) }
 
     var body: some View {

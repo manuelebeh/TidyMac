@@ -39,6 +39,9 @@ jobs:
       - name: Test
         run: swift test
 
+      - name: Check the translations
+        run: Packaging/check-translations.sh
+
       - name: Build the app bundle
         run: ./bundle.sh
 
