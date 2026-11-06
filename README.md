@@ -20,16 +20,20 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 - **Screen Cleaning Mode**: locks the keyboard and trackpad and blanks the screen so you can wipe it.
 - **Menu bar**: Mac Health at a glance, live storage, memory, battery, CPU and network with charts, Wi-Fi security, a speed test, top consumers, external drives with eject, connected Bluetooth devices, drive health, and recommendations you can act on or ignore for a while. The icon gets a dot when something needs attention.
 - **Background alerts**: notifications for low disk space, a full Trash, heavy memory use, critical battery health, new threats, overfilled external drives, low device batteries, hung apps (with Force Quit All), Chrome using too much memory, apps moved to the Trash, and a Smart Care reminder every 3, 7, 14 or 30 days. Thresholds are configurable in Settings (⌘,).
+- **Updates**: Settings › Updates shows the version and looks for a new release when you ask. It asks GitHub for the latest release and sends nothing about your Mac. A daily check with a notification is off by default. TidyMac never installs anything by itself.
 - **General settings**: sounds when a scan or cleanup finishes, Reduce Motion (System, Enabled, Disabled), keep the Dock icon after the window closes, show or hide the recommendations, and empty a drive's Trash when you eject it from the menu (off by default, the files are deleted for good).
 - **Integrations**: right-click an app in Finder › Services (or Quick Actions) › Uninstall with TidyMac. Shortcuts can do the same with "Open URLs" on `tidymac://uninstall?path=/Applications/Name.app`. On launch outside the Applications folder, TidyMac offers to move itself there.
 - **Ignore List**: right-click an item in the review sheet to keep it out of future scans; manage the list by category in Settings › Ignore List.
 
-## Requirements
+## Install
 
-- macOS 13 or later
-- Swift 5.9 or later (Xcode 15+ or the Command Line Tools)
+Download the DMG or ZIP from the [releases page](https://github.com/manuelebeh/TidyMac/releases) and move TidyMac to your Applications folder. It needs macOS 13 or later and runs on Apple silicon and Intel Macs.
 
-## Build and run
+A release that is not notarized shows a warning on first launch. Try to open the app once, then choose **Open Anyway** in System Settings › Privacy & Security. Compare the download with `SHA256SUMS.txt` from the same release first.
+
+## Build from source
+
+Building needs Swift 5.9 or later (Xcode 15+ or the Command Line Tools).
 
 ```bash
 swift build          # build
@@ -63,6 +67,7 @@ Sources/TidyCore   scan engines, actions, history, system readings, alert rules
 Sources/TidyMac    SwiftUI app: screens, menu bar tray, background monitor, settings
 Tests/             unit tests for the core library
 bundle.sh          builds build/TidyMac.app
+Packaging/         release packaging, Homebrew cask template, app icon
 ```
 
 ## Command line helpers
@@ -72,6 +77,7 @@ These print results and quit. They never run a cleaning action.
 ```bash
 build/TidyMac.app/Contents/MacOS/TidyMac --scan <module>   # smartCare, cleanup, protection, performance, applications, clutter
 build/TidyMac.app/Contents/MacOS/TidyMac --health-check    # current readings and active alerts
+build/TidyMac.app/Contents/MacOS/TidyMac --check-update    # compares this version with the latest release
 ```
 
 ## Contributing

@@ -7,6 +7,8 @@ struct TidyMacApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     private var app: AppState { delegate.app }
 
+    init() { BundleMigration.run() }
+
     var body: some Scene {
         WindowGroup("TidyMac", id: "main") {
             RootView(app: app)
@@ -120,6 +122,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     print("screen cleaning ended, success shown: \(MainActor.assumeIsolated { session.showSuccess })")
                     exit(0)
                 }
+            }
+            return
+        }
+        // `--check-update` prints what Settings › Updates would say. Installs nothing.
+        if args.contains("--check-update") {
+            Task.detached {
+                do { print("version \(SelfUpdate.currentVersion ?? "unknown"): \(try await SelfUpdate.check())"); exit(0) }
+                catch { print("check failed: \(error)"); exit(1) }
             }
             return
         }

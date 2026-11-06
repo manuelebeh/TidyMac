@@ -10,10 +10,13 @@ public enum GeneralSettings {
     public static let keepInDockKey = "\(prefix).keepInDock"
     public static let assistantKey = "\(prefix).assistant"
     public static let cleanOnEjectKey = "\(prefix).cleanOnEject"
+    public static let checkUpdatesKey = "\(prefix).checkUpdates"
 
-    /// Defaults keep TidyMac as it was before these settings existed; cleaning on ejection deletes files, so it is opt-in.
+    /// Defaults keep TidyMac as it was before these settings existed; cleaning on ejection deletes files and the update
+    /// check goes over the network, so both are opt-in.
     public static let defaults: [String: Any] = [
         soundsKey: true, reduceMotionKey: ReduceMotion.system.rawValue, keepInDockKey: true, assistantKey: true, cleanOnEjectKey: false,
+        checkUpdatesKey: false,
     ]
 
     static func bool(_ key: String, _ d: UserDefaults) -> Bool { d.object(forKey: key) as? Bool ?? defaults[key] as? Bool ?? false }
@@ -22,6 +25,7 @@ public enum GeneralSettings {
     public static func keepsDockIcon(_ d: UserDefaults = .standard) -> Bool { bool(keepInDockKey, d) }
     public static func showsAssistant(_ d: UserDefaults = .standard) -> Bool { bool(assistantKey, d) }
     public static func cleansOnEject(_ d: UserDefaults = .standard) -> Bool { bool(cleanOnEjectKey, d) }
+    public static func checksForUpdates(_ d: UserDefaults = .standard) -> Bool { bool(checkUpdatesKey, d) }
 
     public static func reduceMotion(_ d: UserDefaults = .standard) -> ReduceMotion {
         d.string(forKey: reduceMotionKey).flatMap(ReduceMotion.init(rawValue:)) ?? .system
