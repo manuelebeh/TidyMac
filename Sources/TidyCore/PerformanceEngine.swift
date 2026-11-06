@@ -67,6 +67,12 @@ public struct PerformanceEngine: ScanEngine {
              symbol: "clock.badge.xmark", command: Command("/usr/bin/tmutil", "thinlocalsnapshots", "/", "999999999999", "4"), admin: true, heavy: true),
     ]
 
+    /// The tasks this Mac can run. macOS drops old tools over time (macOS 27 has no `periodic`), and a task that can only
+    /// fail should not be offered, let alone preselected.
+    static func availableTasks(isInstalled: (String) -> Bool = FileManager.default.isExecutableFile(atPath:)) -> [Task] {
+        tasks.filter { isInstalled($0.command.executable) }
+    }
+
     /// The date `tmutil deletelocalsnapshots` takes, from a line of `tmutil listlocalsnapshots` such as
     /// "com.apple.TimeMachine.2026-11-06-101500.local". nil for any other line.
     static func snapshotDate(_ line: Substring) -> String? {
@@ -78,7 +84,7 @@ public struct PerformanceEngine: ScanEngine {
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {
         progress(String(localized: "Maintenance tasks"))
         let lastRun = UserDefaults.standard.dictionary(forKey: "TidyMac.taskRuns") as? [String: Date] ?? [:]
-        let tasks = Self.tasks.map { t -> ResultItem in
+        let tasks = Self.availableTasks().map { t -> ResultItem in
             let last = lastRun[t.id]
             // Recommend tasks not run in the last week.
             let due = last.map { Date().timeIntervalSince($0) > 7 * 86_400 } ?? true

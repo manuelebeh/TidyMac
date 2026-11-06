@@ -190,6 +190,20 @@ extension TidyCoreTests {
         XCTAssertTrue(lines.contains("OK:2"))
     }
 
+    func testMaintenanceTasksNeedTheirToolOnThisMac() {
+        let ids = { (tasks: [PerformanceEngine.Task]) in tasks.map(\.id) }
+        let all = ids(PerformanceEngine.tasks)
+        XCTAssertEqual(ids(PerformanceEngine.availableTasks { _ in true }), all)
+        XCTAssertEqual(ids(PerformanceEngine.availableTasks { $0 != "/usr/sbin/periodic" }), all.filter { $0 != "periodicScripts" })
+        // A script only needs its shell, and the check has to see a path it can look up.
+        XCTAssertTrue(ids(PerformanceEngine.availableTasks { $0 == "/bin/sh" }).contains("speedUpMail"))
+        XCTAssertTrue(PerformanceEngine.tasks.allSatisfy { $0.command.executable.hasPrefix("/") })
+        // The real check, on whichever macOS runs the tests.
+        let fm = FileManager.default
+        XCTAssertEqual(PerformanceEngine.availableTasks().contains { $0.id == "periodicScripts" }, fm.isExecutableFile(atPath: "/usr/sbin/periodic"))
+        XCTAssertTrue(PerformanceEngine.availableTasks().contains { $0.id == "freeUpRAM" })
+    }
+
     func testSnapshotDateOnlyComesFromASnapshotLine() {
         XCTAssertEqual(PerformanceEngine.snapshotDate("com.apple.TimeMachine.2026-11-06-101500.local"), "2026-11-06-101500")
         XCTAssertNil(PerformanceEngine.snapshotDate("Snapshots for disk /:"))
