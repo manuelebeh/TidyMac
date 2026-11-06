@@ -67,8 +67,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                 items: [ResultItem(title: "Caches", size: 2_400_000_000, action: .shell("true", admin: false))]),
                                     ResultGroup(id: "b", title: "Trash Bins", description: "", symbol: "trash.fill", items: [])]
                         c.selected = Set(c.groups.flatMap(\.items).map(\.id)); c.phase = .results
+                        c.scannedWithoutAccess = !Permissions.hasFullDiskAccess
                     case "scanning": c.current = "~/Library/Caches"; c.phase = .scanning
                     case "done": c.report = ActionReport(); c.phase = .done
+                    case "blocked":
+                        let item = ResultItem(title: "Mail Downloads", action: .shell("true", admin: false))
+                        var report = ActionReport()
+                        report.failed = [(item, "You don't have permission to access this item.")]
+                        report.needsAccess = [item]
+                        c.report = report; c.phase = .done
                     default: break
                     }
                 }

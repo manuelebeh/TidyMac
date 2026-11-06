@@ -17,6 +17,8 @@ final class ModuleController: ObservableObject {
     /// Running apps that hold files about to be removed; non-empty shows the quit sheet.
     @Published var appsToQuit: [NSRunningApplication] = []
     @Published var clutterRoot = Paths.home
+    /// These results were found without Full Disk Access, so protected folders are missing from them.
+    @Published var scannedWithoutAccess = false
     private var task: Task<Void, Never>?
 
     init(module: Module) { self.module = module; tool = nil }
@@ -30,6 +32,7 @@ final class ModuleController: ObservableObject {
 
     func scan() {
         phase = .scanning; current = ""; report = nil
+        scannedWithoutAccess = !Permissions.hasFullDiskAccess
         let engine: any ScanEngine = tool.map(ToolEngine.init) ?? module.engine(clutterRoot: clutterRoot)
         task = Task {
             let result = await Task.detached(priority: .userInitiated) {
@@ -70,9 +73,26 @@ final class ModuleController: ObservableObject {
     private func execute(_ items: [ResultItem]) {
         phase = .running
         Task {
+            var r = await Task.detached { await Executor.run(items) }.value
+            PerformanceEngine.markRun(r.succeeded)
+            // With access already there, it cannot be what is missing.
+            if Permissions.hasFullDiskAccess { r.needsAccess = [] }
+            report = r
+            phase = .done
+            Sounds.cleanupFinished()
+        }
+    }
+
+    /// Finishes what macOS blocked, once access is granted: the user already confirmed these items.
+    /// Whatever still fails is reported, and is not tried again.
+    func retryBlockedItems() {
+        guard phase == .done, let first = report, !first.needsAccess.isEmpty else { return }
+        let items = first.needsAccess
+        phase = .running
+        Task {
             let r = await Task.detached { await Executor.run(items) }.value
             PerformanceEngine.markRun(r.succeeded)
-            report = r
+            report = first.merging(retry: r)
             phase = .done
             Sounds.cleanupFinished()
         }
@@ -100,11 +120,12 @@ final class ModuleController: ObservableObject {
 
 struct ModuleScreen: View {
     @ObservedObject var controller: ModuleController
+    @ObservedObject private var access = FullDiskAccessWatcher.shared
     var module: Module { controller.module }
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            if controller.phase == .intro && !Permissions.hasFullDiskAccess {
+            if controller.phase == .intro && !access.granted {
                 FullDiskAccessBanner().frame(maxHeight: .infinity, alignment: .top).padding(.top, 40)
             }
             Group {
@@ -122,6 +143,8 @@ struct ModuleScreen: View {
             EdgeButton { bottomButton }
         }
         .animation(Motion.animation(.easeInOut(duration: 0.35)), value: controller.phase)
+        .onChange(of: access.granted) { if $0 { controller.retryBlockedItems() } }
+        .onAppear { if access.granted { controller.retryBlockedItems() } }
         .sheet(isPresented: $controller.reviewing) { ReviewSheet(controller: controller) }
         .sheet(isPresented: Binding(get: { !controller.appsToQuit.isEmpty }, set: { if !$0 { controller.appsToQuit = [] } })) {
             QuitAppsSheet(apps: controller.appsToQuit, onContinue: controller.continueAfterQuitting,
@@ -142,21 +165,6 @@ struct ModuleScreen: View {
             }
         case .done: ScanButton(title: "Done", module: module) { controller.phase = .intro }
         }
-    }
-}
-
-/// Without Full Disk Access, macOS blocks or prompts for most of what a cleaner needs to read.
-struct FullDiskAccessBanner: View {
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "lock.shield.fill").foregroundStyle(.yellow)
-            Text("Grant Full Disk Access so TidyMac can scan protected folders without repeated prompts.")
-                .font(.callout).foregroundStyle(.white)
-            Button("Open Settings") { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) }
-                .buttonStyle(PillButtonStyle())
-        }
-        .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Capsule().fill(.black.opacity(0.25)))
     }
 }
 
@@ -220,6 +228,7 @@ struct ProgressScreen: View {
 
 struct ResultsView: View {
     @ObservedObject var controller: ModuleController
+    @ObservedObject private var access = FullDiskAccessWatcher.shared
     var module: Module { controller.module }
 
     var header: String {
@@ -239,6 +248,14 @@ struct ResultsView: View {
                 Spacer()
                 Button("Review All") { controller.reviewing = true }.buttonStyle(PillButtonStyle())
                 Button("Start Over") { controller.phase = .intro }.buttonStyle(PillButtonStyle())
+            }
+            if controller.scannedWithoutAccess {
+                if access.granted {
+                    FullDiskAccessBanner(message: "Full Disk Access is on. Scan again to include protected folders.",
+                                         symbol: "checkmark.shield.fill", actionTitle: "Scan Again") { controller.scan() }
+                } else {
+                    FullDiskAccessBanner(message: "Protected folders were skipped. Grant Full Disk Access to include them.")
+                }
             }
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 16)], spacing: 16) {
@@ -368,6 +385,7 @@ struct ReviewSheet: View {
 
 struct DoneView: View {
     @ObservedObject var controller: ModuleController
+    @ObservedObject private var access = FullDiskAccessWatcher.shared
     var body: some View {
         let r = controller.report ?? ActionReport()
         VStack(spacing: 18) {
@@ -388,6 +406,10 @@ struct DoneView: View {
             Text(r.freed > 0 ? "\(formatSize(r.freed)) freed · \(r.succeeded.count) items" : "\(r.succeeded.count) items done")
                 .font(.title3).foregroundStyle(.white.opacity(0.8))
                 .appear(delay: 0.22)
+            if !r.needsAccess.isEmpty && !access.granted {
+                FullDiskAccessBanner(message: "macOS blocked \(r.needsAccess.count) of these items. Stay on this screen and grant Full Disk Access: they will be removed as soon as you do.")
+                    .frame(maxWidth: 640)
+            }
             if !r.failed.isEmpty {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {

@@ -25,8 +25,9 @@ public struct AppFacts: Codable, Sendable, Equatable {
         if let d = try? JSONEncoder().encode(self) { defaults.set(d, forKey: Self.key) }
     }
 
-    static func record(apps: [InstalledApp], updates: [ApplicationsEngine.Update]) {
-        AppFacts(updates: updates.map(\.app.name),
+    /// `others` names updates that are not tied to an installed app bundle, such as Homebrew casks.
+    static func record(apps: [InstalledApp], updates: [ApplicationsEngine.Update], others: [String] = []) {
+        AppFacts(updates: updates.map(\.app.name) + others,
                  unused: apps.filter { $0.kind == .app && $0.isUnused() }.map(\.url.path)).save()
     }
 
