@@ -1,0 +1,25 @@
+cask "tidymac" do
+  version "@VERSION@"
+  sha256 "@SHA256@"
+
+  url "https://github.com/manuelebeh/TidyMac/releases/download/v#{version}/TidyMac-#{version}.zip"
+  name "TidyMac"
+  desc "Clean up, protect and speed up your computer"
+  homepage "https://github.com/manuelebeh/TidyMac"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  depends_on macos: ">= :ventura"
+
+  app "TidyMac.app"
+
+  zap trash: [
+    "~/Library/Caches/io.github.manuelebeh.TidyMac",
+    "~/Library/HTTPStorages/io.github.manuelebeh.TidyMac",
+    "~/Library/Preferences/io.github.manuelebeh.TidyMac.plist",
+    "~/Library/Saved Application State/io.github.manuelebeh.TidyMac.savedState",
+  ]
+end

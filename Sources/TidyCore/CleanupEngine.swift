@@ -57,7 +57,7 @@ public struct CleanupEngine: ScanEngine {
     ]
 
     @Sendable static func userCache() -> ResultGroup {
-        let ownID = Bundle.main.bundleIdentifier ?? "dev.local.TidyMac"
+        let ownID = Bundle.main.bundleIdentifier ?? BundleMigration.bundleID
         let items = Paths.children(Paths.library.appendingPathComponent("Caches"))
             .filter { !protectedCaches.contains($0.lastPathComponent) && $0.lastPathComponent != ownID }
             .map { ResultItem.file($0) }

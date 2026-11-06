@@ -7,6 +7,8 @@ struct TidyMacApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     private var app: AppState { delegate.app }
 
+    init() { BundleMigration.run() }
+
     var body: some Scene {
         WindowGroup("TidyMac", id: "main") {
             RootView(app: app)

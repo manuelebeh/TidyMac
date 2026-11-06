@@ -1,0 +1,90 @@
+name: Release
+
+# A tag such as v1.2.3 builds the release and leaves it as a draft to review and publish by hand.
+# Running the workflow by hand builds the same files as a downloadable artifact and publishes nothing.
+#
+# Signing and notarization need these repository secrets. Without them the app is signed ad hoc.
+#   DEVELOPER_ID_CERT_P12      the Developer ID Application certificate and key, base64-encoded
+#   DEVELOPER_ID_CERT_PASSWORD the password of that .p12
+#   APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD   for notarytool (an app-specific password)
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  package:
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      contents: write # creates the draft release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the build number is the commit count
+
+      - name: Check the tag matches the VERSION file
+        if: github.event_name == 'push'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$TAG" != "v$(cat VERSION)" ]; then
+            echo "::error::Tag $TAG does not match VERSION $(cat VERSION)"
+            exit 1
+          fi
+
+      - name: Test
+        run: swift test
+
+      - name: Import the signing certificate
+        env:
+          CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          if [ -z "$CERT_P12" ]; then
+            echo "::notice::No signing certificate configured, the app will be signed ad hoc."
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -1)"
+          if [ -z "$identity" ]; then
+            echo "::error::The certificate is not a Developer ID Application certificate."
+            exit 1
+          fi
+          echo "SIGN_ID=$identity" >> "$GITHUB_ENV"
+
+      - name: Package
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: Packaging/package.sh
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: TidyMac
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Create the draft release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/* --draft --verify-tag --generate-notes --title "TidyMac $TAG"
