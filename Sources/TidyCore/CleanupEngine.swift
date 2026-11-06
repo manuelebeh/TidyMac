@@ -18,6 +18,7 @@ public struct CleanupEngine: ScanEngine {
         Category(id: "user-logs", title: "User Log Files", build: userLogs),
         Category(id: "system-logs", title: "System Log Files", build: systemLogs),
         Category(id: "xcode", title: "Xcode Junk", build: xcodeJunk),
+        Category(id: "dev-tools", title: "Developer Tool Caches", build: { devToolCaches() }),
         Category(id: "ios-backups", title: "iOS Device Backups", build: iosBackups),
         Category(id: "broken-prefs", title: "Broken Preferences", build: brokenPreferences),
         Category(id: "broken-login", title: "Broken Login Items", build: brokenLoginItems),
@@ -48,7 +49,8 @@ public struct CleanupEngine: ScanEngine {
 
     /// Caches whose removal breaks sync or account state rather than just costing a rebuild.
     static let protectedCaches: Set<String> = [
-        "com.apple.bird", "CloudKit", "com.apple.containermanagerd", "FamilyCircle", "com.apple.HomeKit",
+        "com.apple.bird", "CloudKit", "com.apple.cloudkit", "com.apple.cloudd", "com.apple.FileProvider",
+        "com.apple.containermanagerd", "FamilyCircle", "com.apple.HomeKit",
         "com.apple.Safari.SafeBrowsing", "com.apple.akd", "com.apple.ap.adprivacyd", "GeoServices",
     ]
 
@@ -63,7 +65,7 @@ public struct CleanupEngine: ScanEngine {
 
     @Sendable static func systemCache() -> ResultGroup {
         let items = Paths.children(URL(fileURLWithPath: "/Library/Caches"))
-            .filter { !$0.lastPathComponent.hasPrefix("com.apple.") }
+            .filter { !$0.lastPathComponent.hasPrefix("com.apple.") && !RemovalGuard.isProtectedByMacOS($0) }
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
         return group("system-cache", "System Cache Files",
                      "Caches of system-wide services and installers. Removal needs your administrator password.",
@@ -77,10 +79,11 @@ public struct CleanupEngine: ScanEngine {
 
     @Sendable static func systemLogs() -> ResultGroup {
         var items = Paths.children(URL(fileURLWithPath: "/Library/Logs"))
+            .filter { !RemovalGuard.isProtectedByMacOS($0) }
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
         // Only rotated archives in /var/log; live logs stay.
         items += Paths.children(URL(fileURLWithPath: "/private/var/log"))
-            .filter { ["gz", "bz2"].contains($0.pathExtension) }
+            .filter { ["gz", "bz2"].contains($0.pathExtension) && !RemovalGuard.isProtectedByMacOS($0) }
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
         return group("system-logs", "System Log Files",
                      "Logs of system services. Useful for debugging only. Needs your administrator password.",
@@ -107,6 +110,48 @@ public struct CleanupEngine: ScanEngine {
         return group("xcode", "Xcode Junk",
                      "Derived data, device support files and simulator caches. Xcode recreates what it needs.",
                      "hammer", items.filter { ($0.size ?? 1) > 0 })
+    }
+
+    /// Download and build caches kept outside ~/Library/Caches, which User Cache Files already covers. Only what a tool
+    /// fetches again by itself is preselected. Not preselected: pnpm's store, which projects share files with, so removing
+    /// it may free little; Maven and NuGet folders, which can hold local packages; and browser and model downloads, which
+    /// have to be requested again.
+    static let devCaches: [(path: String, tool: String, selected: Bool)] = [
+        (".npm/_cacache", "npm", true), (".npm/_logs", "npm", true),
+        (".cache/yarn", "Yarn", true), (".yarn/berry/cache", "Yarn", true),
+        ("Library/pnpm/store", "pnpm", false), (".pnpm-store", "pnpm", false), (".cache/pnpm", "pnpm", false),
+        (".bun/install/cache", "Bun", true), (".cache/node-gyp", "node-gyp", true), (".cache/deno", "Deno", true),
+        (".cache/pip", "pip", true), (".cache/pypoetry", "Poetry", true), (".cache/uv", "uv", true),
+        (".cargo/registry/cache", "Cargo", true), (".cargo/registry/index", "Cargo", true),
+        (".cargo/git/db", "Cargo", true), (".cargo/git/checkouts", "Cargo", true),
+        ("go/pkg/mod/cache", "Go", true), (".cache/mise", "mise", true),
+        (".gradle/caches", "Gradle", true), (".gradle/wrapper/dists", "Gradle", true),
+        // Only downloads: the rest of ~/.pub-cache holds globally activated tools.
+        (".pub-cache/hosted", "Dart pub", true), (".pub-cache/git", "Dart pub", true),
+        ("Library/Application Support/Code/Cache", "VS Code", true), ("Library/Application Support/Code/CachedData", "VS Code", true),
+        ("Library/Application Support/Code/CachedExtensionVSIXs", "VS Code", true), ("Library/Application Support/Code/logs", "VS Code", true),
+        (".local/share/NuGet/http-cache", "NuGet", true), (".nuget/packages", "NuGet", false), (".m2/repository", "Maven", false),
+        (".cache/puppeteer", "Puppeteer", false), (".cache/ms-playwright", "Playwright", false),
+        (".cache/huggingface/hub", "Hugging Face", false), (".cache/huggingface/datasets", "Hugging Face", false),
+    ]
+
+    static func devToolCaches(home: URL = Paths.home) -> ResultGroup {
+        let found = devCaches.map { (url: home.appendingPathComponent($0.path), tool: $0.tool, selected: $0.selected) }
+            .filter { Paths.exists($0.url) }
+        // These trees can hold hundreds of thousands of files, and the whole group has one deadline.
+        var sizes = [Int64](repeating: 0, count: found.count)
+        let lock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: found.count) { i in
+            let size = FileSize.allocated(found[i].url)
+            lock.lock(); sizes[i] = size; lock.unlock()
+        }
+        let items = found.indices.map { i in
+            ResultItem.file(found[i].url, size: sizes[i], selected: found[i].selected)
+                .with(title: "\(found[i].tool): \(found[i].url.lastPathComponent)")
+        }
+        return group("dev-tools", "Developer Tool Caches",
+                     "Packages and build files kept by npm, pnpm, Cargo, Gradle and similar tools. They are downloaded again when a project needs them.",
+                     "terminal", items)
     }
 
     @Sendable static func iosBackups() -> ResultGroup {
@@ -151,6 +196,7 @@ public struct CleanupEngine: ScanEngine {
 
     @Sendable static func deletedUsers() -> ResultGroup {
         let items = Paths.children(URL(fileURLWithPath: "/Users/Deleted Users"))
+            .filter { !RemovalGuard.isProtectedByMacOS($0) }
             .map { ResultItem.file($0, selected: false, action: .adminDelete($0)) }
         return group("deleted-users", "Deleted Users", "Data left over from user accounts that were removed.", "person.crop.circle.badge.xmark", items)
     }

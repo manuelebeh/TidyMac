@@ -7,7 +7,7 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 ## Features
 
 - **Smart Care**: one scan across cleanup, protection, performance, applications and clutter, then one button to run it all.
-- **Cleanup**: system junk, AI tool caches and logs, mail attachments, Trash bins.
+- **Cleanup**: system junk, developer tool caches (npm, pnpm, Bun, Cargo, Gradle, uv and more), AI tool caches and logs, mail attachments, Trash bins.
 - **Protection**: suspicious launch agents and daemons, browser privacy data, application permissions.
 - **Performance**: maintenance tasks, login items, background items, Time Machine snapshots.
 - **Applications**: uninstaller with leftovers, updates from Sparkle feeds and the App Store, unused installers. The update check sends the IDs of your App Store apps to Apple's public lookup API.
@@ -48,6 +48,8 @@ Run it as an app bundle rather than with `swift run`: notifications and Open at 
 
 - Files go to the Trash instead of being deleted, except items already in a Trash bin.
 - The executor refuses to trash anything outside your home folder.
+- Before any removal, a last check refuses system folders, other users' files and the live data of iCloud sync, including through symbolic links. Items macOS protects (SIP, locked files) are not offered, so no password is asked for a removal that cannot work.
+- A duplicate only goes to the Trash after both files are read again, to confirm the copy being kept is still there, separate and identical. Hard links are not counted as duplicates.
 - Nothing is removed until you review the results and confirm.
 - Malware detection is a heuristic over launch items (missing or unsigned executables, hidden or temporary locations). It is not an antivirus engine.
 - Language files and universal binaries inside app bundles are left alone, since changing them breaks code signatures.

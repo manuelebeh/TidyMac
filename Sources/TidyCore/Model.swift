@@ -5,6 +5,8 @@ import Foundation
 public enum ItemAction: Hashable, Sendable {
     /// Move to the user's Trash (recoverable).
     case trash(URL)
+    /// Move a duplicate to the Trash, once `keeping` is confirmed to still hold the content with this SHA-256.
+    case trashDuplicate(URL, keeping: URL, digest: String)
     /// Permanently delete. Only used for items that already sit in a Trash bin.
     case delete(URL)
     /// Delete paths that need root (system caches/logs), batched into one admin prompt.

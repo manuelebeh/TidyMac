@@ -18,7 +18,7 @@ public enum AppTerminator {
     public static func removedURLs(_ items: [ResultItem]) -> [URL] {
         items.compactMap {
             switch $0.action {
-            case .trash(let u), .delete(let u), .adminDelete(let u): u
+            case .trash(let u), .trashDuplicate(let u, _, _), .delete(let u), .adminDelete(let u): u
             default: nil
             }
         }

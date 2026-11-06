@@ -149,6 +149,7 @@ public enum Uninstaller {
             for u in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] where match(u.lastPathComponent.lowercased()) {
                 guard !u.path.hasPrefix(app.url.path + "/") else { continue }
                 let inHome = u.standardizedFileURL.path.hasPrefix(homePath + "/")
+                guard inHome || !RemovalGuard.isProtectedByMacOS(u) else { continue }
                 out.append(Leftover(url: u, size: FileSize.allocated(u), kind: kind, action: inHome ? .trash(u) : .adminDelete(u)))
             }
         }
@@ -169,6 +170,7 @@ public enum Uninstaller {
             for u in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] {
                 guard let id = Bundle(url: u)?.bundleIdentifier?.lowercased(), byID(id) else { continue }
                 let inHome = u.standardizedFileURL.path.hasPrefix(homePath + "/")
+                guard inHome || !RemovalGuard.isProtectedByMacOS(u) else { continue }
                 out.append(Leftover(url: u, size: FileSize.allocated(u), kind: .plugins, action: inHome ? .trash(u) : .adminDelete(u)))
             }
         }

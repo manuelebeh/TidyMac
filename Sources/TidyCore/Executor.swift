@@ -12,25 +12,28 @@ public enum Executor {
             do {
                 switch item.action {
                 case .trash(let url):
-                    let path = url.standardizedFileURL.path
-                    let isApp = path.hasPrefix("/Applications/") && url.pathExtension == "app"
-                    guard path.hasPrefix(home + "/") || isApp else { throw Failure("Outside home folder") }
-                    try fm.trashItem(at: url, resultingItemURL: nil)
+                    try moveToTrash(url, home: home, fm: fm)
+                case .trashDuplicate(let url, let keep, let digest):
+                    try verifyDuplicate(url, of: keep, digest: digest)
+                    try moveToTrash(url, home: home, fm: fm)
                 case .delete(let url):
+                    try allow(url, permanent: true)
                     // Only items already inside a Trash bin are deleted permanently.
-                    guard url.path.contains("/.Trash") else { throw Failure("Refusing permanent delete outside a Trash") }
+                    guard RemovalGuard.isInsideTrash(url) else { throw Failure("Refusing permanent delete outside a Trash") }
                     if fm.isDeletableFile(atPath: url.path) {
                         try fm.removeItem(at: url)
                     } else {
                         adminItems.append((item, "rm -rf \(quote(url.path))")); continue
                     }
                 case .adminDelete(let url):
+                    try allow(url, permanent: true)
                     adminItems.append((item, "rm -rf \(quote(url.path))")); continue
                 case .shell(let cmd, let admin):
                     if admin { adminItems.append((item, cmd)); continue }
                     let r = Shell.run("/bin/zsh", ["-c", cmd])
                     if r.status != 0 { throw Failure(r.output.isEmpty ? "Exit \(r.status)" : r.output) }
                 case .removeLaunchItem(let url, let admin):
+                    try allow(url, permanent: admin)
                     if admin {
                         adminItems.append((item, "launchctl bootout system \(quote(url.path)) 2>/dev/null; rm -f \(quote(url.path))")); continue
                     }
@@ -64,6 +67,30 @@ public enum Executor {
         return report
     }
 
+    static func allow(_ url: URL, permanent: Bool) throws {
+        if let reason = RemovalGuard.refusal(for: url, permanent: permanent) { throw Failure(reason) }
+    }
+
+    static func moveToTrash(_ url: URL, home: String, fm: FileManager) throws {
+        try allow(url, permanent: false)
+        let path = url.standardizedFileURL.path
+        let isApp = path.hasPrefix("/Applications/") && url.pathExtension == "app"
+        guard path.hasPrefix(home + "/") || isApp else { throw Failure("Outside home folder") }
+        try fm.trashItem(at: url, resultingItemURL: nil)
+    }
+
+    /// Time passes between a scan and a cleanup. Both files are read again, so the copy being kept is known to still
+    /// be there, to be a separate file and to have the same content before the other one goes.
+    static func verifyDuplicate(_ url: URL, of keep: URL, digest: String) throws {
+        guard let kept = ClutterEngine.regularFile(keep), ClutterEngine.hash(keep, limit: nil) == digest else {
+            throw Failure("The copy to keep is gone or has changed")
+        }
+        guard let copy = ClutterEngine.regularFile(url), ClutterEngine.hash(url, limit: nil) == digest else {
+            throw Failure("Changed since the scan")
+        }
+        guard kept.id != copy.id else { throw Failure("Same file as the copy to keep") }
+    }
+
     public static func quote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
     static func appleScriptEscape(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
@@ -79,11 +106,22 @@ public enum Executor {
 public enum Shell {
     public struct Result: Sendable { public let status: Int32; public let output: String }
 
+    /// An app opened from the Finder only gets the system folders in its PATH, so tools installed with Homebrew or their
+    /// own installer (such as `ollama`) would not be found. They go last, so system tools keep priority.
+    static func environment(_ base: [String: String] = ProcessInfo.processInfo.environment, home: URL = Paths.home) -> [String: String] {
+        var env = base
+        let current = (env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin").split(separator: ":").map(String.init)
+        let tools = ["/opt/homebrew/bin", "/usr/local/bin", home.appendingPathComponent(".local/bin").path]
+        env["PATH"] = (current + tools.filter { !current.contains($0) }).joined(separator: ":")
+        return env
+    }
+
     @discardableResult
     public static func run(_ launchPath: String, _ args: [String]) -> Result {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: launchPath)
         p.arguments = args
+        p.environment = environment()
         let pipe = Pipe()
         p.standardOutput = pipe; p.standardError = pipe
         do { try p.run() } catch { return Result(status: -1, output: error.localizedDescription) }
