@@ -143,7 +143,7 @@ extension SystemMonitor {
 
     /// Uses macOS's built-in `networkQuality` (12+). Returns bytes per second.
     public static func speedTest() -> (download: Double, upload: Double)? {
-        let r = Shell.run("/usr/bin/networkQuality", ["-c", "-s"])
+        let r = Shell.run("/usr/bin/networkQuality", ["-c", "-s"], timeout: 120)
         guard r.status == 0, let json = try? JSONSerialization.jsonObject(with: Data(r.output.utf8)) as? [String: Any],
               let dl = json["dl_throughput"] as? Double, let ul = json["ul_throughput"] as? Double else { return nil }
         return (dl / 8, ul / 8)

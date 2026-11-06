@@ -30,7 +30,7 @@ public enum Executor {
                     adminItems.append((item, Command("/bin/rm", "-rf", url.path).shellText)); continue
                 case .run(let command, let admin):
                     if admin { adminItems.append((item, command.shellText)); continue }
-                    let r = Shell.run(command.executable, command.arguments)
+                    let r = Shell.run(command.executable, command.arguments, timeout: nil)
                     if r.status != 0 { throw Failure(r.output.isEmpty ? String(localized: "Exit \(r.status)") : r.output) }
                 case .removeLaunchItem(let url, let admin):
                     if admin {
@@ -40,18 +40,21 @@ public enum Executor {
                     }
                     // Checked before the job is stopped, so a refused item is left running as it was.
                     try allowInTrash(url, home: home)
-                    _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())", url.path])
+                    _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())", url.path], timeout: 30)
                     try fm.trashItem(at: url, resultingItemURL: nil)
                 case .removeLoginItem(let name):
-                    let r = Shell.osascript("tell application \"System Events\" to delete login item \(Shell.appleScriptString(name))")
+                    let r = Shell.osascript("tell application \"System Events\" to delete login item \(Shell.appleScriptString(name))", timeout: nil)
                     if r.status != 0 { throw Failure(r.output) }
                 case .open(let url):
                     // Store pages are macappstore:// links, which `open` takes whole.
-                    _ = Shell.run("/usr/bin/open", [url.isFileURL ? url.path : url.absoluteString])
+                    _ = Shell.run("/usr/bin/open", [url.isFileURL ? url.path : url.absoluteString], timeout: 30)
                 }
                 report.succeeded.append(item)
             } catch {
                 report.failed.append((item, error.localizedDescription))
+                // The kind of action only: what it touched, and why it failed, may name files.
+                let kind = Mirror(reflecting: item.action).children.first?.label ?? "action"
+                Log.executor.error("\(kind, privacy: .public) failed: \(error.localizedDescription, privacy: .private)")
                 if blockedByMacOS(error) { report.needsAccess.append(item) }
             }
         }
@@ -123,6 +126,8 @@ public enum Shell {
     public struct Result: Sendable {
         public let status: Int32
         public let output: String
+        /// The program ran past its time limit and was stopped; `status` is -2 and `output` what it had written.
+        public var timedOut = false
 
         /// The JSON object in `output`. Errors share the pipe, so a tool's warnings can surround it.
         var jsonObject: Data {
@@ -141,22 +146,61 @@ public enum Shell {
         return env
     }
 
+    /// How long a reading may take. A tool that hangs, such as `docker` with a dead daemon or a Bluetooth query, would
+    /// otherwise hold a scan or the menu bar for good.
+    public static let defaultTimeout: TimeInterval = 60
+
+    /// Collects what a program writes while it is still running, so a full pipe cannot stall it.
+    private final class Output: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+        let finished = DispatchSemaphore(value: 0)
+        func append(_ more: Data) { lock.lock(); data.append(more); lock.unlock() }
+        var text: String {
+            lock.lock(); defer { lock.unlock() }
+            return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    /// Runs a program and waits for it. Past `timeout` it is stopped (nil waits for as long as it takes, for what the
+    /// user asked for). Output and errors come back together.
     @discardableResult
-    public static func run(_ launchPath: String, _ args: [String]) -> Result {
+    public static func run(_ launchPath: String, _ args: [String], timeout: TimeInterval? = defaultTimeout) -> Result {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: launchPath)
         p.arguments = args
         p.environment = environment()
-        let pipe = Pipe()
+        let pipe = Pipe(), output = Output(), exited = DispatchSemaphore(value: 0)
         p.standardOutput = pipe; p.standardError = pipe
-        do { try p.run() } catch { return Result(status: -1, output: error.localizedDescription) }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        return Result(status: p.terminationStatus, output: String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
+        p.terminationHandler = { _ in exited.signal() }
+        pipe.fileHandleForReading.readabilityHandler = { handle in
+            let more = handle.availableData
+            if more.isEmpty { handle.readabilityHandler = nil; output.finished.signal() } else { output.append(more) }
+        }
+        do { try p.run() } catch {
+            pipe.fileHandleForReading.readabilityHandler = nil
+            Log.shell.error("could not start \(launchPath, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            return Result(status: -1, output: error.localizedDescription)
+        }
+        var timedOut = false
+        if let timeout, exited.wait(timeout: .now() + timeout) == .timedOut {
+            timedOut = true
+            Log.shell.error("\(launchPath, privacy: .public) took more than \(Int(timeout)) s and was stopped")
+            if p.isRunning { p.terminate() }
+            if exited.wait(timeout: .now() + 2) == .timedOut { kill(p.processIdentifier, SIGKILL); exited.wait() }
+        } else if timeout == nil {
+            exited.wait()
+        }
+        // A program can leave a child behind that keeps the pipe open: take what is there once it has had a moment.
+        _ = output.finished.wait(timeout: .now() + 2)
+        pipe.fileHandleForReading.readabilityHandler = nil
+        return Result(status: timedOut ? -2 : p.terminationStatus, output: output.text, timedOut: timedOut)
     }
 
     @discardableResult
-    public static func osascript(_ source: String) -> Result { run("/usr/bin/osascript", ["-e", source]) }
+    public static func osascript(_ source: String, timeout: TimeInterval? = defaultTimeout) -> Result {
+        run("/usr/bin/osascript", ["-e", source], timeout: timeout)
+    }
 
     /// `text` as an AppleScript string, whatever it contains.
     static func appleScriptString(_ text: String) -> String {
@@ -170,7 +214,7 @@ public enum Shell {
     /// Runs a shell script as root, after the standard macOS password prompt. The one way TidyMac gets root, so the
     /// quoting cannot be forgotten at a call site.
     @discardableResult
-    static func runAsAdministrator(_ script: String) -> Result { osascript(administratorScript(script)) }
+    static func runAsAdministrator(_ script: String) -> Result { osascript(administratorScript(script), timeout: nil) }
 }
 
 

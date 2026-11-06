@@ -81,8 +81,8 @@ public struct ApplicationsEngine: ScanEngine {
     /// Nothing is installed. Without Homebrew there is simply nothing to report.
     static func homebrewUpdates() -> [HomebrewUpdate] {
         let brew = ["HOMEBREW_NO_ANALYTICS=1", "HOMEBREW_NO_ENV_HINTS=1", "brew"]
-        guard Shell.run("/usr/bin/env", brew + ["update", "--quiet"]).status != 127 else { return [] }
-        let r = Shell.run("/usr/bin/env", brew + ["outdated", "--cask", "--json=v2"])
+        guard Shell.run("/usr/bin/env", brew + ["update", "--quiet"], timeout: 300).status != 127 else { return [] }
+        let r = Shell.run("/usr/bin/env", brew + ["outdated", "--cask", "--json=v2"], timeout: 120)
         return r.status == 0 ? parseHomebrewOutdated(r.jsonObject) : []
     }
 
