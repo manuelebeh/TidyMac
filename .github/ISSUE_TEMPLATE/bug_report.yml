@@ -1,0 +1,44 @@
+name: Bug report
+description: Something does not work, or TidyMac removed or offered the wrong thing.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste personal file names or paths you would rather keep private.
+        For a security problem, use the private report form instead (see the link on the issue chooser).
+  - type: input
+    id: version
+    attributes:
+      label: TidyMac version
+      description: Settings › Updates, or `build/TidyMac.app/Contents/MacOS/TidyMac --check-update`.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac model
+      placeholder: macOS 15.1, MacBook Air M2
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What you did, what you expected, what happened
+    validations:
+      required: true
+  - type: dropdown
+    id: permissions
+    attributes:
+      label: Permissions given to TidyMac
+      multiple: true
+      options:
+        - Full Disk Access
+        - Notifications
+        - None
+  - type: textarea
+    id: scan
+    attributes:
+      label: Scan output
+      description: For a wrong scan result, the output of `TidyMac --scan <module>`. It never changes anything.
+      render: text

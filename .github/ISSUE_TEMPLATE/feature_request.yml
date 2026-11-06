@@ -1,0 +1,17 @@
+name: Feature request
+description: An idea for TidyMac.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like TidyMac to do?
+  - type: markdown
+    attributes:
+      value: TidyMac has no telemetry and nothing runs without your review, so ideas that need either are unlikely to be accepted.

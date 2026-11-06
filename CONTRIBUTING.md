@@ -13,6 +13,8 @@ Open an issue with:
 
 Please do not paste personal file names or paths you would rather keep private.
 
+For a security problem, do not open a public issue: follow [SECURITY.md](SECURITY.md).
+
 ## Setting up
 
 You need macOS 13 or later and Swift 5.9 or later.
