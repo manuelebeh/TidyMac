@@ -381,7 +381,7 @@ final class TidyCoreTests: XCTestCase {
     func testAppTerminatorOnlyConsidersRemovals() {
         let u = URL(fileURLWithPath: "/Applications/Slack.app")
         let items = [ResultItem(title: "a", url: u, action: .open(u)), ResultItem(title: "b", url: u, action: .trash(u)),
-                     ResultItem(title: "c", action: .shell("true", admin: false))]
+                     ResultItem(title: "c", action: .run(Command("/usr/bin/true"), admin: false))]
         XCTAssertEqual(AppTerminator.removedURLs(items), [u])
     }
 
@@ -433,7 +433,7 @@ final class TidyCoreTests: XCTestCase {
         XCTAssertEqual(byURL["sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper"]?.kind, .binaries)
         if case .adminDelete = byURL["sys/Library/PrivilegedHelperTools/com.acme.SuperNotes.helper"]?.action {} else { XCTFail("system file needs admin") }
         XCTAssertEqual(byURL["sys/var/db/receipts/com.acme.SuperNotes.pkg.plist"]?.action,
-                       .shell("/usr/sbin/pkgutil --forget 'com.acme.SuperNotes.pkg'", admin: true))
+                       .run(Command("/usr/sbin/pkgutil", "--forget", "com.acme.SuperNotes.pkg"), admin: true))
     }
 
     func testInstalledAppsSourcesAndFilters() throws {
@@ -744,8 +744,8 @@ extension TidyCoreTests {
         XCTAssertTrue(Automations.runsUnattended(.delete(u)))
         XCTAssertFalse(Automations.runsUnattended(.delete(URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"))))
         XCTAssertFalse(Automations.runsUnattended(.adminDelete(u)))
-        XCTAssertFalse(Automations.runsUnattended(.shell("purge", admin: true)))
-        XCTAssertTrue(Automations.runsUnattended(.shell("true", admin: false)))
+        XCTAssertFalse(Automations.runsUnattended(.run(Command("/usr/sbin/purge"), admin: true)))
+        XCTAssertTrue(Automations.runsUnattended(.run(Command("/usr/bin/true"), admin: false)))
     }
 
     func testAutomationRulesRoundTrip() {

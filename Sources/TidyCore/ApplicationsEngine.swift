@@ -68,7 +68,7 @@ public struct ApplicationsEngine: ScanEngine {
 
         var item: ResultItem {
             ResultItem(id: "update:brew:\(token)", title: token, subtitle: "\(current) → \(latest) · Homebrew",
-                       action: .shell("HOMEBREW_NO_ANALYTICS=1 brew upgrade --cask \(Executor.quote(token))", admin: false),
+                       action: .run(Command("/usr/bin/env", "HOMEBREW_NO_ANALYTICS=1", "brew", "upgrade", "--cask", token), admin: false),
                        selectedByDefault: false, badge: latest)
         }
 

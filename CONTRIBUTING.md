@@ -66,10 +66,11 @@ To add a language, create `Localization/<code>.lproj` with the same files as `fr
 
 TidyMac deletes files on people's machines, so these are not negotiable:
 
-- Every action goes through `Executor`. Do not delete, move or run commands from anywhere else.
-- Files go to the Trash. Permanent deletion is only for items already inside a Trash bin.
-- Nothing outside the user's home folder is trashed.
-- Nothing is selected by default unless it is clearly safe to remove, and nothing runs without the user's review.
+- Every action goes through `Executor`. Do not delete, move or run commands from anywhere else. Installing TidyMac itself (`MoveToApplications`) is the one exception, and it applies the same `RemovalGuard` check.
+- An action's command is a `Command` with a list of arguments. Never build shell text from something read from the disk or the network. Root is only reached through `Shell.runAsAdministrator`.
+- Files go to the Trash. Permanent deletion is only for items already inside a Trash bin and for what needs root, which `RemovalGuard` limits to `permanentRoots` and app bundles. Add to that list only for something a scan really offers.
+- Nothing outside the user's home folder is trashed, apart from apps in `/Applications`.
+- Nothing is selected by default unless it is clearly safe to remove, and nothing runs without the user's review. The one exception is an Automations rule the user created and set to clean automatically, and those never use the administrator password.
 - Tests must never touch real user files. Use a temporary directory, as the existing tests do.
 - Do not read or send personal data off the machine. There is no telemetry and no network access beyond what a feature explicitly needs, such as update checks.
 

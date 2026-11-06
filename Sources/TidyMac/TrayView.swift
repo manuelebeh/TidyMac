@@ -193,7 +193,7 @@ final class MonitorModel: ObservableObject {
     func freeUpMemory() {
         freeingMemory = true
         Task {
-            var item = ResultItem(title: String(localized: "Free Up RAM"), action: .shell("purge", admin: true))
+            var item = ResultItem(title: String(localized: "Free Up RAM"), action: .run(Command("/usr/sbin/purge"), admin: true))
             item.category = "maintenance"
             _ = await Task.detached { [item] in await Executor.run([item]) }.value
             freeingMemory = false

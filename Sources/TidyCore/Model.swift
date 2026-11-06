@@ -1,7 +1,31 @@
 import Foundation
 
+/// A program and its arguments. Run directly, the arguments reach the program as they are. Run as administrator, they
+/// go through a shell one quoted word at a time, so a name found on disk can never become part of the command.
+public struct Command: Hashable, Sendable {
+    public let executable: String
+    public let arguments: [String]
+
+    public init(_ executable: String, _ arguments: String...) { self.init(executable: executable, arguments: arguments) }
+    private init(executable: String, arguments: [String]) { self.executable = executable; self.arguments = arguments }
+
+    /// A tool that lives wherever its installer put it (`docker`, `ollama`), found through `Shell.environment`'s PATH.
+    public static func tool(_ name: String, _ arguments: String...) -> Command {
+        Command(executable: "/usr/bin/env", arguments: [name] + arguments)
+    }
+
+    /// For the few commands that need a shell's globbing or sequencing. The text has to be known at compile time,
+    /// which keeps anything read from disk out of it.
+    public static func script(_ text: StaticString) -> Command {
+        Command(executable: "/bin/sh", arguments: ["-c", text.description])
+    }
+
+    /// The command as one line of a shell script.
+    var shellText: String { ([executable] + arguments).map(Executor.quote).joined(separator: " ") }
+}
+
 /// What happens to an item when the user runs a module. Engines only describe actions;
-/// `Executor` is the single place that touches the filesystem or the shell.
+/// `Executor` is the single place that touches the filesystem or runs an action's command.
 public enum ItemAction: Hashable, Sendable {
     /// Move to the user's Trash (recoverable).
     case trash(URL)
@@ -9,10 +33,11 @@ public enum ItemAction: Hashable, Sendable {
     case trashDuplicate(URL, keeping: URL, digest: String)
     /// Permanently delete. Only used for items that already sit in a Trash bin.
     case delete(URL)
-    /// Delete paths that need root (system caches/logs), batched into one admin prompt.
+    /// Permanently delete what needs root and has no Trash to go to, batched into one admin prompt.
+    /// `RemovalGuard` limits it to a fixed list of folders.
     case adminDelete(URL)
-    /// Run a shell command, optionally as administrator (batched into one prompt).
-    case shell(String, admin: Bool)
+    /// Run a command, optionally as administrator (batched into one prompt).
+    case run(Command, admin: Bool)
     /// Unload a launchd job, then move its plist to the Trash.
     case removeLaunchItem(URL, admin: Bool)
     /// Remove a login item registered with System Events.

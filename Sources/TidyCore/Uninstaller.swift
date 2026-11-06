@@ -246,7 +246,7 @@ public enum Uninstaller {
         for u in (try? fm.contentsOfDirectory(at: system.appendingPathComponent("var/db/receipts"), includingPropertiesForKeys: nil)) ?? []
         where u.pathExtension == "plist" && byID(u.deletingPathExtension().lastPathComponent.lowercased()) {
             let pkg = u.deletingPathExtension().lastPathComponent
-            out.append(Leftover(url: u, size: 0, kind: .installers, action: .shell("/usr/sbin/pkgutil --forget \(Executor.quote(pkg))", admin: true)))
+            out.append(Leftover(url: u, size: 0, kind: .installers, action: .run(Command("/usr/sbin/pkgutil", "--forget", pkg), admin: true)))
         }
 
         var seen = Set<URL>()

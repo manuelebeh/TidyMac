@@ -12,14 +12,20 @@ public enum RemovalGuard {
         "Library/Caches/com.apple.cloudd", "Library/Caches/com.apple.FileProvider",
     ]
     static let systemTrees = ["/bin", "/sbin", "/etc", "/private/etc", "/cores", "/dev"]
-    /// Folders only their contents may leave when `rm` does the removing. Space Lens can still send the ones in the home
-    /// folder to the Trash, with a warning, because that can be undone.
-    static let systemRoots: Set<String> = [
-        "/Library/Application Support", "/Library/Caches", "/Library/Logs", "/Library/Preferences", "/Library/Extensions",
-        "/Library/LaunchAgents", "/Library/LaunchDaemons", "/Library/PrivilegedHelperTools", "/Library/Keychains", "/Library/Security",
-        "/private/var", "/private/var/log", "/private/var/db", "/private/tmp", "/tmp", "/usr/local",
-        "/Users/Shared", "/Users/Deleted Users",
-    ]
+    /// The only folders outside the home folder whose contents may be removed without a Trash to go back to: what the
+    /// scans and the Uninstaller offer. Anything else is refused, so a folder nobody thought of stays safe by default.
+    static let permanentRoots = [
+        "/Library/Application Support", "/Library/Audio/Plug-Ins", "/Library/Caches", "/Library/Internet Plug-Ins",
+        "/Library/LaunchAgents", "/Library/LaunchDaemons", "/Library/PreferencePanes", "/Library/Preferences",
+        "/Library/PrivilegedHelperTools", "/Library/QuickLook", "/Library/Screen Savers", "/Library/Spotlight",
+    ] + logRoots
+    /// Allowed to hold Apple's items too, since these only hold logs and data of removed accounts.
+    /// `standardizedFileURL` turns /private/var into /var, so the path as written and the real path each need their entry.
+    static let logRoots = ["/Library/Logs", "/private/var/log", "/var/log", "/Users/Deleted Users"]
+    /// Where an app bundle may be, wherever else it is: Finder's "Uninstall with TidyMac" can point at any of these.
+    static let applicationRoots = ["/Applications", "/Users/Shared", "/Volumes"]
+    /// Folders only their contents may leave when `rm` does the removing. Space Lens can still send them to the Trash,
+    /// with a warning, because that can be undone.
     static let homeRoots = ["Library/Caches", "Library/Logs", "Library/Developer", ".cache", ".config", ".ssh", ".gnupg"]
 
     /// Why `url` must not be removed, or nil when it may be. `permanent` is for removals that skip the Trash.
@@ -42,15 +48,41 @@ public enum RemovalGuard {
             return String(localized: "Another user's files")
         }
         guard permanent else { return nil }
-        if systemRoots.contains(path) || homeRoots.contains(where: { path == home + "/" + $0 }) { return String(localized: "Protected folder") }
+        if homeRoots.contains(where: { path == home + "/" + $0 }) { return String(localized: "Protected folder") }
         if isInside(home + "/Library/Mobile Documents") || isInside(home + "/Library/CloudStorage") { return String(localized: "Stored in the cloud") }
-        return nil
+        return isInside(home) || mayGoForGood(path) ? nil : String(localized: "Protected folder")
+    }
+
+    /// Outside the home folder: an item in a Trash bin, an app bundle or something in `permanentRoots` that is not Apple's.
+    static func mayGoForGood(_ path: String) -> Bool {
+        let parent = (path as NSString).deletingLastPathComponent
+        if hasTrashFolder(parent) { return true }
+        // "/Volumes/Backup.app" would be a whole drive, not an app.
+        if (path as NSString).pathExtension == "app", parent != "/Volumes", applicationRoots.contains(where: { path.hasPrefix($0 + "/") }) { return true }
+        guard let root = permanentRoots.first(where: { path.hasPrefix($0 + "/") }) else { return false }
+        if logRoots.contains(root) { return true }
+        let item = path.dropFirst(root.count + 1).prefix { $0 != "/" }
+        return item != "Apple" && !item.hasPrefix("com.apple.")
     }
 
     /// True for an item that sits in a Trash bin, where it is written and where it really is.
     public static func isInsideTrash(_ url: URL) -> Bool {
         let parent = url.standardizedFileURL.deletingLastPathComponent().path
-        return [parent, resolved(parent)].allSatisfy { $0.split(separator: "/").contains { $0 == ".Trash" || $0 == ".Trashes" } }
+        return [parent, resolved(parent)].allSatisfy(hasTrashFolder)
+    }
+
+    static func hasTrashFolder(_ folder: String) -> Bool {
+        folder.split(separator: "/").contains { $0 == ".Trash" || $0 == ".Trashes" }
+    }
+
+    /// True when both where `url` is written and where it really leads stay in the home folder, or it is an app in
+    /// /Applications. A link in the home folder can point at another drive; only the link itself counts as being here.
+    static func isTrashable(_ url: URL, home: String) -> Bool {
+        func allowed(_ path: String, home: String) -> Bool {
+            path.hasPrefix(home + "/") || (path.hasPrefix("/Applications/") && (path as NSString).pathExtension == "app")
+        }
+        let literal = url.standardizedFileURL.path
+        return allowed(literal, home: home) && allowed(physicalPath(literal), home: resolved(home))
     }
 
     /// True for SIP-protected or locked items, which even an administrator cannot delete: BSD flags carry

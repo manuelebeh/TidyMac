@@ -23,24 +23,27 @@ public enum Executor {
                     if fm.isDeletableFile(atPath: url.path) {
                         try fm.removeItem(at: url)
                     } else {
-                        adminItems.append((item, "rm -rf \(quote(url.path))")); continue
+                        adminItems.append((item, Command("/bin/rm", "-rf", url.path).shellText)); continue
                     }
                 case .adminDelete(let url):
                     try allow(url, permanent: true)
-                    adminItems.append((item, "rm -rf \(quote(url.path))")); continue
-                case .shell(let cmd, let admin):
-                    if admin { adminItems.append((item, cmd)); continue }
-                    let r = Shell.run("/bin/zsh", ["-c", cmd])
+                    adminItems.append((item, Command("/bin/rm", "-rf", url.path).shellText)); continue
+                case .run(let command, let admin):
+                    if admin { adminItems.append((item, command.shellText)); continue }
+                    let r = Shell.run(command.executable, command.arguments)
                     if r.status != 0 { throw Failure(r.output.isEmpty ? String(localized: "Exit \(r.status)") : r.output) }
                 case .removeLaunchItem(let url, let admin):
-                    try allow(url, permanent: admin)
                     if admin {
-                        adminItems.append((item, "launchctl bootout system \(quote(url.path)) 2>/dev/null; rm -f \(quote(url.path))")); continue
+                        try allow(url, permanent: true)
+                        let bootout = Command("/bin/launchctl", "bootout", "system", url.path).shellText
+                        adminItems.append((item, "\(bootout) 2>/dev/null; \(Command("/bin/rm", "-f", url.path).shellText)")); continue
                     }
+                    // Checked before the job is stopped, so a refused item is left running as it was.
+                    try allowInTrash(url, home: home)
                     _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())", url.path])
                     try fm.trashItem(at: url, resultingItemURL: nil)
                 case .removeLoginItem(let name):
-                    let r = Shell.osascript("tell application \"System Events\" to delete login item \"\(appleScriptEscape(name))\"")
+                    let r = Shell.osascript("tell application \"System Events\" to delete login item \(Shell.appleScriptString(name))")
                     if r.status != 0 { throw Failure(r.output) }
                 case .open(let url):
                     // Store pages are macappstore:// links, which `open` takes whole.
@@ -58,14 +61,20 @@ public enum Executor {
             let script = adminItems.enumerated().map { i, pair in
                 "( \(pair.1) ) >/dev/null 2>&1 && echo OK:\(i) || echo KO:\(i)"
             }.joined(separator: "; ")
-            let r = Shell.osascript("do shell script \"\(appleScriptEscape(script))\" with administrator privileges")
+            let r = Shell.runAsAdministrator(script)
+            let lines = outputLines(r.output)
             for (i, pair) in adminItems.enumerated() {
-                if r.status == 0 && r.output.contains("OK:\(i)") { report.succeeded.append(pair.0) }
+                if r.status == 0 && lines.contains("OK:\(i)") { report.succeeded.append(pair.0) }
                 else { report.failed.append((pair.0, r.status == 0 ? String(localized: "Command failed") : String(localized: "Administrator authorization was cancelled"))) }
             }
         }
         History.record(report)
         return report
+    }
+
+    /// Whole lines, so that "OK:10" does not also report item 1 as done. `do shell script` ends its lines with a return.
+    static func outputLines(_ output: String) -> Set<String> {
+        Set(output.split(whereSeparator: \.isNewline).map(String.init))
     }
 
     /// A file operation refused for lack of permission. The message is localized, so the error code is what counts.
@@ -80,11 +89,13 @@ public enum Executor {
     }
 
     static func moveToTrash(_ url: URL, home: String, fm: FileManager) throws {
-        try allow(url, permanent: false)
-        let path = url.standardizedFileURL.path
-        let isApp = path.hasPrefix("/Applications/") && url.pathExtension == "app"
-        guard path.hasPrefix(home + "/") || isApp else { throw Failure(String(localized: "Outside home folder")) }
+        try allowInTrash(url, home: home)
         try fm.trashItem(at: url, resultingItemURL: nil)
+    }
+
+    static func allowInTrash(_ url: URL, home: String) throws {
+        try allow(url, permanent: false)
+        guard RemovalGuard.isTrashable(url, home: home) else { throw Failure(String(localized: "Outside home folder")) }
     }
 
     /// Time passes between a scan and a cleanup. Both files are read again, so the copy being kept is known to still
@@ -99,10 +110,7 @@ public enum Executor {
         guard kept.id != copy.id else { throw Failure(String(localized: "Same file as the copy to keep")) }
     }
 
-    public static func quote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-    static func appleScriptEscape(_ s: String) -> String {
-        s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-    }
+    static func quote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
 
     struct Failure: LocalizedError {
         let message: String
@@ -149,6 +157,20 @@ public enum Shell {
 
     @discardableResult
     public static func osascript(_ source: String) -> Result { run("/usr/bin/osascript", ["-e", source]) }
+
+    /// `text` as an AppleScript string, whatever it contains.
+    static func appleScriptString(_ text: String) -> String {
+        "\"" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    }
+
+    static func administratorScript(_ script: String) -> String {
+        "do shell script \(appleScriptString(script)) with administrator privileges"
+    }
+
+    /// Runs a shell script as root, after the standard macOS password prompt. The one way TidyMac gets root, so the
+    /// quoting cannot be forgotten at a call site.
+    @discardableResult
+    static func runAsAdministrator(_ script: String) -> Result { osascript(administratorScript(script)) }
 }
 
 
