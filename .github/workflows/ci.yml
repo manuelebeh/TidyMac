@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes the running check pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest image still supported and the current one, so a change that only builds on the newest
+        # compiler is caught before it lands.
+        os: [macos-15, macos-26]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Show the toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Build the app bundle
+        run: ./bundle.sh
+
+      - name: Check the app bundle
+        run: |
+          plutil -lint build/TidyMac.app/Contents/Info.plist
+          codesign --verify --strict build/TidyMac.app
+
+      # Read-only by design: `--scan` prints what it finds and quits without running any action.
+      - name: Run a scan with the bundled app
+        timeout-minutes: 5
+        run: build/TidyMac.app/Contents/MacOS/TidyMac --scan cleanup
