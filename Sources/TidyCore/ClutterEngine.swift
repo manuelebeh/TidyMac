@@ -68,21 +68,24 @@ public struct ClutterEngine: ScanEngine {
     }
 
     /// Same size → same hash of the first 64 KB → same full SHA-256. The newest copy is kept.
+    /// Hard-linked files are left out: their names share one copy on disk, so removing one frees nothing.
     public static func duplicates(_ files: [FileInfo], minSize: Int64 = 100_000) -> ResultGroup {
         let bySize = Dictionary(grouping: files.filter { $0.size >= minSize }, by: \.size).values.filter { $0.count > 1 }
         var items: [ResultItem] = []
         for group in bySize {
-            let byHead = Dictionary(grouping: group) { hash($0.url, limit: 65_536) ?? UUID().uuidString }.values.filter { $0.count > 1 }
+            let separate = group.filter { regularFile($0.url)?.links == 1 }
+            let byHead = Dictionary(grouping: separate) { hash($0.url, limit: 65_536) ?? UUID().uuidString }.values.filter { $0.count > 1 }
             for g in byHead {
-                let byFull = Dictionary(grouping: g) { hash($0.url, limit: nil) ?? UUID().uuidString }.values.filter { $0.count > 1 }
-                for set in byFull {
+                let byFull = Dictionary(grouping: g) { hash($0.url, limit: nil) ?? UUID().uuidString }.filter { $0.value.count > 1 }
+                for (digest, set) in byFull {
                     let sorted = set.sorted { $0.modified > $1.modified }
                     let keep = sorted[0].url
                     // Only copies in Downloads are preselected ("Duplicate Downloads" in Smart Care).
                     let downloads = Paths.home("Downloads").path + "/"
                     for f in sorted.dropFirst() {
                         items.append(.file(f.url, size: f.size, subtitle: "Copy of \(Paths.abbreviate(keep))",
-                                           selected: f.url.path.hasPrefix(downloads)))
+                                           selected: f.url.path.hasPrefix(downloads),
+                                           action: .trashDuplicate(f.url, keeping: keep, digest: digest)))
                     }
                 }
             }
@@ -90,6 +93,13 @@ public struct ClutterEngine: ScanEngine {
         return ResultGroup(id: "duplicates", title: "Duplicates",
                            description: "Identical copies of the same file. The most recent copy is kept.",
                            symbol: "doc.on.doc", items: items.sorted { ($0.size ?? 0) > ($1.size ?? 0) }, verb: "to remove")
+    }
+
+    /// A regular file's identity on disk and how many names it has; nil for a symbolic link or anything missing.
+    static func regularFile(_ url: URL) -> (id: [UInt64], links: Int)? {
+        var info = stat()
+        guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return nil }
+        return ([UInt64(UInt32(bitPattern: info.st_dev)), info.st_ino], Int(info.st_nlink))
     }
 
     static func hash(_ url: URL, limit: Int?) -> String? {

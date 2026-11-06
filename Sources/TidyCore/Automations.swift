@@ -146,7 +146,7 @@ public enum Automations {
 
     static func runsUnattended(_ a: ItemAction, fm: FileManager = .default) -> Bool {
         switch a {
-        case .trash, .removeLoginItem: true
+        case .trash, .trashDuplicate, .removeLoginItem: true
         // `Executor` falls back to an administrator prompt for Trash items it cannot delete.
         case .delete(let url): fm.isDeletableFile(atPath: url.path)
         case .shell(_, let admin), .removeLaunchItem(_, let admin): !admin
