@@ -11,8 +11,8 @@ public struct ScanSettings: Codable, Sendable, Equatable {
 
     /// Smart Care's tiles, by `SmartCareEngine` group ID.
     public static let smartCareModules: [(id: String, title: String)] = [
-        ("cleanup", "Cleanup"), ("protection", "Protection"), ("performance", "Performance"),
-        ("applications", "Applications"), ("clutter", "My Clutter"),
+        ("cleanup", String(localized: "Cleanup")), ("protection", String(localized: "Protection")), ("performance", String(localized: "Performance")),
+        ("applications", String(localized: "Applications")), ("clutter", String(localized: "My Clutter")),
     ]
 
     public init() {}

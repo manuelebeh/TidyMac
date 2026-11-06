@@ -23,6 +23,7 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 - **Updates**: Settings › Updates shows the version and looks for a new release when you ask. It asks GitHub for the latest release and sends nothing about your Mac. A daily check with a notification is off by default. TidyMac never installs anything by itself.
 - **General settings**: sounds when a scan or cleanup finishes, Reduce Motion (System, Enabled, Disabled), keep the Dock icon after the window closes, show or hide the recommendations, and empty a drive's Trash when you eject it from the menu (off by default, the files are deleted for good).
 - **Integrations**: right-click an app in Finder › Services (or Quick Actions) › Uninstall with TidyMac. Shortcuts can do the same with "Open URLs" on `tidymac://uninstall?path=/Applications/Name.app`. On launch outside the Applications folder, TidyMac offers to move itself there.
+- **Languages**: English and French. TidyMac follows the language set for it in System Settings › General › Language & Region.
 - **Ignore List**: right-click an item in the review sheet to keep it out of future scans; manage the list by category in Settings › Ignore List.
 
 ## Install
@@ -67,7 +68,8 @@ Sources/TidyCore   scan engines, actions, history, system readings, alert rules
 Sources/TidyMac    SwiftUI app: screens, menu bar tray, background monitor, settings
 Tests/             unit tests for the core library
 bundle.sh          builds build/TidyMac.app
-Packaging/         release packaging, Homebrew cask template, app icon
+Localization/      translations, copied into the app bundle
+Packaging/         release packaging, translation check, Homebrew cask template, app icon
 ```
 
 ## Command line helpers

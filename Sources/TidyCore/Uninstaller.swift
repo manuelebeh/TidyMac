@@ -5,7 +5,11 @@ public struct InstalledApp: Identifiable, Sendable {
     public enum Kind: Sendable { case app, audioPlugin }
 
     /// Where the app came from (the Stores filter).
-    public enum Store: String, CaseIterable, Sendable { case appStore = "App Store", setapp = "Setapp", steam = "Steam", other = "Other" }
+    public enum Store: String, CaseIterable, Sendable {
+        case appStore = "App Store", setapp = "Setapp", steam = "Steam", other = "Other"
+
+        public var title: String { self == .other ? String(localized: "Other") : rawValue }
+    }
 
     public var id: URL { url }
     public let url: URL
@@ -29,6 +33,8 @@ public struct InstalledApp: Identifiable, Sendable {
 public enum Vendor: String, CaseIterable, Sendable {
     case apple = "Apple", adobe = "Adobe", google = "Google", jetBrains = "JetBrains", microsoft = "Microsoft", other = "Other"
 
+    public var title: String { self == .other ? String(localized: "Other") : rawValue }
+
     init(bundleID: String?) {
         let id = bundleID?.lowercased() ?? ""
         let prefixes: [(String, Vendor)] = [("com.apple.", .apple), ("com.adobe.", .adobe), ("com.google.", .google),
@@ -43,6 +49,21 @@ public struct Leftover: Identifiable, Hashable, Sendable {
         case supportingFiles = "Supporting Files", preferences = "Preferences", caches = "Caches", container = "Container",
              logs = "Logs", crashes = "Crashes", launchItems = "Login Items", binaries = "Binaries", plugins = "Plugins",
              installers = "Installers"
+
+        public var title: String {
+            switch self {
+            case .supportingFiles: String(localized: "Supporting Files")
+            case .preferences: String(localized: "Preferences")
+            case .caches: String(localized: "Caches")
+            case .container: String(localized: "Container")
+            case .logs: String(localized: "Logs")
+            case .crashes: String(localized: "Crashes")
+            case .launchItems: String(localized: "Login Items")
+            case .binaries: String(localized: "Binaries")
+            case .plugins: String(localized: "Plugins")
+            case .installers: String(localized: "Installers")
+            }
+        }
     }
 
     public var id: URL { url }

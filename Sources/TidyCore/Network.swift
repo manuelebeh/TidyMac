@@ -69,14 +69,26 @@ extension SystemMonitor {
     // MARK: Connection info
 
     public struct WiFiSecurity: Sendable, Equatable {
-        public enum Rating: String, Sendable { case open = "Open", weak = "Weak", basic = "Basic", good = "Good", strong = "Strong" }
+        public enum Rating: String, Sendable {
+            case open = "Open", weak = "Weak", basic = "Basic", good = "Good", strong = "Strong"
+
+            public var title: String {
+                switch self {
+                case .open: String(localized: "Open")
+                case .weak: String(localized: "Weak")
+                case .basic: String(localized: "Basic")
+                case .good: String(localized: "Good")
+                case .strong: String(localized: "Strong")
+                }
+            }
+        }
         public let name: String
         public let rating: Rating
 
         /// From `CWSecurity`'s raw value.
         public init?(coreWLAN raw: Int) {
             switch raw {
-            case 0: (name, rating) = ("no password", .open)
+            case 0: (name, rating) = (String(localized: "no password"), .open)
             case 1, 6: (name, rating) = ("WEP", .weak)
             case 2, 3: (name, rating) = ("WPA Personal", .basic)
             case 7, 8: (name, rating) = ("WPA Enterprise", .basic)
@@ -92,7 +104,18 @@ extension SystemMonitor {
     }
 
     public struct NetworkInfo: Sendable, Equatable {
-        public enum Kind: String, Sendable { case wifi = "Wi-Fi", wired = "Wired", vpn = "VPN", other = "Other" }
+        public enum Kind: String, Sendable {
+            case wifi = "Wi-Fi", wired = "Wired", vpn = "VPN", other = "Other"
+
+            public var title: String {
+                switch self {
+                case .wifi: "Wi-Fi"
+                case .wired: String(localized: "Wired")
+                case .vpn: "VPN"
+                case .other: String(localized: "Other")
+                }
+            }
+        }
         public let kind: Kind
         public let interface: String
         /// The Wi-Fi network's name. macOS hides it from apps without Location access, so it is often nil.
@@ -131,12 +154,12 @@ extension SystemMonitor {
     public static func goodFor(download: Double, upload: Double) -> [String] {
         let dl = download * 8 / 1_000_000, ul = upload * 8 / 1_000_000
         var out: [String] = []
-        if dl >= 0.5 { out.append("Messaging") }
-        if dl >= 1, ul >= 0.5 { out.append("Audio calls") }
-        if dl >= 2 { out.append("Music streaming") }
-        if dl >= 4, ul >= 3 { out.append("Video calls") }
-        if dl >= 15 { out.append("Video streaming") }
-        if dl >= 15, ul >= 5 { out.append("Online gaming") }
+        if dl >= 0.5 { out.append(String(localized: "Messaging")) }
+        if dl >= 1, ul >= 0.5 { out.append(String(localized: "Audio calls")) }
+        if dl >= 2 { out.append(String(localized: "Music streaming")) }
+        if dl >= 4, ul >= 3 { out.append(String(localized: "Video calls")) }
+        if dl >= 15 { out.append(String(localized: "Video streaming")) }
+        if dl >= 15, ul >= 5 { out.append(String(localized: "Online gaming")) }
         return out
     }
 }

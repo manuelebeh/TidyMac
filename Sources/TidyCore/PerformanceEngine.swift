@@ -46,74 +46,74 @@ public struct PerformanceEngine: ScanEngine {
     }
 
     public static let tasks: [Task] = [
-        Task(id: "freeUpRAM", title: "Free Up RAM", detail: "Flushes inactive memory so apps get room to work.",
+        Task(id: "freeUpRAM", title: String(localized: "Free Up RAM"), detail: String(localized: "Flushes inactive memory so apps get room to work."),
              symbol: "memorychip", command: "purge", admin: true),
-        Task(id: "flushDNSCache", title: "Flush DNS Cache", detail: "Clears cached domain lookups that may be stale.",
+        Task(id: "flushDNSCache", title: String(localized: "Flush DNS Cache"), detail: String(localized: "Clears cached domain lookups that may be stale."),
              symbol: "network", command: "dscacheutil -flushcache; killall -HUP mDNSResponder", admin: true),
-        Task(id: "speedUpMail", title: "Speed Up Mail", detail: "Rebuilds Mail's envelope index. Mail must be closed.",
+        Task(id: "speedUpMail", title: String(localized: "Speed Up Mail"), detail: String(localized: "Rebuilds Mail's envelope index. Mail must be closed."),
              symbol: "envelope", command: "for f in ~/Library/Mail/V*/MailData/Envelope\\ Index; do /usr/bin/sqlite3 \"$f\" vacuum; done",
              admin: false),
-        Task(id: "reindexSpotlight", title: "Reindex Spotlight", detail: "Rebuilds the Spotlight index for the startup disk.",
+        Task(id: "reindexSpotlight", title: String(localized: "Reindex Spotlight"), detail: String(localized: "Rebuilds the Spotlight index for the startup disk."),
              symbol: "magnifyingglass", command: "mdutil -E /", admin: true, heavy: true),
-        Task(id: "repairDiskPermissions", title: "Repair Disk Permissions",
-             detail: "Resets permissions on your home folder files.",
+        Task(id: "repairDiskPermissions", title: String(localized: "Repair Disk Permissions"),
+             detail: String(localized: "Resets permissions on your home folder files."),
              symbol: "lock.shield", command: "diskutil resetUserPermissions / \(getuid())", admin: true, heavy: true),
-        Task(id: "periodicScripts", title: "Run Maintenance Scripts",
-             detail: "Runs the daily, weekly and monthly system scripts.",
+        Task(id: "periodicScripts", title: String(localized: "Run Maintenance Scripts"),
+             detail: String(localized: "Runs the daily, weekly and monthly system scripts."),
              symbol: "clock.arrow.circlepath", command: "periodic daily weekly monthly", admin: true),
-        Task(id: "thinLocalSnapshots", title: "Thin Time Machine Snapshots",
-             detail: "Removes local Time Machine snapshots. Backups on your drive are not affected.",
+        Task(id: "thinLocalSnapshots", title: String(localized: "Thin Time Machine Snapshots"),
+             detail: String(localized: "Removes local Time Machine snapshots. Backups on your drive are not affected."),
              symbol: "clock.badge.xmark", command: "tmutil thinlocalsnapshots / 999999999999 4", admin: true, heavy: true),
     ]
 
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {
-        progress("Maintenance tasks")
+        progress(String(localized: "Maintenance tasks"))
         let lastRun = UserDefaults.standard.dictionary(forKey: "TidyMac.taskRuns") as? [String: Date] ?? [:]
         let tasks = Self.tasks.map { t -> ResultItem in
             let last = lastRun[t.id]
             // Recommend tasks not run in the last week.
             let due = last.map { Date().timeIntervalSince($0) > 7 * 86_400 } ?? true
             return ResultItem(id: "task:\(t.id)", title: t.title,
-                              subtitle: t.detail + (last.map { " Last run \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date()))." } ?? ""),
+                              subtitle: t.detail + (last.map { String(localized: " Last run \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date())).") } ?? ""),
                               action: .shell(t.command, admin: t.admin), selectedByDefault: due && !t.heavy)
         }
 
-        progress("Login items")
+        progress(String(localized: "Login items"))
         let loginNames = Shell.osascript("tell application \"System Events\" to get the name of every login item").output
         let logins = loginNames.isEmpty || loginNames.contains("execution error") ? [] :
             loginNames.components(separatedBy: ", ").map {
-                ResultItem(id: "login:\($0)", title: $0, subtitle: "Opens when you log in",
+                ResultItem(id: "login:\($0)", title: $0, subtitle: String(localized: "Opens when you log in"),
                            action: .removeLoginItem(name: $0), selectedByDefault: false)
             }
 
-        progress("Background items")
+        progress(String(localized: "Background items"))
         let agents = LaunchItems.all().filter { !$0.label.hasPrefix("com.apple.") }.map { li in
             ResultItem(id: "launch:\(li.plist.path)", title: li.label,
-                       subtitle: (li.isDaemon ? "System daemon" : li.isSystemWide ? "Agent for all users" : "User agent")
-                           + (li.isBroken ? " · broken" : ""),
+                       subtitle: (li.isDaemon ? String(localized: "System daemon") : li.isSystemWide ? String(localized: "Agent for all users") : String(localized: "User agent"))
+                           + (li.isBroken ? String(localized: " · broken") : ""),
                        url: li.plist, action: .removeLaunchItem(li.plist, admin: li.isSystemWide),
-                       selectedByDefault: li.isBroken, badge: li.isBroken ? "Broken" : nil)
+                       selectedByDefault: li.isBroken, badge: li.isBroken ? String(localized: "Broken") : nil)
         }
 
         let snapshots = Shell.run("/usr/bin/tmutil", ["listlocalsnapshots", "/"]).output
             .split(separator: "\n").filter { $0.contains("com.apple.TimeMachine") }
-            .map { s in ResultItem(id: "snap:\(s)", title: String(s), subtitle: "Local Time Machine snapshot",
+            .map { s in ResultItem(id: "snap:\(s)", title: String(s), subtitle: String(localized: "Local Time Machine snapshot"),
                                    action: .shell("tmutil deletelocalsnapshots \(s.split(separator: ".").dropFirst(3).first ?? "")", admin: true),
                                    selectedByDefault: false) }
 
         return [
-            ResultGroup(id: "maintenance", title: "Maintenance Tasks",
-                        description: "Essential care for your Mac's software and hardware. Most tasks ask for your administrator password once.",
-                        symbol: "wrench.and.screwdriver", items: tasks, verb: "to run"),
-            ResultGroup(id: "login-items", title: "Login Items",
-                        description: "Apps that open automatically when you log in.", symbol: "person.badge.clock",
-                        items: logins, verb: "to review"),
-            ResultGroup(id: "background-items", title: "Background Items",
-                        description: "Launch agents and daemons that run in the background.", symbol: "gearshape.arrow.triangle.2.circlepath",
-                        items: agents, verb: "to review"),
-            ResultGroup(id: "snapshots", title: "Time Machine Snapshots",
-                        description: "Local snapshots kept on the startup disk.", symbol: "clock.arrow.circlepath",
-                        items: snapshots, verb: "to remove"),
+            ResultGroup(id: "maintenance", title: String(localized: "Maintenance Tasks"),
+                        description: String(localized: "Essential care for your Mac's software and hardware. Most tasks ask for your administrator password once."),
+                        symbol: "wrench.and.screwdriver", items: tasks, verb: String(localized: "to run")),
+            ResultGroup(id: "login-items", title: String(localized: "Login Items"),
+                        description: String(localized: "Apps that open automatically when you log in."), symbol: "person.badge.clock",
+                        items: logins, verb: String(localized: "to review")),
+            ResultGroup(id: "background-items", title: String(localized: "Background Items"),
+                        description: String(localized: "Launch agents and daemons that run in the background."), symbol: "gearshape.arrow.triangle.2.circlepath",
+                        items: agents, verb: String(localized: "to review")),
+            ResultGroup(id: "snapshots", title: String(localized: "Time Machine Snapshots"),
+                        description: String(localized: "Local snapshots kept on the startup disk."), symbol: "clock.arrow.circlepath",
+                        items: snapshots, verb: String(localized: "to remove")),
         ].filter { !$0.isEmpty }
     }
 

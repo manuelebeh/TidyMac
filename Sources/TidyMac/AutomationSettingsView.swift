@@ -35,7 +35,7 @@ struct AutomationSettingsView: View {
                             if let r = results[rule.id] { Text(r).font(.caption) }
                         }
                         Spacer()
-                        Button("Run Now") { runNow(rule) }.disabled(results[rule.id] == "Running…")
+                        Button(String(localized: "Run Now")) { runNow(rule) }.disabled(results[rule.id] == String(localized: "Running…"))
                         Button("Edit") { editing = Editing(rule: rule, isNew: false) }
                         Toggle(rule.name, isOn: $rule.enabled).labelsHidden().toggleStyle(.switch).controlSize(.small)
                     }
@@ -84,11 +84,11 @@ struct AutomationSettingsView: View {
 
     /// One starting point per trigger; each opens in the editor.
     static let presets: [(name: String, rule: () -> Automations.Rule)] = [
-        ("Weekly Cleanup", { .init(name: "Weekly Cleanup", trigger: .schedule(.init()), categories: ["user-cache", "user-logs", "ai-junk", "broken-prefs"]) }),
-        ("When Free Space Is Low", { .init(name: "Low Disk Space", trigger: .freeSpaceBelow(10_000_000_000), categories: ["user-cache", "user-logs", "xcode", "ai-junk"]) }),
-        ("When Trash Gets Too Big", { .init(name: "Empty Trash", trigger: .trashOver(5_000_000_000), categories: ["trash"]) }),
-        ("When an External Drive Is Almost Full", { .init(name: "Full External Drive", trigger: .driveAlmostFull, categories: ["trash"]) }),
-        ("When a Drive Is Connected", { .init(name: "Drive Connected", trigger: .driveConnected, categories: ["trash"]) }),
+        (String(localized: "Weekly Cleanup"), { .init(name: String(localized: "Weekly Cleanup"), trigger: .schedule(.init()), categories: ["user-cache", "user-logs", "ai-junk", "broken-prefs"]) }),
+        (String(localized: "When Free Space Is Low"), { .init(name: String(localized: "Low Disk Space"), trigger: .freeSpaceBelow(10_000_000_000), categories: ["user-cache", "user-logs", "xcode", "ai-junk"]) }),
+        (String(localized: "When Trash Gets Too Big"), { .init(name: String(localized: "Empty Trash"), trigger: .trashOver(5_000_000_000), categories: ["trash"]) }),
+        (String(localized: "When an External Drive Is Almost Full"), { .init(name: String(localized: "Full External Drive"), trigger: .driveAlmostFull, categories: ["trash"]) }),
+        (String(localized: "When a Drive Is Connected"), { .init(name: String(localized: "Drive Connected"), trigger: .driveConnected, categories: ["trash"]) }),
     ]
 }
 
@@ -100,9 +100,18 @@ struct RuleEditor: View {
     let delete: () -> Void
     @Environment(\.dismiss) private var dismiss
 
-    private enum Kind: String, CaseIterable {
-        case schedule = "On a Schedule", freeSpace = "Free Space Is Below", trash = "Trash Size Exceeds"
-        case driveFull = "An External Drive Is Almost Full", driveConnected = "A Drive Is Connected"
+    private enum Kind: CaseIterable {
+        case schedule, freeSpace, trash, driveFull, driveConnected
+
+        var title: String {
+            switch self {
+            case .schedule: String(localized: "On a Schedule")
+            case .freeSpace: String(localized: "Free Space Is Below")
+            case .trash: String(localized: "Trash Size Exceeds")
+            case .driveFull: String(localized: "An External Drive Is Almost Full")
+            case .driveConnected: String(localized: "A Drive Is Connected")
+            }
+        }
     }
 
     private let freeSpaceOptions: [Int64] = [5, 10, 20, 50].map { $0 * 1_000_000_000 }
@@ -115,7 +124,7 @@ struct RuleEditor: View {
                     TextField("Name", text: $rule.name)
                 }
                 Section("When") {
-                    Picker("Trigger", selection: kind) { ForEach(Kind.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
+                    Picker("Trigger", selection: kind) { ForEach(Kind.allCases, id: \.self) { Text($0.title).tag($0) } }
                     switch kind.wrappedValue {
                     case .schedule:
                         Picker("Repeat", selection: schedule.frequency) {
@@ -152,7 +161,7 @@ struct RuleEditor: View {
                 } header: {
                     Text("Clean")
                 } footer: {
-                    Text(rule.categories.contains("trash") ? "Trash Bins includes the Trash on connected drives. Those files are deleted for good." : "Items are moved to the Trash.")
+                    Text(rule.categories.contains("trash") ? String(localized: "Trash Bins includes the Trash on connected drives. Those files are deleted for good.") : String(localized: "Items are moved to the Trash."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section {
@@ -173,7 +182,7 @@ struct RuleEditor: View {
                 if !isNew { Button("Delete Rule", role: .destructive) { delete(); dismiss() } }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(isNew ? "Add" : "Save") { save(rule); dismiss() }
+                Button(isNew ? String(localized: "Add") : String(localized: "Save")) { save(rule); dismiss() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(rule.categories.isEmpty || rule.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
@@ -232,17 +241,17 @@ extension Automations.Rule {
         case .schedule(let s):
             let at = RuleEditor.hour(s.hour)
             switch s.frequency {
-            case .daily: when = "Daily at \(at)"
-            case .weekly: when = "Weekly on \(Calendar.current.weekdaySymbols[s.weekday - 1]) at \(at)"
-            case .monthly: when = "Monthly on day \(s.day) at \(at)"
+            case .daily: when = String(localized: "Daily at \(at)")
+            case .weekly: when = String(localized: "Weekly on \(Calendar.current.weekdaySymbols[s.weekday - 1]) at \(at)")
+            case .monthly: when = String(localized: "Monthly on day \(s.day) at \(at)")
             }
-        case .freeSpaceBelow(let l): when = "When free space is below \(FileSize.format(l))"
-        case .trashOver(let l): when = "When the Trash exceeds \(FileSize.format(l))"
-        case .driveAlmostFull: when = "When an external drive is almost full"
-        case .driveConnected: when = "When a drive is connected"
+        case .freeSpaceBelow(let l): when = String(localized: "When free space is below \(FileSize.format(l))")
+        case .trashOver(let l): when = String(localized: "When the Trash exceeds \(FileSize.format(l))")
+        case .driveAlmostFull: when = String(localized: "When an external drive is almost full")
+        case .driveConnected: when = String(localized: "When a drive is connected")
         }
         let titles = CleanupEngine.categories.filter { categories.contains($0.id) }.map(\.title)
-        let what = titles.count <= 2 ? titles.joined(separator: ", ") : "\(titles.count) categories"
-        return [when, what, mode == .ask ? "Asks first" : "Cleans automatically"].joined(separator: " · ")
+        let what = titles.count <= 2 ? titles.joined(separator: ", ") : String(localized: "\(titles.count) categories")
+        return [when, what, mode == .ask ? String(localized: "Asks first") : String(localized: "Cleans automatically")].joined(separator: " · ")
     }
 }

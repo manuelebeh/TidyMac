@@ -24,17 +24,17 @@ public enum IgnoreList {
 
         public var title: String {
             switch self {
-            case .systemJunk: "System Junk"
-            case .aiClutter: "AI Clutter"
-            case .mail: "Mail Attachments"
-            case .largeOld: "Large & Old Files"
-            case .duplicates: "Duplicates"
-            case .similar: "Similar Images"
-            case .downloads: "Downloads"
-            case .uninstaller: "App Leftovers"
-            case .updater: "Updater"
-            case .malware: "Malware Removal"
-            case .other: "Other"
+            case .systemJunk: String(localized: "System Junk")
+            case .aiClutter: String(localized: "AI Clutter")
+            case .mail: String(localized: "Mail Attachments")
+            case .largeOld: String(localized: "Large & Old Files")
+            case .duplicates: String(localized: "Duplicates")
+            case .similar: String(localized: "Similar Images")
+            case .downloads: String(localized: "Downloads")
+            case .uninstaller: String(localized: "App Leftovers")
+            case .updater: String(localized: "Updater")
+            case .malware: String(localized: "Malware Removal")
+            case .other: String(localized: "Other")
             }
         }
 

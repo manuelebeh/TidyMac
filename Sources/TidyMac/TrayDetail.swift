@@ -100,12 +100,12 @@ struct TrayDetail: View {
     var title: String {
         switch card {
         case .storage: monitor.storage.name
-        case .memory: "Memory"
-        case .battery: "Battery"
+        case .memory: String(localized: "Memory")
+        case .battery: String(localized: "Battery")
         case .cpu: Self.chip
-        case .network: "Network"
-        case .drives: "External Drives"
-        case .devices: "Connected Devices"
+        case .network: String(localized: "Network")
+        case .drives: String(localized: "External Drives")
+        case .devices: String(localized: "Connected Devices")
         }
     }
 
@@ -126,21 +126,21 @@ struct TrayDetail: View {
         let low = monitor.issues.contains { $0.kind == .lowDiskSpace } || (s.total > 0 && s.available < s.total / 50)
         HStack(spacing: 26) {
             Donut(parts: [(Double(used), .white)], total: Double(max(s.total, 1))) {
-                BigFigure(size: s.available, color: low ? TrayStyle.warning : .primary, caption: "of \(formatSize(s.total)) available")
+                BigFigure(size: s.available, color: low ? TrayStyle.warning : .primary, caption: String(localized: "of \(formatSize(s.total)) available"))
             }
             VStack(alignment: .leading, spacing: 12) {
-                LegendRow(color: .white, title: "Used", value: formatSize(used))
-                LegendRow(color: .primary.opacity(0.25), title: "Available", value: formatSize(s.available))
+                LegendRow(color: .white, title: String(localized: "Used"), value: formatSize(used))
+                LegendRow(color: .primary.opacity(0.25), title: String(localized: "Available"), value: formatSize(s.available))
             }
         }
         .padding(.horizontal, 14)
         HStack(alignment: .top, spacing: 11) {
             if let h = monitor.driveHealth { InfoCard(symbol: "heart.fill", metric: Metric.driveHealth(h)) }
-            InfoCard(symbol: nil, metric: Metric(title: "Capacity", value: formatSize(s.total), severity: .normal,
-                                                             detail: "The total size of your startup disk."))
+            InfoCard(symbol: nil, metric: Metric(title: String(localized: "Capacity"), value: formatSize(s.total), severity: .normal,
+                                                             detail: String(localized: "The total size of your startup disk.")))
         }
         .fixedSize(horizontal: false, vertical: true)
-        SectionTitle("Components")
+        SectionTitle(String(localized: "Components"))
         HStack(alignment: .top, spacing: 11) {
             trash.frame(maxWidth: .infinity)
             Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
@@ -158,7 +158,7 @@ struct TrayDetail: View {
             Label("Trash", systemImage: "trash.fill").font(.system(size: 15, weight: .semibold)).labelStyle(TrayStyle.TightLabel())
             if let t = monitor.trash {
                 ThinBar(fraction: Double(t.size) / Double(max(limit, 1)), color: t.size > limit ? TrayStyle.warning : .white)
-                Text("Used: \(t.size == 0 ? "Empty" : formatSize(t.size)) of \(formatSize(limit))").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(String(localized: "Used: \(t.size == 0 ? "Empty" : formatSize(t.size)) of \(formatSize(limit))")).font(.system(size: 11)).foregroundStyle(.secondary)
             } else {
                 Text("Allow Full Disk Access to analyze Trash contents.").font(.system(size: 11)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -171,7 +171,7 @@ struct TrayDetail: View {
                     Button("Cancel") { confirmEmptyTrash = false }.buttonStyle(TrayTextStyle())
                     Button("Delete for Good") { confirmEmptyTrash = false; monitor.emptyTrash() }.buttonStyle(TrayLinkStyle())
                 } else if (monitor.trash?.size ?? 0) > 0 {
-                    Button(monitor.emptyingTrash ? "Freeing Up..." : "Free Up") { confirmEmptyTrash = true }
+                    Button(monitor.emptyingTrash ? String(localized: "Freeing Up...") : String(localized: "Free Up")) { confirmEmptyTrash = true }
                         .buttonStyle(TrayLinkStyle()).disabled(monitor.emptyingTrash)
                 }
             }
@@ -185,13 +185,13 @@ struct TrayDetail: View {
     @ViewBuilder var memory: some View {
         let m = monitor.memory
         let parts: [(String, Int64, Color, String)] = [
-            ("Active", m.active, Color(hex: 0x3CA8FF), "The amount of RAM that’s being actively used"),
-            ("Wired", m.wired, Color(hex: 0x3F7BFF), "Memory that’s used by the system, so it must stay in RAM and can’t be borrowed by other apps"),
-            ("Compressed", m.compressed, Color(hex: 0x6C57FE), "The amount of memory that was compressed to make more RAM available for active apps"),
+            (String(localized: "Active"), m.active, Color(hex: 0x3CA8FF), String(localized: "The amount of RAM that’s being actively used")),
+            (String(localized: "Wired"), m.wired, Color(hex: 0x3F7BFF), String(localized: "Memory that’s used by the system, so it must stay in RAM and can’t be borrowed by other apps")),
+            (String(localized: "Compressed"), m.compressed, Color(hex: 0x6C57FE), String(localized: "The amount of memory that was compressed to make more RAM available for active apps")),
         ]
         HStack(spacing: 26) {
             Donut(parts: parts.map { (Double($0.1), $0.2) }, total: Double(max(m.total, 1))) {
-                BigFigure(size: m.available, color: .primary, caption: "of \(formatSize(m.total)) available")
+                BigFigure(size: m.available, color: .primary, caption: String(localized: "of \(formatSize(m.total)) available"))
             }
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(parts, id: \.0) { p in LegendRow(color: p.2, title: p.0, value: formatSize(p.1)).help(p.3) }
@@ -203,7 +203,7 @@ struct TrayDetail: View {
             InfoCard(symbol: nil, metric: Metric.swap(m))
         }
         .fixedSize(horizontal: false, vertical: true)
-        ConsumerList(monitor: monitor, unit: "Usage", key: \.memory, heavy: { $0.memory > 2_000_000_000 }) { formatSize($0.memory) }
+        ConsumerList(monitor: monitor, unit: String(localized: "Usage"), key: \.memory, heavy: { $0.memory > 2_000_000_000 }) { formatSize($0.memory) }
     }
 
     // MARK: Battery
@@ -251,9 +251,9 @@ struct TrayDetail: View {
             CPUChart(user: monitor.cpuUserHistory, system: monitor.cpuSystemHistory, capacity: MonitorModel.historyLength)
                 .frame(height: 142)
             VStack(alignment: .leading, spacing: 16) {
-                LegendBar(color: .primary.opacity(0.22), value: p.idle, title: "Available")
-                LegendBar(color: CPUChart.user, value: p.user, title: "User")
-                LegendBar(color: CPUChart.system, value: p.system, title: "System")
+                LegendBar(color: .primary.opacity(0.22), value: p.idle, title: String(localized: "Available"))
+                LegendBar(color: CPUChart.user, value: p.user, title: String(localized: "User"))
+                LegendBar(color: CPUChart.system, value: p.system, title: String(localized: "System"))
             }
             .frame(width: 104, alignment: .leading)
         }
@@ -261,11 +261,11 @@ struct TrayDetail: View {
         HStack(alignment: .top, spacing: 11) {
             InfoCard(symbol: "clock.fill", metric: Metric.uptime(p.uptime))
             InfoCard(symbol: "gauge.with.dots.needle.67percent", metric: Metric(
-                title: "Load", value: "\(Int(p.load * 100))%", severity: p.load > 0.8 ? .warning : .normal,
-                detail: p.load > 0.8 ? "Your Mac is working hard right now. The apps below use the most." : "Your processor has room for more work."))
+                title: String(localized: "Load"), value: "\(Int(p.load * 100))%", severity: p.load > 0.8 ? .warning : .normal,
+                detail: p.load > 0.8 ? String(localized: "Your Mac is working hard right now. The apps below use the most.") : String(localized: "Your processor has room for more work.")))
         }
         .fixedSize(horizontal: false, vertical: true)
-        ConsumerList(monitor: monitor, unit: "Usage, %", key: \.cpu, heavy: { $0.cpu > 20 }) { String(format: "%.1f", $0.cpu) }
+        ConsumerList(monitor: monitor, unit: String(localized: "Usage, %"), key: \.cpu, heavy: { $0.cpu > 20 }) { String(format: "%.1f", $0.cpu) }
     }
 
     // MARK: Network
@@ -281,8 +281,8 @@ struct TrayDetail: View {
                 HStack(spacing: 12) {
                     Image(systemName: info?.kind == .wired ? "cable.connector" : "wifi").font(.system(size: 20, weight: .medium))
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(info?.name ?? "Network").font(.system(size: 15, weight: .semibold)).lineLimit(1)
-                        Text(info.map { $0.kind == .wifi ? "Wi-Fi connection" : $0.kind == .wired ? "Wired connection" : $0.kind.rawValue } ?? "Connected")
+                        Text(info?.name ?? String(localized: "Network")).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                        Text(info.map { $0.kind == .wifi ? String(localized: "Wi-Fi connection") : $0.kind == .wired ? String(localized: "Wired connection") : $0.kind.title } ?? String(localized: "Connected"))
                             .font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -298,20 +298,20 @@ struct TrayDetail: View {
             }
             .trayCard()
             HStack(spacing: 11) {
-                TrafficCard(title: "Download", total: n.received, speed: n.download, history: monitor.downloadHistory, color: Color(hex: 0x5B8CFF))
+                TrafficCard(title: String(localized: "Download"), total: n.received, speed: n.download, history: monitor.downloadHistory, color: Color(hex: 0x5B8CFF))
                     .help("Amount of data transferred to your Mac since its network interface came up")
-                TrafficCard(title: "Upload", total: n.sent, speed: n.upload, history: monitor.uploadHistory, color: Color(hex: 0xFF6B81))
+                TrafficCard(title: String(localized: "Upload"), total: n.sent, speed: n.upload, history: monitor.uploadHistory, color: Color(hex: 0xFF6B81))
                     .help("Amount of data transferred from your Mac since its network interface came up")
             }
         }
-        SectionTitle("Test Your Connection")
+        SectionTitle(String(localized: "Test Your Connection"))
         HStack(spacing: 26) {
             SpeedTestButton(testing: monitor.testingSpeed, done: monitor.speedTest != nil) { monitor.runSpeedTest() }
             VStack(alignment: .leading, spacing: 5) {
                 if let s = monitor.speedTest {
                     HStack(spacing: 18) {
-                        LegendRow(color: Color(hex: 0x5B8CFF), title: "Download", value: TrayView.speed(s.download))
-                        LegendRow(color: Color(hex: 0xFF6B81), title: "Upload", value: TrayView.speed(s.upload))
+                        LegendRow(color: Color(hex: 0x5B8CFF), title: String(localized: "Download"), value: TrayView.speed(s.download))
+                        LegendRow(color: Color(hex: 0xFF6B81), title: String(localized: "Upload"), value: TrayView.speed(s.upload))
                     }
                     let good = SystemMonitor.goodFor(download: s.download, upload: s.upload)
                     if good.isEmpty {
@@ -326,8 +326,8 @@ struct TrayDetail: View {
                     Text("Check your internet connection and try again.").font(.system(size: 12)).foregroundStyle(.secondary)
                 } else {
                     Text("How it works").font(.system(size: 15, weight: .semibold))
-                    Text(monitor.testingSpeed ? "Running, about 20 seconds… TidyMac measures your download and upload speed with macOS’s networkQuality."
-                                              : "TidyMac measures your download and upload speed with macOS’s networkQuality.")
+                    Text(monitor.testingSpeed ? String(localized: "Running, about 20 seconds… TidyMac measures your download and upload speed with macOS’s networkQuality.")
+                                              : String(localized: "TidyMac measures your download and upload speed with macOS’s networkQuality."))
                         .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -338,18 +338,18 @@ struct TrayDetail: View {
     // MARK: Drives & devices
 
     @ViewBuilder var drives: some View {
-        if monitor.drives.isEmpty { Note("When connected, external storage devices will appear here.") }
+        if monitor.drives.isEmpty { Note(String(localized: "When connected, external storage devices will appear here.")) }
         ForEach(monitor.drives) { d in
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
                     Image(systemName: d.isDiskImage ? "opticaldiscdrive" : "externaldrive.fill").font(.system(size: 15))
                     Text(d.name).font(.system(size: 15, weight: .semibold)).lineLimit(1)
-                    Text(d.isDiskImage ? "Disk Image" : d.format ?? "").font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                    Text(d.isDiskImage ? String(localized: "Disk Image") : d.format ?? "").font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
                     Spacer()
                     Button("Eject") { monitor.eject([d]) }.buttonStyle(TrayLinkStyle()).disabled(monitor.ejecting.contains(d.id))
                 }
                 ThinBar(fraction: d.total > 0 ? Double(d.total - d.available) / Double(d.total) : 0, color: d.almostFull ? TrayStyle.warning : .white)
-                Text(d.almostFull ? "Almost Full · \(formatSize(d.available)) available" : "\(formatSize(d.available)) available of \(formatSize(d.total))")
+                Text(d.almostFull ? String(localized: "Almost Full · \(formatSize(d.available)) available") : String(localized: "\(formatSize(d.available)) available of \(formatSize(d.total))"))
                     .font(.system(size: 11)).foregroundStyle(d.almostFull ? TrayStyle.warning : .secondary)
             }
             .padding(14)
@@ -360,7 +360,7 @@ struct TrayDetail: View {
 
     @ViewBuilder var devices: some View {
         let all = monitor.bluetooth
-        if all.isEmpty { Note("Connect wireless devices to your Mac, and they will appear here.") }
+        if all.isEmpty { Note(String(localized: "Connect wireless devices to your Mac, and they will appear here.")) }
         if !all.isEmpty {
             VStack(spacing: 0) {
                 ForEach(Array((showAllDevices ? all : Array(all.prefix(Self.visibleDevices))).enumerated()), id: \.element.id) { i, d in
@@ -377,7 +377,7 @@ struct TrayDetail: View {
                             HStack(spacing: 10) {
                                 ForEach(d.batteries, id: \.label) { b in
                                     HStack(spacing: 3) {
-                                        if !b.label.isEmpty { Text(b.label.prefix(1)).foregroundStyle(.secondary).help(b.label) }
+                                        if !b.label.isEmpty { Text(b.title.prefix(1)).foregroundStyle(.secondary).help(b.title) }
                                         Text("\(b.percent)%").monospacedDigit()
                                             .foregroundStyle(b.label != "Case" && b.percent <= HealthAlerts.bluetoothLowLevel ? TrayStyle.warning : .primary)
                                     }
@@ -392,7 +392,7 @@ struct TrayDetail: View {
             .trayCard()
         }
         if all.count > Self.visibleDevices {
-            Button(showAllDevices ? "Show less" : "Show \(all.count - Self.visibleDevices) more") { showAllDevices.toggle() }
+            Button(showAllDevices ? String(localized: "Show less") : String(localized: "Show \(all.count - Self.visibleDevices) more")) { showAllDevices.toggle() }
                 .buttonStyle(TrayLinkStyle()).padding(.horizontal, 7)
         }
     }
@@ -638,7 +638,7 @@ struct SpeedTestButton: View {
                             .frame(width: 142, height: 142)
                             .rotationEffect(.degrees(phase * 360))
                     }
-                    Text(testing ? "Testing..." : done ? "Test again" : "Test speed").font(.system(size: 15, weight: .semibold))
+                    Text(testing ? String(localized: "Testing...") : done ? String(localized: "Test again") : String(localized: "Test speed")).font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.85))
                 }
             }

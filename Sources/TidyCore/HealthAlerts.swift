@@ -38,7 +38,7 @@ public enum HealthAlerts {
         public init() {}
 
         /// Reminder options: Once in 3 Days, Weekly, Every 2 Weeks, Monthly.
-        public static let smartCareIntervals: [(days: Int, title: String)] = [(3, "Once in 3 Days"), (7, "Weekly"), (14, "Every 2 Weeks"), (30, "Monthly")]
+        public static let smartCareIntervals: [(days: Int, title: String)] = [(3, String(localized: "Once in 3 Days")), (7, String(localized: "Weekly")), (14, String(localized: "Every 2 Weeks")), (30, String(localized: "Monthly"))]
 
         public static let defaultsKey = "TidyMac.alerts"
         public static func load(_ d: UserDefaults = .standard) -> Settings {
@@ -144,68 +144,70 @@ public enum HealthAlerts {
     public static func conditions(_ r: Readings, settings s: Settings, state: inout State, now: Date = Date()) -> [Alert] {
         var out: [Alert] = []
         if s.lowDisk, r.storage.total > 0, r.storage.available < s.freeSpaceLimit {
-            out.append(Alert(kind: .lowDisk, key: "lowDisk", title: "You are running out of disk space!",
-                             body: "Only \(FileSize.format(r.storage.available)) left on \(r.storage.name). Launch TidyMac to remove unneeded items and reclaim space.",
+            out.append(Alert(kind: .lowDisk, key: "lowDisk", title: String(localized: "You are running out of disk space!"),
+                             body: String(localized: "Only \(FileSize.format(r.storage.available)) left on \(r.storage.name). Launch TidyMac to remove unneeded items and reclaim space."),
                              target: "cleanup"))
         }
         if s.trashSize, let t = r.trashSize, t > s.trashLimit {
-            out.append(Alert(kind: .trashSize, key: "trashSize", title: "It’s time to empty your Trash!",
-                             body: "The size of files in your Trash (\(FileSize.format(t))) has exceeded the \(FileSize.format(s.trashLimit)) limit you have set.",
+            out.append(Alert(kind: .trashSize, key: "trashSize", title: String(localized: "It’s time to empty your Trash!"),
+                             body: String(localized: "The size of files in your Trash (\(FileSize.format(t))) has exceeded the \(FileSize.format(s.trashLimit)) limit you have set."),
                              target: "cleanup"))
         }
 
         let p = r.memory.pressureLevel
         if p >= 2 { state.memoryHighSince = state.memoryHighSince ?? now } else { state.memoryHighSince = nil }
         if s.memory, p >= 4 || (p >= 2 && now.timeIntervalSince(state.memoryHighSince ?? now) >= memoryGrace) {
-            let hint = r.topConsumer.map { " \($0.name) is using \(FileSize.format($0.bytes))." } ?? ""
-            out.append(Alert(kind: .memory, key: "memory", title: "Heavy memory usage",
-                             body: "You're running out of memory and your Mac may become noticeably slower.\(hint) Consider quitting some applications.",
+            let hint = r.topConsumer.map { String(localized: " \($0.name) is using \(FileSize.format($0.bytes)).") } ?? ""
+            out.append(Alert(kind: .memory, key: "memory", title: String(localized: "Heavy memory usage"),
+                             body: String(localized: "You're running out of memory and your Mac may become noticeably slower.\(hint) Consider quitting some applications."),
                              target: "performance"))
         }
         if s.battery, let h = r.batteryHealth, h < 70 {
-            out.append(Alert(kind: .battery, key: "battery", title: "Critical battery health",
-                             body: "Your Mac’s battery capacity has degraded severely (\(h)% of its original capacity). Consider a battery change.",
+            out.append(Alert(kind: .battery, key: "battery", title: String(localized: "Critical battery health"),
+                             body: String(localized: "Your Mac’s battery capacity has degraded severely (\(h)% of its original capacity). Consider a battery change."),
                              target: "activity"))
         }
 
         if s.externalDrives {
             for d in r.externalDrives where d.almostFull {
-                out.append(Alert(kind: .externalFull, key: "externalFull:\(d.name)", title: "Connected disk is almost full",
-                                 body: "\(d.name) has \(FileSize.format(d.available)) available. Open Space Lens to see what takes up space on it.",
+                out.append(Alert(kind: .externalFull, key: "externalFull:\(d.name)", title: String(localized: "Connected disk is almost full"),
+                                 body: String(localized: "\(d.name) has \(FileSize.format(d.available)) available. Open Space Lens to see what takes up space on it."),
                                  target: "spaceLens"))
             }
         }
         let low = r.bluetooth.filter { ($0.lowest ?? 100) <= bluetoothLowLevel }
         if s.bluetooth, !low.isEmpty {
             let names = low.map { "\($0.name) (\($0.lowest ?? 0)%)" }.joined(separator: ", ")
-            out.append(Alert(kind: .bluetoothLow, key: "bluetoothLow", title: "Time to juice up!",
-                             body: "Some of your devices are low on battery: \(names). Connect them to a charger before they shut down.",
+            out.append(Alert(kind: .bluetoothLow, key: "bluetoothLow", title: String(localized: "Time to juice up!"),
+                             body: String(localized: "Some of your devices are low on battery: \(names). Connect them to a charger before they shut down."),
                              target: "smartCare"))
         }
 
         if s.smartCareReminder, let last = r.lastCleanup, now.timeIntervalSince(last) >= Double(s.smartCareInterval) * 86_400 {
             let days = Int(now.timeIntervalSince(last) / 86_400)
-            out.append(Alert(kind: .smartCare, key: "smartCare", title: "It’s time to care for your Mac!",
-                             body: "Your last cleanup was \(days) days ago. Run Smart Care to keep your Mac clean, safe and fast.",
+            out.append(Alert(kind: .smartCare, key: "smartCare", title: String(localized: "It’s time to care for your Mac!"),
+                             body: String(localized: "Your last cleanup was \(days) days ago. Run Smart Care to keep your Mac clean, safe and fast."),
                              target: "smartCare"))
         }
         if s.hungApps, !r.hungApps.isEmpty {
-            let one = r.hungApps.count == 1
-            out.append(Alert(kind: .hungApps, key: "hungApps", title: "Non-responsive applications",
-                             body: "\(r.hungApps.joined(separator: ", ")) \(one ? "is" : "are") not responding. Force quit \(one ? "it" : "them") from TidyMac's menu, or wait until \(one ? "it responds" : "they respond").",
+            let one = r.hungApps.count == 1, names = r.hungApps.joined(separator: ", ")
+            out.append(Alert(kind: .hungApps, key: "hungApps", title: String(localized: "Non-responsive applications"),
+                             body: one
+                                 ? String(localized: "\(names) is not responding. Force quit it from TidyMac's menu, or wait until it responds.")
+                                 : String(localized: "\(names) are not responding. Force quit them from TidyMac's menu, or wait until they respond."),
                              target: "performance"))
         }
         if s.heavyChrome, let m = r.chromeMemory, m > chromeLimit(totalMemory: r.memory.total) {
-            out.append(Alert(kind: .heavyChrome, key: "heavyChrome", title: "Chrome memory usage is high",
-                             body: "Google Chrome is using \(FileSize.format(m)). High RAM usage may slow down your Mac. Managing your tabs can help free up memory.",
+            out.append(Alert(kind: .heavyChrome, key: "heavyChrome", title: String(localized: "Chrome memory usage is high"),
+                             body: String(localized: "Google Chrome is using \(FileSize.format(m)). High RAM usage may slow down your Mac. Managing your tabs can help free up memory."),
                              target: "performance"))
         }
         if let trashed = r.trashedApps {
             // The first look only learns what is already there.
             if s.trashedApps, let known = state.trashedApps {
                 for name in trashed where !known.contains(name) {
-                    out.append(Alert(kind: .trashedApp, key: "trashedApp:\(name)", title: "Uninstall applications correctly",
-                                     body: "\(name) is in the Trash, but the files it created may still be on your Mac. Scan Applications to remove its leftovers.",
+                    out.append(Alert(kind: .trashedApp, key: "trashedApp:\(name)", title: String(localized: "Uninstall applications correctly"),
+                                     body: String(localized: "\(name) is in the Trash, but the files it created may still be on your Mac. Scan Applications to remove its leftovers."),
                                      target: "applications"))
                 }
             }
@@ -215,8 +217,8 @@ public enum HealthAlerts {
         if let threats = r.threats { state.threatKeys = threats.map(\.key) }
         if s.threats {
             for t in r.threats ?? [] {
-                out.append(Alert(kind: .threat, key: t.key, title: "TidyMac has detected a threat!",
-                                 body: "⚠️ A suspicious '\(t.name)' has been found on your Mac. Review it in Protection.",
+                out.append(Alert(kind: .threat, key: t.key, title: String(localized: "TidyMac has detected a threat!"),
+                                 body: String(localized: "⚠️ A suspicious '\(t.name)' has been found on your Mac. Review it in Protection."),
                                  target: "protection"))
             }
         }
