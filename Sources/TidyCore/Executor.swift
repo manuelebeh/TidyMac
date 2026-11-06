@@ -33,10 +33,12 @@ public enum Executor {
                     let r = Shell.run("/bin/zsh", ["-c", cmd])
                     if r.status != 0 { throw Failure(r.output.isEmpty ? String(localized: "Exit \(r.status)") : r.output) }
                 case .removeLaunchItem(let url, let admin):
-                    try allow(url, permanent: admin)
                     if admin {
+                        try allow(url, permanent: true)
                         adminItems.append((item, "launchctl bootout system \(quote(url.path)) 2>/dev/null; rm -f \(quote(url.path))")); continue
                     }
+                    // Checked before the job is stopped, so a refused item is left running as it was.
+                    try allowInTrash(url, home: home)
                     _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())", url.path])
                     try fm.trashItem(at: url, resultingItemURL: nil)
                 case .removeLoginItem(let name):
@@ -80,11 +82,13 @@ public enum Executor {
     }
 
     static func moveToTrash(_ url: URL, home: String, fm: FileManager) throws {
-        try allow(url, permanent: false)
-        let path = url.standardizedFileURL.path
-        let isApp = path.hasPrefix("/Applications/") && url.pathExtension == "app"
-        guard path.hasPrefix(home + "/") || isApp else { throw Failure(String(localized: "Outside home folder")) }
+        try allowInTrash(url, home: home)
         try fm.trashItem(at: url, resultingItemURL: nil)
+    }
+
+    static func allowInTrash(_ url: URL, home: String) throws {
+        try allow(url, permanent: false)
+        guard RemovalGuard.isTrashable(url, home: home) else { throw Failure(String(localized: "Outside home folder")) }
     }
 
     /// Time passes between a scan and a cleanup. Both files are read again, so the copy being kept is known to still

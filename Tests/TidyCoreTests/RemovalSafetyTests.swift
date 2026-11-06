@@ -1,6 +1,12 @@
 import XCTest
 @testable import TidyCore
 
+/// Records what would go to the Trash, so tests leave the real one alone.
+private final class RecordingFileManager: FileManager {
+    var trashed: [URL] = []
+    override func trashItem(at url: URL, resultingItemURL: AutoreleasingUnsafeMutablePointer<NSURL?>?) throws { trashed.append(url) }
+}
+
 extension TidyCoreTests {
     func testGuardRefusesSystemOtherUsersAndCloudState() {
         let home = URL(fileURLWithPath: "/Users/me")
@@ -84,7 +90,51 @@ extension TidyCoreTests {
         XCTAssertEqual(chflags(u.path, UInt32(UF_IMMUTABLE)), 0)
         defer { chflags(u.path, 0) }
         XCTAssertTrue(RemovalGuard.isProtectedByMacOS(u))
-        XCTAssertEqual(RemovalGuard.refusal(for: u, permanent: true), "Protected by macOS")
+        XCTAssertEqual(RemovalGuard.refusal(for: u, permanent: true, home: tmp), "Protected by macOS")
+    }
+
+    func testPermanentRemovalsOutsideHomeOnlyReachKnownFolders() {
+        let home = URL(fileURLWithPath: "/Users/me")
+        func refused(_ path: String) -> Bool { RemovalGuard.refusal(for: URL(fileURLWithPath: path), permanent: true, home: home) != nil }
+        for path in ["/Library/Frameworks", "/Library/Fonts", "/Library/Keychains/System.keychain", "/Library/Security/x",
+                     "/Library/Application Support/Apple", "/Library/Preferences/com.apple.loginwindow.plist",
+                     "/Library/LaunchDaemons/com.apple.thing.plist", "/usr/local/bin", "/opt/homebrew", "/private/var/db/dslocal",
+                     "/private/var/root", "/var/root", "/private/tmp/x", "/tmp/x", "/Volumes/USB", "/Volumes/USB/notes.txt",
+                     "/Volumes/Backup.app", "/Users/Shared/notes.txt", "/Applications/Foo.app/Contents/MacOS/Foo"] {
+            XCTAssertTrue(refused(path), path)
+        }
+        for path in ["/Library/Logs/com.apple.thing", "/private/var/log/system.log.0.gz", "/Library/LaunchDaemons/com.acme.helper.plist",
+                     "/Library/Audio/Plug-Ins/VST/Acme.vst", "/Applications/Foo.app", "/Applications/Suite/Foo.app",
+                     "/Users/Shared/Foo.app", "/Volumes/USB/Foo.app", "/Volumes/USB/.Trashes/501/old.zip",
+                     "/Users/me/.Trash/old.zip", "/Users/me/Downloads/old.zip"] {
+            XCTAssertFalse(refused(path), path)
+        }
+    }
+
+    func testTrashFollowsLinksThatLeadOutOfTheHomeFolder() throws {
+        let fm = RecordingFileManager()
+        let home = tmp.appendingPathComponent("home"), outside = tmp.appendingPathComponent("outside")
+        let kept = try write("outside/victim.txt", 1), own = try write("home/mine.txt", 1)
+        try FileManager.default.createSymbolicLink(at: home.appendingPathComponent("link"), withDestinationURL: outside)
+        let homeLink = tmp.appendingPathComponent("homeLink")
+        try FileManager.default.createSymbolicLink(at: homeLink, withDestinationURL: home)
+
+        XCTAssertThrowsError(try Executor.moveToTrash(kept, home: home.path, fm: fm))
+        XCTAssertThrowsError(try Executor.moveToTrash(home.appendingPathComponent("link/victim.txt"), home: home.path, fm: fm))
+        XCTAssertEqual(fm.trashed, [], "nothing behind the link moves")
+
+        try Executor.moveToTrash(own, home: home.path, fm: fm)
+        // The link itself is here, whatever it points at, and a home folder reached through a link is still the home folder.
+        try Executor.moveToTrash(home.appendingPathComponent("link"), home: home.path, fm: fm)
+        try Executor.moveToTrash(homeLink.appendingPathComponent("mine.txt"), home: homeLink.path, fm: fm)
+        XCTAssertEqual(fm.trashed.map(\.lastPathComponent), ["mine.txt", "link", "mine.txt"])
+    }
+
+    func testLaunchItemOutsideHomeIsRefusedBeforeItIsStopped() async throws {
+        let u = try write("com.acme.agent.plist", 1)
+        let r = await Executor.run([ResultItem(title: "agent", url: u, action: .removeLaunchItem(u, admin: false))])
+        XCTAssertEqual(r.failed.first?.1, "Outside home folder")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: u.path))
     }
 
     func testDuplicatesIgnoreHardLinks() throws {
