@@ -11,7 +11,60 @@ struct SettingsView: View {
             ScanSettingsView().tabItem { Label("Scanning", systemImage: "magnifyingglass") }
             AutomationSettingsView().tabItem { Label("Automations", systemImage: "clock.arrow.circlepath") }
             IgnoreListSettingsView().tabItem { Label("Ignore List", systemImage: "eye.slash") }
+            UpdateSettingsView().tabItem { Label("Updates", systemImage: "arrow.down.circle") }
         }
+    }
+}
+
+/// Settings › Updates. Asks GitHub only when requested, or once a day if that is turned on, and never installs anything.
+struct UpdateSettingsView: View {
+    private enum Status: Equatable { case idle, checking, failed, finished(SelfUpdate.Outcome) }
+
+    @AppStorage(GeneralSettings.checkUpdatesKey) private var checksDaily = false
+    @State private var status = Status.idle
+
+    private var versionLabel: String {
+        guard let version = SelfUpdate.currentVersion else { return String(localized: "Development build") }
+        return SelfUpdate.currentBuild.map { "\(version) (\($0))" } ?? version
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Version", value: versionLabel)
+                HStack {
+                    statusView
+                    Spacer()
+                    Button("Check Now") { Task { await check() } }.disabled(status == .checking)
+                }
+                Toggle("Check for new versions once a day", isOn: $checksDaily)
+            } footer: {
+                Text("A check asks GitHub for the latest release of TidyMac and sends nothing about your Mac. New versions are installed by you, never automatically.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Link("Project page", destination: SelfUpdate.projectPage)
+                Link("Report a problem", destination: SelfUpdate.issuesPage)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 480)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private var statusView: some View {
+        switch status {
+        case .idle: Text("Not checked yet").foregroundStyle(.secondary)
+        case .checking: ProgressView().controlSize(.small)
+        case .failed: Label("Could not reach GitHub. Try again later.", systemImage: "exclamationmark.triangle")
+        case .finished(.upToDate): Label("TidyMac is up to date.", systemImage: "checkmark.circle")
+        case .finished(.available(let release)): Link("Download TidyMac \(release.version)", destination: release.page)
+        }
+    }
+
+    private func check() async {
+        status = .checking
+        if let outcome = try? await SelfUpdate.check() { status = .finished(outcome) } else { status = .failed }
     }
 }
 
