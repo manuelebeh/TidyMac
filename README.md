@@ -31,7 +31,7 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 
 Download the DMG or ZIP from the [releases page](https://github.com/manuelebeh/TidyMac/releases) and move TidyMac to your Applications folder. It needs macOS 13 or later and runs on Apple silicon and Intel Macs.
 
-A release that is not notarized shows a warning on first launch. Try to open the app once, then choose **Open Anyway** in System Settings › Privacy & Security. Compare the download with `SHA256SUMS.txt` from the same release first.
+A release that is not notarized shows a warning on first launch. Try to open the app once, then choose **Open Anyway** in System Settings › Privacy & Security. Compare the download with `SHA256SUMS.txt` from the same release first. To check that it was built by this repository's release workflow, run `gh attestation verify TidyMac-<version>.zip -R manuelebeh/TidyMac`.
 
 ## Build from source
 
