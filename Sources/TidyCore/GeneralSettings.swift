@@ -2,7 +2,17 @@ import Foundation
 
 /// Settings › General, plus the menu's "Clean up junk automatically on ejection". Stored as plain keys so the Settings window can bind them with `@AppStorage`.
 public enum GeneralSettings {
-    public enum ReduceMotion: String, CaseIterable, Sendable { case system = "System", enabled = "Enabled", disabled = "Disabled" }
+    public enum ReduceMotion: String, CaseIterable, Sendable {
+        case system = "System", enabled = "Enabled", disabled = "Disabled"
+
+        public var title: String {
+            switch self {
+            case .system: String(localized: "System")
+            case .enabled: String(localized: "Enabled")
+            case .disabled: String(localized: "Disabled")
+            }
+        }
+    }
 
     static let prefix = "TidyMac.general"
     public static let soundsKey = "\(prefix).sounds"

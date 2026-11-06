@@ -79,7 +79,7 @@ struct ActivityScreen: View {
     @ViewBuilder var recommendations: some View {
         let recs = health?.recommendations ?? []
         HStack {
-            Text(recs.isEmpty ? "Today's Recommendation" : "\(recs.count) Recommendations")
+            Text(recs.isEmpty ? String(localized: "Today's Recommendation") : String(localized: "\(recs.count) Recommendations"))
                 .font(.callout).foregroundStyle(.white.opacity(0.7))
             Spacer()
             if recs.count > 1 { Button("View All") { showAll = true }.buttonStyle(.plain).font(.callout.weight(.semibold)).foregroundStyle(.white) }
@@ -109,16 +109,16 @@ struct ActivityScreen: View {
     // MARK: Cards
 
     var storageCard: some View {
-        StatCard(info: "Everything you remove on this Mac with TidyMac adds up here. From junk files and clutter to uninstalled apps — the total local storage cleanup is shown in MB or GB.",
-                 symbol: "internaldrive.fill", empty: summary.freed == 0 ? ("Clean up storage and watch your free gigabytes add up.", "Go to Smart Care", .smartCare) : nil,
+        StatCard(info: String(localized: "Everything you remove on this Mac with TidyMac adds up here. From junk files and clutter to uninstalled apps — the total local storage cleanup is shown in MB or GB."),
+                 symbol: "internaldrive.fill", empty: summary.freed == 0 ? (String(localized: "Clean up storage and watch your free gigabytes add up."), String(localized: "Go to Smart Care"), .smartCare) : nil,
                  go: go) {
             Text("Local Storage Cleaned").font(.callout).foregroundStyle(.white.opacity(0.7))
             Text(formatSize(summary.freed)).font(.system(size: 30, weight: .light)).foregroundStyle(.white)
-            Delta(text: "+\(formatSize(summary.freedThisMonth)) this month")
+            Delta(text: String(localized: "+\(formatSize(summary.freedThisMonth)) this month"))
             let total = max(summary.freedBy.map(\.1).max() ?? 1, 1)
             ForEach(summary.freedBy, id: \.0) { part, bytes in
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack { Text(part.rawValue); Spacer(); Text(formatSize(bytes)).monospacedDigit() }
+                    HStack { Text(part.title); Spacer(); Text(formatSize(bytes)).monospacedDigit() }
                         .font(.caption).foregroundStyle(.white.opacity(0.8))
                     Bar(fraction: Double(bytes) / Double(total), color: Module.cleanup.accent)
                 }
@@ -127,12 +127,12 @@ struct ActivityScreen: View {
     }
 
     var timeCard: some View {
-        StatCard(info: "TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Smart Care, adds to your total here.",
-                 symbol: "stopwatch.fill", empty: summary.minutesSaved == 0 ? ("Start using TidyMac to see your recent time saved.", "Go to Smart Care", .smartCare) : nil,
+        StatCard(info: String(localized: "TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Smart Care, adds to your total here."),
+                 symbol: "stopwatch.fill", empty: summary.minutesSaved == 0 ? (String(localized: "Start using TidyMac to see your recent time saved."), String(localized: "Go to Smart Care"), .smartCare) : nil,
                  go: go) {
             Text("Total Time Saved").font(.callout).foregroundStyle(.white.opacity(0.7))
             Text(ActivitySummary.format(minutes: summary.minutesSaved)).font(.system(size: 30, weight: .light)).foregroundStyle(.white)
-            Delta(text: "+\(ActivitySummary.format(minutes: summary.minutesThisMonth)) this month")
+            Delta(text: String(localized: "+\(ActivitySummary.format(minutes: summary.minutesThisMonth)) this month"))
             Text(summary.timeSavedHint).font(.caption).foregroundStyle(.white.opacity(0.6))
             Text("Saved by Activity").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.7)).padding(.top, 4)
             ForEach(summary.savedBy.prefix(3), id: \.0) { c, m in
@@ -143,15 +143,15 @@ struct ActivityScreen: View {
     }
 
     var malwareCard: some View {
-        StatCard(info: "TidyMac counts how many background items were checked and how many looked suspicious — whether through Smart Care, Protection or the Malware Finder tool.",
-                 symbol: "hand.raised.fill", empty: summary.malwareScans == 0 ? ("No scans yet. It’s time to protect your Mac.", "Go to Protection", .protection) : nil,
+        StatCard(info: String(localized: "TidyMac counts how many background items were checked and how many looked suspicious — whether through Smart Care, Protection or the Malware Finder tool."),
+                 symbol: "hand.raised.fill", empty: summary.malwareScans == 0 ? (String(localized: "No scans yet. It’s time to protect your Mac."), String(localized: "Go to Protection"), .protection) : nil,
                  go: go) {
             Text("Scanned for Malware").font(.callout).foregroundStyle(.white.opacity(0.7))
             Text("\(summary.itemsScanned) items").font(.system(size: 30, weight: .light)).foregroundStyle(.white)
             Text("Malware History").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.7)).padding(.top, 4)
             Group {
-                Text("\(summary.malwareScans) scan\(summary.malwareScans == 1 ? "" : "s") run")
-                Text(summary.threatsFound == 0 ? "No threats found" : "\(summary.threatsFound) suspicious items found")
+                Text("\(summary.malwareScans) scans run")
+                Text(summary.threatsFound == 0 ? String(localized: "No threats found") : String(localized: "\(summary.threatsFound) suspicious items found"))
                 if let d = summary.lastMalwareScan { Text("Last scan \(RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date()))") }
             }
             .font(.caption).foregroundStyle(.white.opacity(0.8))
@@ -159,8 +159,8 @@ struct ActivityScreen: View {
     }
 
     var recentCard: some View {
-        StatCard(info: "Your latest runs, with the time each one saved.",
-                 symbol: "clock.arrow.circlepath", empty: summary.recentSaves.isEmpty ? ("Your recent saves will show up here.", "Go to My Tools", .myTools) : nil,
+        StatCard(info: String(localized: "Your latest runs, with the time each one saved."),
+                 symbol: "clock.arrow.circlepath", empty: summary.recentSaves.isEmpty ? (String(localized: "Your recent saves will show up here."), String(localized: "Go to My Tools"), .myTools) : nil,
                  go: go) {
             Text("Recent Saves").font(.callout).foregroundStyle(.white.opacity(0.7))
             ForEach(Array(summary.recentSaves.enumerated()), id: \.offset) { _, save in
@@ -205,7 +205,7 @@ struct HealthCard: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Mac Health:").font(.callout).foregroundStyle(.white.opacity(0.7))
             HStack(spacing: 6) {
-                Text(health?.state.rawValue ?? "…").font(.system(size: 24, weight: .medium)).foregroundStyle(stateColor)
+                Text(health?.state.title ?? "…").font(.system(size: 24, weight: .medium)).foregroundStyle(stateColor)
                 if let health {
                     Button { info = true } label: { Image(systemName: "info.circle").foregroundStyle(.white.opacity(0.6)) }
                         .buttonStyle(.plain)

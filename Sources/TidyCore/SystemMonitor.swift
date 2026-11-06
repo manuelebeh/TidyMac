@@ -14,7 +14,7 @@ public enum SystemMonitor {
     public static func storage() -> Storage {
         let root = URL(fileURLWithPath: "/")
         let v = try? root.resourceValues(forKeys: [.volumeNameKey, .volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey])
-        return Storage(name: v?.volumeName ?? "Macintosh HD", total: Int64(v?.volumeTotalCapacity ?? 0),
+        return Storage(name: v?.volumeName ?? String(localized: "Macintosh HD"), total: Int64(v?.volumeTotalCapacity ?? 0),
                        available: v?.volumeAvailableCapacityForImportantUsage ?? 0)
     }
 
@@ -25,7 +25,7 @@ public enum SystemMonitor {
         /// kern.memorystatus_vm_pressure_level: 1 normal, 2 warning, 4 critical.
         public let pressureLevel: Int
         public var used: Int64 { total - available }
-        public var pressure: String { pressureLevel >= 4 ? "Critical" : pressureLevel >= 2 ? "High" : "Normal" }
+        public var pressure: String { pressureLevel >= 4 ? String(localized: "Critical") : pressureLevel >= 2 ? String(localized: "High") : String(localized: "Normal") }
     }
 
     public static func memory() -> Memory {
@@ -103,20 +103,20 @@ public enum SystemMonitor {
         public let temperature: Double?
 
         public var status: String {
-            if isCharged { return "Fully charged" }
-            if isCharging { return "Charging" }
-            if isPluggedIn { return "Not charging" }
-            guard let m = minutesRemaining else { return "Calculating…" }
-            return "\(m / 60):\(String(format: "%02d", m % 60)) remaining"
+            if isCharged { return String(localized: "Fully charged") }
+            if isCharging { return String(localized: "Charging") }
+            if isPluggedIn { return String(localized: "Not charging") }
+            guard let m = minutesRemaining else { return String(localized: "Calculating…") }
+            return String(localized: "\(m / 60):\(String(format: "%02d", m % 60)) remaining")
         }
 
         /// The battery chart's heading and subtitle.
         public var chartStatus: (title: String, detail: String?) {
-            func time(_ m: Int) -> String { m >= 60 ? "\(m / 60) h \(m % 60) min" : "\(m) min" }
-            if isCharged { return ("Fully Charged", "You're running from a power adapter") }
-            if isCharging { return ("Charging", minutesToFull.map { "\(time($0)) until full" }) }
-            if isPluggedIn { return ("Not Charging", "You're running from a power adapter") }
-            return ("Discharging", minutesRemaining.map { "About \(time($0)) until empty" })
+            func time(_ m: Int) -> String { m >= 60 ? String(localized: "\(m / 60) h \(m % 60) min") : String(localized: "\(m) min") }
+            if isCharged { return (String(localized: "Fully Charged"), String(localized: "You're running from a power adapter")) }
+            if isCharging { return (String(localized: "Charging"), minutesToFull.map { String(localized: "\(time($0)) until full") }) }
+            if isPluggedIn { return (String(localized: "Not Charging"), String(localized: "You're running from a power adapter")) }
+            return (String(localized: "Discharging"), minutesRemaining.map { String(localized: "About \(time($0)) until empty") })
         }
     }
 
@@ -174,38 +174,40 @@ public enum SystemMonitor {
                               drives: [Drive] = []) -> [Issue] {
         var out: [Issue] = []
         if storage.total > 0, storage.available < max(storage.total / 10, 15_000_000_000) {
-            out.append(Issue(kind: .lowDiskSpace, title: "You are running out of disk space!",
-                             detail: "Only \(FileSize.format(storage.available)) left. Remove unneeded items to reclaim space."))
+            out.append(Issue(kind: .lowDiskSpace, title: String(localized: "You are running out of disk space!"),
+                             detail: String(localized: "Only \(FileSize.format(storage.available)) left. Remove unneeded items to reclaim space.")))
         }
         if let t = trashSize, t > trashLimit {
-            out.append(Issue(kind: .trashSize, title: "It’s time to empty your Trash!",
-                             detail: "Your Trash holds \(FileSize.format(t))."))
+            out.append(Issue(kind: .trashSize, title: String(localized: "It’s time to empty your Trash!"),
+                             detail: String(localized: "Your Trash holds \(FileSize.format(t)).")))
         }
         if trashedApps > 0 {
-            out.append(Issue(kind: .trashedApps, title: "Uninstall applications correctly",
-                             detail: "\(trashedApps) app\(trashedApps == 1 ? "" : "s") in the Trash may have left files behind."))
+            out.append(Issue(kind: .trashedApps, title: String(localized: "Uninstall applications correctly"),
+                             detail: String(localized: "\(trashedApps) apps in the Trash may have left files behind.")))
         }
         if memory.pressureLevel >= 2 {
-            out.append(Issue(kind: .heavyMemory, title: "Heavy memory usage",
-                             detail: "Memory pressure is \(memory.pressure.lowercased()). Quitting unused apps can help."))
+            out.append(Issue(kind: .heavyMemory, title: String(localized: "Heavy memory usage"),
+                             detail: String(localized: "Memory pressure is \(memory.pressure.lowercased()). Quitting unused apps can help.")))
         }
         if !hungApps.isEmpty {
-            out.append(Issue(kind: .hungApps, title: "Non-responsive applications",
-                             detail: "\(hungApps.joined(separator: ", ")) \(hungApps.count == 1 ? "is" : "are") not responding. Force quit or wait until \(hungApps.count == 1 ? "it responds" : "they respond")."))
+            out.append(Issue(kind: .hungApps, title: String(localized: "Non-responsive applications"),
+                             detail: hungApps.count == 1
+                                 ? String(localized: "\(hungApps[0]) is not responding. Force quit or wait until it responds.")
+                                 : String(localized: "\(hungApps.joined(separator: ", ")) are not responding. Force quit or wait until they respond.")))
         }
         let low = bluetooth.filter { ($0.lowest ?? 100) <= HealthAlerts.bluetoothLowLevel }
         if !low.isEmpty {
-            out.append(Issue(kind: .bluetoothLow, title: "Time to juice up!",
-                             detail: "Low on battery: \(low.map { "\($0.name) (\($0.lowest ?? 0)%)" }.joined(separator: ", ")). Connect to a charger before they shut down."))
+            out.append(Issue(kind: .bluetoothLow, title: String(localized: "Time to juice up!"),
+                             detail: String(localized: "Low on battery: \(low.map { "\($0.name) (\($0.lowest ?? 0)%)" }.joined(separator: ", ")). Connect to a charger before they shut down.")))
         }
         let full = drives.filter(\.almostFull)
         if !full.isEmpty {
-            out.append(Issue(kind: .externalFull, title: "Connected disk is almost full",
-                             detail: full.map { "\($0.name): \(FileSize.format($0.available)) available" }.joined(separator: ", ") + "."))
+            out.append(Issue(kind: .externalFull, title: String(localized: "Connected disk is almost full"),
+                             detail: full.map { String(localized: "\($0.name): \(FileSize.format($0.available)) available") }.joined(separator: ", ") + "."))
         }
         if screenCleaningDue {
-            out.append(Issue(kind: .screenCleaning, title: "Your screen deserves some care",
-                             detail: "Keep your Mac clean inside and out with Screen Cleaning Mode."))
+            out.append(Issue(kind: .screenCleaning, title: String(localized: "Your screen deserves some care"),
+                             detail: String(localized: "Keep your Mac clean inside and out with Screen Cleaning Mode.")))
         }
         return out
     }
@@ -216,11 +218,11 @@ public enum SystemMonitor {
 
         public var title: String {
             switch self {
-            case .untilTomorrow: "Until tomorrow"
-            case .day: "For a day"
-            case .threeDays: "For 3 days"
-            case .week: "For a week"
-            case .forever: "Forever"
+            case .untilTomorrow: String(localized: "Until tomorrow")
+            case .day: String(localized: "For a day")
+            case .threeDays: String(localized: "For 3 days")
+            case .week: String(localized: "For a week")
+            case .forever: String(localized: "Forever")
             }
         }
 
@@ -286,7 +288,7 @@ extension SystemMonitor {
         guard let data = out.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let hw = (json["SPHardwareDataType"] as? [[String: Any]])?.first,
-              let name = hw["machine_name"] as? String else { return "Mac" }
+              let name = hw["machine_name"] as? String else { return String(localized: "Mac") }
         return name
     }
 }

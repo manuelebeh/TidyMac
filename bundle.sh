@@ -21,6 +21,7 @@ APP=build/TidyMac.app
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$(swift build $build_flags --show-bin-path)/TidyMac" "$APP/Contents/MacOS/TidyMac"
 cp Packaging/TidyMac.icns "$APP/Contents/Resources/TidyMac.icns"
+cp -R Localization/*.lproj "$APP/Contents/Resources/"
 cat > "$APP/Contents/Info.plist" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -33,6 +34,7 @@ cat > "$APP/Contents/Info.plist" <<PL
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>CFBundleVersion</key><string>$BUILD_NUMBER</string>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
+<key>CFBundleLocalizations</key><array><string>en</string><string>fr</string></array>
 <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>

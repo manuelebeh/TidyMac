@@ -51,6 +51,17 @@ Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `chore`. Scop
 - `TidyCore` holds logic and has no UI. `TidyMac` holds SwiftUI views and system integration.
 - Comments explain why, not what.
 
+## Translations
+
+The English text in the code is the key. `Text("Scan")` and similar SwiftUI literals are translated as they are. A `String` that ends up on screen goes through `String(localized: "Scan")`, including the ones in `TidyCore`.
+
+- Write whole sentences. Do not assemble a text from pieces, since word order changes between languages.
+- Never compare a displayed text in code or save it as a setting. Keep a fixed value and give it a `title` for display.
+- Add a new text's translation to `Localization/fr.lproj/Localizable.strings`. A text with a count goes in `Localizable.stringsdict`, for both English and French.
+- Run `Packaging/check-translations.sh`. CI runs it too. It fails on a missing or outdated translation, and on format specifiers that do not match.
+
+To add a language, create `Localization/<code>.lproj` with the same files as `fr.lproj` and add the code to `CFBundleLocalizations` in `bundle.sh`.
+
 ## Safety rules
 
 TidyMac deletes files on people's machines, so these are not negotiable:

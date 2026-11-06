@@ -1,0 +1,2 @@
+/* Shown by macOS when TidyMac first asks for this permission. */
+"NSAppleEventsUsageDescription" = "TidyMac demande à System Events de lister et supprimer les éléments d’ouverture, et de redémarrer votre Mac lorsque vous le demandez.";

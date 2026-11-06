@@ -19,7 +19,7 @@ public enum Executor {
                 case .delete(let url):
                     try allow(url, permanent: true)
                     // Only items already inside a Trash bin are deleted permanently.
-                    guard RemovalGuard.isInsideTrash(url) else { throw Failure("Refusing permanent delete outside a Trash") }
+                    guard RemovalGuard.isInsideTrash(url) else { throw Failure(String(localized: "Refusing permanent delete outside a Trash")) }
                     if fm.isDeletableFile(atPath: url.path) {
                         try fm.removeItem(at: url)
                     } else {
@@ -31,7 +31,7 @@ public enum Executor {
                 case .shell(let cmd, let admin):
                     if admin { adminItems.append((item, cmd)); continue }
                     let r = Shell.run("/bin/zsh", ["-c", cmd])
-                    if r.status != 0 { throw Failure(r.output.isEmpty ? "Exit \(r.status)" : r.output) }
+                    if r.status != 0 { throw Failure(r.output.isEmpty ? String(localized: "Exit \(r.status)") : r.output) }
                 case .removeLaunchItem(let url, let admin):
                     try allow(url, permanent: admin)
                     if admin {
@@ -61,7 +61,7 @@ public enum Executor {
             let r = Shell.osascript("do shell script \"\(appleScriptEscape(script))\" with administrator privileges")
             for (i, pair) in adminItems.enumerated() {
                 if r.status == 0 && r.output.contains("OK:\(i)") { report.succeeded.append(pair.0) }
-                else { report.failed.append((pair.0, r.status == 0 ? "Command failed" : "Administrator authorization was cancelled")) }
+                else { report.failed.append((pair.0, r.status == 0 ? String(localized: "Command failed") : String(localized: "Administrator authorization was cancelled"))) }
             }
         }
         History.record(report)
@@ -83,7 +83,7 @@ public enum Executor {
         try allow(url, permanent: false)
         let path = url.standardizedFileURL.path
         let isApp = path.hasPrefix("/Applications/") && url.pathExtension == "app"
-        guard path.hasPrefix(home + "/") || isApp else { throw Failure("Outside home folder") }
+        guard path.hasPrefix(home + "/") || isApp else { throw Failure(String(localized: "Outside home folder")) }
         try fm.trashItem(at: url, resultingItemURL: nil)
     }
 
@@ -91,12 +91,12 @@ public enum Executor {
     /// be there, to be a separate file and to have the same content before the other one goes.
     static func verifyDuplicate(_ url: URL, of keep: URL, digest: String) throws {
         guard let kept = ClutterEngine.regularFile(keep), ClutterEngine.hash(keep, limit: nil) == digest else {
-            throw Failure("The copy to keep is gone or has changed")
+            throw Failure(String(localized: "The copy to keep is gone or has changed"))
         }
         guard let copy = ClutterEngine.regularFile(url), ClutterEngine.hash(url, limit: nil) == digest else {
-            throw Failure("Changed since the scan")
+            throw Failure(String(localized: "Changed since the scan"))
         }
-        guard kept.id != copy.id else { throw Failure("Same file as the copy to keep") }
+        guard kept.id != copy.id else { throw Failure(String(localized: "Same file as the copy to keep")) }
     }
 
     public static func quote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }

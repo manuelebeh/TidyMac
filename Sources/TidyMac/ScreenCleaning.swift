@@ -105,10 +105,10 @@ struct ScreenCleaningOverlay: View {
     @State private var sweep = false
     @State private var introVisible = true
     private let message = [
-        "Thank you for this moment of care 🌱 Your Mac is in good hands — inside and out.",
-        "Every swipe counts ✨ When you're done, let us help you find and remove duplicate files too.",
-        "While you clean the outside, Space Lens can show you what's taking up space inside 🌱",
-        "Files unopened for over a year are most of the clutter 🥰 Large and Old Files can help you take care of them.",
+        String(localized: "Thank you for this moment of care 🌱 Your Mac is in good hands — inside and out."),
+        String(localized: "Every swipe counts ✨ When you're done, let us help you find and remove duplicate files too."),
+        String(localized: "While you clean the outside, Space Lens can show you what's taking up space inside 🌱"),
+        String(localized: "Files unopened for over a year are most of the clutter 🥰 Large and Old Files can help you take care of them."),
     ].randomElement()!
 
     var body: some View {
@@ -156,8 +156,8 @@ struct ScreenCleaningSuccess: View {
         VStack(spacing: 14) {
             Image(systemName: "sparkles").font(.system(size: 44)).foregroundStyle(.yellow)
             Text("Your screen is shining!").font(.title.weight(.semibold))
-            Text(remindersOn ? "Great! We'll remind you in 2 weeks."
-                 : "A clean screen, a happy Mac. Give your screen a clean every couple of weeks — we can send you a gentle nudge when it's time.")
+            Text(remindersOn ? String(localized: "Great! We'll remind you in 2 weeks.")
+                 : String(localized: "A clean screen, a happy Mac. Give your screen a clean every couple of weeks — we can send you a gentle nudge when it's time."))
                 .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(width: 360)
             HStack {
                 if !remindersOn { Button("Turn On Reminders") { session.turnOnReminders(); remindersOn = true } }

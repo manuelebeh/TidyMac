@@ -28,22 +28,22 @@ public enum RemovalGuard {
         let reason = check(literal, home: literalHome, permanent: permanent)
             ?? check(physicalPath(literal), home: resolved(literalHome), permanent: permanent)
         if let reason { return reason }
-        return permanent && isProtectedByMacOS(url) ? "Protected by macOS" : nil
+        return permanent && isProtectedByMacOS(url) ? String(localized: "Protected by macOS") : nil
     }
 
     static func check(_ path: String, home: String, permanent: Bool) -> String? {
         func isInside(_ root: String) -> Bool { path == root || path.hasPrefix(root + "/") }
         if path == home || SpaceLens.protection(of: URL(fileURLWithPath: path), home: URL(fileURLWithPath: home)) == .essential {
-            return "Protected folder"
+            return String(localized: "Protected folder")
         }
-        if systemTrees.contains(where: isInside) { return "Protected system folder" }
-        if cloudState.contains(where: { isInside(home + "/" + $0) }) { return "Used by iCloud sync" }
+        if systemTrees.contains(where: isInside) { return String(localized: "Protected system folder") }
+        if cloudState.contains(where: { isInside(home + "/" + $0) }) { return String(localized: "Used by iCloud sync") }
         if path.hasPrefix("/Users/"), !isInside(home), !isInside("/Users/Shared"), !isInside("/Users/Deleted Users") {
-            return "Another user's files"
+            return String(localized: "Another user's files")
         }
         guard permanent else { return nil }
-        if systemRoots.contains(path) || homeRoots.contains(where: { path == home + "/" + $0 }) { return "Protected folder" }
-        if isInside(home + "/Library/Mobile Documents") || isInside(home + "/Library/CloudStorage") { return "Stored in the cloud" }
+        if systemRoots.contains(path) || homeRoots.contains(where: { path == home + "/" + $0 }) { return String(localized: "Protected folder") }
+        if isInside(home + "/Library/Mobile Documents") || isInside(home + "/Library/CloudStorage") { return String(localized: "Stored in the cloud") }
         return nil
     }
 

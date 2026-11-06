@@ -9,7 +9,7 @@ final class FinderService: NSObject {
     @objc func uninstallApplications(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         let urls = pboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
         guard let app = urls.first(where: { $0.pathExtension == "app" }) else {
-            error.pointee = "Select an application to uninstall." as NSString
+            error.pointee = String(localized: "Select an application to uninstall.") as NSString
             return
         }
         // The same link Shortcuts can open; it brings the main window forward on the Uninstaller.
@@ -24,10 +24,10 @@ enum MoveOffer {
         let bundle = Bundle.main.bundleURL
         guard Bundle.main.bundleIdentifier != nil, MoveToApplications.shouldOffer(bundle: bundle) else { return }
         let alert = NSAlert()
-        alert.messageText = "Move to Applications folder?"
-        alert.informativeText = "TidyMac works best from your Applications folder: Open at Login and the menu bar item expect to find it there."
-        alert.addButton(withTitle: "Move to Applications Folder")
-        alert.addButton(withTitle: "Do Not Move")
+        alert.messageText = String(localized: "Move to Applications folder?")
+        alert.informativeText = String(localized: "TidyMac works best from your Applications folder: Open at Login and the menu bar item expect to find it there.")
+        alert.addButton(withTitle: String(localized: "Move to Applications Folder"))
+        alert.addButton(withTitle: String(localized: "Do Not Move"))
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else {
             UserDefaults.standard.set(true, forKey: MoveToApplications.declinedKey)
@@ -55,7 +55,7 @@ enum MoveOffer {
 
     private static func fail(_ reason: String) {
         let alert = NSAlert()
-        alert.messageText = "TidyMac could not be moved to Applications."
+        alert.messageText = String(localized: "TidyMac could not be moved to Applications.")
         alert.informativeText = reason
         alert.runModal()
     }

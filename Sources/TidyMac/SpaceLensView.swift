@@ -33,7 +33,7 @@ struct SpaceLensScreen: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.bottom, 90)
-                EdgeButton { ScanButton(title: "Scan", module: module) { selected = [:]; message = nil; path = [Paths.home] } }
+                EdgeButton { ScanButton(title: String(localized: "Scan"), module: module) { selected = [:]; message = nil; path = [Paths.home] } }
             } else {
                 map
             }
@@ -56,7 +56,7 @@ struct SpaceLensScreen: View {
             HStack(spacing: 6) {
                 Button { path.removeLast() } label: { Image(systemName: "chevron.left") }.buttonStyle(PillButtonStyle())
                 ForEach(Array(path.enumerated()), id: \.offset) { i, u in
-                    Button(i == 0 ? "Home" : u.lastPathComponent) { path = Array(path.prefix(i + 1)) }
+                    Button(i == 0 ? String(localized: "Home") : u.lastPathComponent) { path = Array(path.prefix(i + 1)) }
                         .buttonStyle(.plain).foregroundStyle(.white.opacity(i == path.count - 1 ? 1 : 0.6))
                     if i < path.count - 1 { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.white.opacity(0.5)) }
                 }
@@ -181,8 +181,8 @@ struct SpaceLensScreen: View {
             RemovalLog.record(report)
             for item in report.succeeded { if let u = item.url { selected[u] = nil } }
             message = report.failed.isEmpty
-                ? "Removal complete! \(report.succeeded.count) item\(report.succeeded.count == 1 ? "" : "s") successfully removed."
-                : "Removal failed... Some files were not removed. Please make sure none of your apps are using them and try again."
+                ? String(localized: "Removal complete! \(report.succeeded.count) items successfully removed.")
+                : String(localized: "Removal failed... Some files were not removed. Please make sure none of your apps are using them and try again.")
             Sounds.cleanupFinished()
             refresh += 1
         }

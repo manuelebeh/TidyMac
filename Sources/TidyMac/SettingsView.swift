@@ -110,8 +110,8 @@ struct NotificationSettingsView: View {
                 }
             }
             Section("Disk Space") {
-                limitRow("Warn when free space is less than", isOn: $lowDisk, limit: $freeSpaceLimit, options: freeSpaceOptions)
-                limitRow("Notify if Trash size exceeds", isOn: $trashSize, limit: $trashLimit, options: trashOptions)
+                limitRow(String(localized: "Warn when free space is less than"), isOn: $lowDisk, limit: $freeSpaceLimit, options: freeSpaceOptions)
+                limitRow(String(localized: "Notify if Trash size exceeds"), isOn: $trashSize, limit: $trashLimit, options: trashOptions)
                 if trashSize, SystemMonitor.trash() == nil {
                     Text("Allow Full Disk Access to analyze Trash contents.").font(.caption).foregroundStyle(.secondary)
                 }
@@ -132,13 +132,13 @@ struct NotificationSettingsView: View {
                 Toggle("Warn when connected device batteries are running low", isOn: $bluetooth)
             }
             Section("Applications") {
-                described("Offer to uninstall applications correctly", isOn: $trashedApps,
-                          "If you put an application into Trash, you will be offered to remove the files it left behind.")
+                described(String(localized: "Offer to uninstall applications correctly"), isOn: $trashedApps,
+                          String(localized: "If you put an application into Trash, you will be offered to remove the files it left behind."))
                 if trashedApps, SystemMonitor.trashedApps() == nil {
                     Text("Allow Full Disk Access so TidyMac can see apps in the Trash.").font(.caption).foregroundStyle(.secondary)
                 }
-                described("Notify about hung applications", isOn: $hungApps,
-                          "If any of your apps stop responding, force quit them right from the notification.")
+                described(String(localized: "Notify about hung applications"), isOn: $hungApps,
+                          String(localized: "If any of your apps stop responding, force quit them right from the notification."))
                 Toggle("Notify when Chrome uses too much memory", isOn: $heavyChrome)
             }
             Section {
@@ -155,8 +155,8 @@ struct NotificationSettingsView: View {
                     openAtLogin = HealthMonitor.opensAtLogin
                 }))
                 if let loginError { Text(loginError).font(.caption).foregroundStyle(.red) }
-                described("Clean up junk automatically on ejection", isOn: $cleanOnEject,
-                          "Ejecting a drive from the menu first empties that drive's Trash. Those files are deleted for good.")
+                described(String(localized: "Clean up junk automatically on ejection"), isOn: $cleanOnEject,
+                          String(localized: "Ejecting a drive from the menu first empties that drive's Trash. Those files are deleted for good."))
             } header: {
                 Text("Menu")
             } footer: {
@@ -267,8 +267,8 @@ struct IgnoreListSettingsView: View {
     }
 
     private var resetTitle: String {
-        if case .section = confirmReset { return "Are you sure you want to reset the selected category of the Ignore List?" }
-        return "Are you sure you want to reset your Ignore List to its initial state?"
+        if case .section = confirmReset { return String(localized: "Are you sure you want to reset the selected category of the Ignore List?") }
+        return String(localized: "Are you sure you want to reset your Ignore List to its initial state?")
     }
 
     private func reload() { entries = IgnoreList.entries(); picked = [] }
@@ -330,7 +330,7 @@ struct GeneralSettingsView: View {
             Section("General") {
                 Toggle("Play sounds for main TidyMac actions", isOn: $sounds)
                 Picker("Reduce Motion:", selection: $reduceMotion) {
-                    ForEach(GeneralSettings.ReduceMotion.allCases, id: \.self) { Text($0.rawValue).tag($0.rawValue) }
+                    ForEach(GeneralSettings.ReduceMotion.allCases, id: \.self) { Text($0.title).tag($0.rawValue) }
                 }
                 Toggle("Keep icon in Dock when TidyMac is not open", isOn: $keepInDock)
                     .onChange(of: keepInDock) { _ in AppDelegate.updateDockIcon() }
@@ -338,7 +338,7 @@ struct GeneralSettingsView: View {
             }
             Section("Full Disk Access") {
                 HStack {
-                    Label(fullDiskAccess ? "Full Disk Access enabled for TidyMac" : "Full Disk Access disabled for TidyMac",
+                    Label(fullDiskAccess ? String(localized: "Full Disk Access enabled for TidyMac") : String(localized: "Full Disk Access disabled for TidyMac"),
                           systemImage: fullDiskAccess ? "checkmark.shield" : "exclamationmark.shield")
                     Spacer()
                     if !fullDiskAccess { Button("Enable") { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) } }
