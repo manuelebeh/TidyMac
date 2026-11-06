@@ -89,6 +89,19 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
                                     state: &runs, now: now)
         runs.save()
         for rule in ready { Task { await AutomationRunner.shared.run(rule) } }
+
+        if SelfUpdate.beginAutomaticCheck(now: now) { Task { await announceUpdate() } }
+    }
+
+    /// Settings › Updates, when the daily check is on. A failed check stays silent until the next one.
+    private func announceUpdate() async {
+        guard case .available(let release)? = try? await SelfUpdate.check(), SelfUpdate.shouldAnnounce(release) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "TidyMac \(release.version) is available"
+        content.body = "Click to open the download page."
+        content.userInfo = ["open": release.page.absoluteString]
+        guard let center else { print("alert: \(content.title) — \(content.body)"); return }
+        try? await center.add(UNNotificationRequest(identifier: "update:\(release.version)", content: content, trigger: nil))
     }
 
     func announceMount(_ url: URL) {
@@ -127,6 +140,10 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         let info = response.notification.request.content.userInfo
         if let path = info["reveal"] as? String, response.actionIdentifier != UNNotificationDismissActionIdentifier {
             await MainActor.run { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+            return
+        }
+        if let link = info["open"] as? String, let url = URL(string: link) {
+            if response.actionIdentifier != UNNotificationDismissActionIdentifier { await MainActor.run { _ = NSWorkspace.shared.open(url) } }
             return
         }
         // An automation that asks before cleaning.

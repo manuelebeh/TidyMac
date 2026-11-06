@@ -125,6 +125,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        // `--check-update` prints what Settings › Updates would say. Installs nothing.
+        if args.contains("--check-update") {
+            Task.detached {
+                do { print("version \(SelfUpdate.currentVersion ?? "unknown"): \(try await SelfUpdate.check())"); exit(0) }
+                catch { print("check failed: \(error)"); exit(1) }
+            }
+            return
+        }
         // `--health-check` prints what the background monitor sees now and which alerts are active. Posts nothing.
         if args.contains("--health-check") {
             Task.detached {
