@@ -93,38 +93,6 @@ struct AppActivePause: ViewModifier {
     }
 }
 
-/// Full-window live background; a module change cross-fades to the new palette.
-struct ModuleBackground: View {
-    let module: Module
-    @State private var shown: Module
-    @State private var outgoing: Module?
-    @State private var fade = 1.0
-    @State private var paused = false
-
-    init(module: Module) {
-        self.module = module
-        _shown = State(initialValue: module)
-    }
-
-    var body: some View {
-        ZStack {
-            if let outgoing { LiveBackground(palette: outgoing.live, paused: paused) }
-            LiveBackground(palette: shown.live, paused: paused).opacity(fade)
-        }
-        .ignoresSafeArea()
-        .modifier(AppActivePause(paused: $paused))
-        .onChange(of: module) { new in
-            guard new != shown else { return }
-            outgoing = shown
-            shown = new
-            guard let animation = Motion.animation(.easeInOut(duration: 0.6)) else { outgoing = nil; return }
-            fade = 0
-            withAnimation(animation) { fade = 1 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) { if fade == 1 { outgoing = nil } }
-        }
-    }
-}
-
 /// The swirling colour disc of the round action button: the module's colours turn slowly and are blurred together.
 struct AuroraDisc: View {
     let colors: [Color]
@@ -178,31 +146,5 @@ struct AppearEffect: ViewModifier {
 extension View {
     func appear(delay: Double = 0, offset: CGSize = CGSize(width: 0, height: 14), scale: CGFloat = 1) -> some View {
         modifier(AppearEffect(delay: delay, offset: offset, scale: scale))
-    }
-}
-
-/// Tile surface: a soft vertical gradient with a gradient border, lighter at the top.
-struct GlassTile: ViewModifier {
-    var cornerRadius: CGFloat = 16
-    var highlighted = false
-    @Environment(\.colorScheme) private var scheme
-
-    func body(content: Content) -> some View {
-        let dark = scheme == .dark
-        let lift = highlighted ? 1.6 : 1
-        // Dark Mode tiles are faint white glass; Light Mode tiles are frosted white with a hairline edge.
-        let fill = dark ? [Color.white.opacity(0.13 * lift), .white.opacity(0.05 * lift)] : [Color.white.opacity(0.62 + 0.1 * (lift - 1)), .white.opacity(0.38)]
-        let edge = dark ? [Color.white.opacity(0.32 * lift), .white.opacity(0.04)] : [Color.white.opacity(0.95), .black.opacity(0.06 * lift)]
-        content
-            .background(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).fill(
-                LinearGradient(colors: fill, startPoint: .top, endPoint: .bottom)))
-            .overlay(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).strokeBorder(
-                LinearGradient(colors: edge, startPoint: .top, endPoint: .bottom), lineWidth: 1))
-    }
-}
-
-extension View {
-    func glassTile(cornerRadius: CGFloat = 16, highlighted: Bool = false) -> some View {
-        modifier(GlassTile(cornerRadius: cornerRadius, highlighted: highlighted))
     }
 }
