@@ -255,24 +255,14 @@ enum HungApps {
 /// The menu bar icon, with a dot when an issue needs attention.
 /// It stays a template image so macOS tints it for light and dark menu bars.
 enum MenuBarIcon {
-    /// The app icon's "T" with its sparkle cut out of the stem, drawn in one colour for the menu bar to tint.
+    /// The app icon's "T" with a dot cut out of the stem, drawn in one colour for the menu bar to tint.
     private static func glyph() -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
             NSColor.black.setFill()
             NSBezierPath(roundedRect: NSRect(x: 1.5, y: 11, width: 15, height: 4.6), xRadius: 2.2, yRadius: 2.2).fill()
             NSBezierPath(roundedRect: NSRect(x: 6.5, y: 1.8, width: 5, height: 12.5), xRadius: 2.2, yRadius: 2.2).fill()
-            // A four-pointed star, cut out of the stem.
-            let c = NSPoint(x: 9, y: 6.6), r: CGFloat = 2.7
-            let star = NSBezierPath()
-            let tips = [NSPoint(x: c.x, y: c.y + r), NSPoint(x: c.x + r, y: c.y), NSPoint(x: c.x, y: c.y - r), NSPoint(x: c.x - r, y: c.y)]
-            star.move(to: tips[0])
-            for i in 0..<4 {
-                let next = tips[(i + 1) % 4]
-                let mid = NSPoint(x: (tips[i].x + next.x) / 2, y: (tips[i].y + next.y) / 2)
-                star.curve(to: next, controlPoint1: NSPoint(x: c.x + (mid.x - c.x) * 0.2, y: c.y + (mid.y - c.y) * 0.2),
-                           controlPoint2: NSPoint(x: c.x + (mid.x - c.x) * 0.2, y: c.y + (mid.y - c.y) * 0.2))
-            }
-            star.close()
+            // A round dot, cut out of the stem.
+            let star = NSBezierPath(ovalIn: NSRect(x: 9 - 1.8, y: 4.4 - 1.8, width: 3.6, height: 3.6))
             NSGraphicsContext.current?.compositingOperation = .clear
             star.fill()
             NSGraphicsContext.current?.compositingOperation = .sourceOver
