@@ -31,13 +31,8 @@ struct MyToolsScreen: View {
     var grid: some View {
         let shown = Toolbox.tools.filter { $0.matches(query) }
         let pinned = shown.filter { favorites.contains($0.id) }, others = shown.filter { !favorites.contains($0.id) }
-        return VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Toolkit").font(.system(size: 24, weight: .semibold)).foregroundStyle(.primary)
-                    Text(Module.myTools.tagline).font(.system(size: 15)).foregroundStyle(.secondary).frame(maxWidth: 440, alignment: .leading)
-                }
-                Spacer()
+        return VStack(alignment: .leading, spacing: 0) {
+            ScreenHeader(title: String(localized: "Toolkit"), subtitle: Module.myTools.tagline) {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                     TextField("Search...", text: $query).textFieldStyle(.plain).foregroundStyle(.primary)
@@ -45,7 +40,7 @@ struct MyToolsScreen: View {
                 .padding(.horizontal, 12).padding(.vertical, 8).frame(width: 260)
                 .background(RoundedRectangle(cornerRadius: 10).fill(DS.selection))
             }
-            .padding(.top, 40)
+            .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 18)
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if shown.isEmpty {
@@ -58,10 +53,9 @@ struct MyToolsScreen: View {
                         section(pinned.isEmpty ? "" : String(localized: "Other Tools"), others)
                     }
                 }
-                .padding(.bottom, 30)
+                .padding(.horizontal, 32).padding(.bottom, 30)
             }
         }
-        .padding(.horizontal, 40)
     }
 
     @ViewBuilder func section(_ title: String, _ tools: [Tool]) -> some View {
