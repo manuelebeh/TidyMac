@@ -585,6 +585,7 @@
 "Select an app to see everything it leaves on your Mac." = "Sélectionnez une app pour voir tout ce qu’elle laisse sur votre Mac.";
 "Select an application to uninstall." = "Sélectionnez une application à désinstaller.";
 "Settings" = "Réglages";
+"Settings..." = "Réglages...";
 "Show %lld more" = "Afficher %lld de plus";
 "Show Assistant recommendations" = "Afficher les recommandations de l’assistant";
 "Show TidyMac" = "Afficher TidyMac";
