@@ -190,9 +190,8 @@ struct NotificationSettingsView: View {
                 Toggle("Notify when a drive is connected to the Mac", isOn: $driveConnected)
             }
             SettingsSection("General") {
-                HStack {
+                VStack(alignment: .leading, spacing: 8) {
                     Toggle("Remind to run regular Full Scan", isOn: $smartCareReminder)
-                    Spacer()
                     Picker("Remind to run regular Full Scan", selection: $smartCareInterval) {
                         ForEach(HealthAlerts.Settings.smartCareIntervals, id: \.days) { Text($0.title).tag($0.days) }
                     }
@@ -230,9 +229,8 @@ struct NotificationSettingsView: View {
     }
 
     private func limitRow(_ title: String, isOn: Binding<Bool>, limit: Binding<Int>, options: [Int]) -> some View {
-        HStack {
+        VStack(alignment: .leading, spacing: 8) {
             Toggle(title, isOn: isOn)
-            Spacer()
             Picker(title, selection: limit) {
                 ForEach(options, id: \.self) { Text(FileSize.format(Int64($0))).tag($0) }
             }
