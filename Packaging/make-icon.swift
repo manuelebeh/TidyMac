@@ -1,7 +1,7 @@
 // Draws the app icon and writes Packaging/TidyMac.icns. Run it from the repository root after changing the design:
 //   swift Packaging/make-icon.swift
 //
-// The sparkle is plain geometry on purpose: Apple's license does not allow SF Symbols in app icons.
+// The gauge and the sparkle are plain geometry on purpose: Apple's license does not allow SF Symbols in app icons.
 import AppKit
 
 func color(_ hex: Int) -> CGColor {
@@ -36,14 +36,14 @@ func render(pixels: Int) -> Data {
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: CGColor(gray: 0, alpha: 0.32))
     ctx.addPath(shape)
-    ctx.setFillColor(color(0x5728CC))
+    ctx.setFillColor(color(0x1B5BE0))
     ctx.fillPath()
     ctx.restoreGState()
 
     ctx.saveGState()
     ctx.addPath(shape)
     ctx.clip()
-    let background = CGGradient(colorsSpace: space, colors: [color(0xE352D3), color(0x7A3BE0), color(0x2B1E8C)] as CFArray, locations: [0, 0.52, 1])!
+    let background = CGGradient(colorsSpace: space, colors: [color(0x5CC0FF), color(0x2E8BFF), color(0x1B5BE0)] as CFArray, locations: [0, 0.5, 1])!
     ctx.drawLinearGradient(background, start: CGPoint(x: 240, y: 924), end: CGPoint(x: 800, y: 100),
                            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
     // A soft light from the top, so the surface does not read as flat.
@@ -51,15 +51,28 @@ func render(pixels: Int) -> Data {
     ctx.drawRadialGradient(sheen, startCenter: CGPoint(x: 512, y: 960), startRadius: 0, endCenter: CGPoint(x: 512, y: 960), endRadius: 620, options: [])
     ctx.restoreGState()
 
+    // A bold glassy "T" (white fading to ice blue) with a small sparkle in its stem: tidy, and clean.
+    let t = CGMutablePath()
+    t.addRoundedRect(in: CGRect(x: 236, y: 596, width: 552, height: 176), cornerWidth: 70, cornerHeight: 70)
+    t.addRoundedRect(in: CGRect(x: 424, y: 228, width: 176, height: 470), cornerWidth: 70, cornerHeight: 70)
+
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -6), blur: 30, color: CGColor(srgbRed: 0.12, green: 0.04, blue: 0.4, alpha: 0.55))
+    ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 34, color: CGColor(srgbRed: 0.03, green: 0.14, blue: 0.5, alpha: 0.45))
     ctx.setFillColor(CGColor(gray: 1, alpha: 1))
-    ctx.addPath(sparkle(center: CGPoint(x: 470, y: 470), radius: 262))
+    ctx.addPath(t)
     ctx.fillPath()
-    ctx.setFillColor(CGColor(gray: 1, alpha: 0.92))
-    ctx.addPath(sparkle(center: CGPoint(x: 712, y: 712), radius: 108))
-    ctx.fillPath()
-    ctx.addPath(sparkle(center: CGPoint(x: 738, y: 318), radius: 58))
+    ctx.restoreGState()
+
+    ctx.saveGState()
+    ctx.addPath(t)
+    ctx.clip()
+    let glass = CGGradient(colorsSpace: space, colors: [color(0xFFFFFF), color(0xDCEEFF), color(0xA9D2FF)] as CFArray, locations: [0, 0.55, 1])!
+    ctx.drawLinearGradient(glass, start: CGPoint(x: 512, y: 772), end: CGPoint(x: 512, y: 228), options: [])
+    ctx.restoreGState()
+
+    ctx.saveGState()
+    ctx.setFillColor(color(0x2F7BF0))
+    ctx.addPath(sparkle(center: CGPoint(x: 512, y: 410), radius: 76))
     ctx.fillPath()
     ctx.restoreGState()
 
