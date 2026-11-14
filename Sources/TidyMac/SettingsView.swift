@@ -2,16 +2,69 @@ import SwiftUI
 import TidyCore
 import UserNotifications
 
-/// TidyMac › Settings (⌘,).
-struct SettingsView: View {
+/// The Settings page inside the main window: a row of sections, and the form of the one picked.
+struct SettingsPage: View {
+    private enum Tab: String, CaseIterable, Identifiable {
+        case general, notifications, scanning, automations, ignoreList, updates
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .general: String(localized: "General")
+            case .notifications: String(localized: "Notifications")
+            case .scanning: String(localized: "Scanning")
+            case .automations: String(localized: "Automations")
+            case .ignoreList: String(localized: "Ignore List")
+            case .updates: String(localized: "Updates")
+            }
+        }
+        var symbol: String {
+            switch self {
+            case .general: "gearshape"
+            case .notifications: "bell"
+            case .scanning: "magnifyingglass"
+            case .automations: "clock.arrow.circlepath"
+            case .ignoreList: "eye.slash"
+            case .updates: "arrow.down.circle"
+            }
+        }
+    }
+
+    @State private var tab = Tab.general
+
     var body: some View {
-        TabView {
-            GeneralSettingsView().tabItem { Label("General", systemImage: "gearshape") }
-            NotificationSettingsView().tabItem { Label("Notifications", systemImage: "bell") }
-            ScanSettingsView().tabItem { Label("Scanning", systemImage: "magnifyingglass") }
-            AutomationSettingsView().tabItem { Label("Automations", systemImage: "clock.arrow.circlepath") }
-            IgnoreListSettingsView().tabItem { Label("Ignore List", systemImage: "eye.slash") }
-            UpdateSettingsView().tabItem { Label("Updates", systemImage: "arrow.down.circle") }
+        VStack(alignment: .leading, spacing: 0) {
+            ScreenHeader(title: String(localized: "Settings")) { EmptyView() }
+                .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 14)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Tab.allCases) { t in
+                        Button { tab = t } label: {
+                            Label(t.title, systemImage: t.symbol).font(.system(size: 12.5, weight: tab == t ? .semibold : .medium))
+                                .labelStyle(.titleAndIcon)
+                                .padding(.horizontal, 12).frame(height: 28)
+                                .background(Capsule().fill(tab == t ? DS.cardHover : Color.clear))
+                                .overlay(Capsule().strokeBorder(tab == t ? DS.border : Color.clear, lineWidth: 1))
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 32)
+            }
+            .padding(.bottom, 8)
+            Group {
+                switch tab {
+                case .general: GeneralSettingsView()
+                case .notifications: NotificationSettingsView()
+                case .scanning: ScanSettingsView()
+                case .automations: AutomationSettingsView()
+                case .ignoreList: IgnoreListSettingsView()
+                case .updates: UpdateSettingsView()
+                }
+            }
+            .frame(maxWidth: 760, maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -48,8 +101,7 @@ struct UpdateSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .scrollContentBackground(.hidden)
     }
 
     @ViewBuilder private var statusView: some View {
@@ -164,8 +216,7 @@ struct NotificationSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        // Scrolls rather than growing past a laptop screen.
-        .frame(width: 480, height: 640)
+        .scrollContentBackground(.hidden)
         .task {
             guard Bundle.main.bundleIdentifier != nil else { return }
             authorization = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
@@ -248,8 +299,8 @@ struct IgnoreListSettingsView: View {
                 Button("Reset All Ignore Lists") { confirmReset = .all }.disabled(entries.isEmpty)
             }
         }
-        .padding()
-        .frame(width: 680, height: 420)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear(perform: reload)
         .alert(resetTitle, isPresented: Binding(get: { confirmReset != nil }, set: { if !$0 { confirmReset = nil } })) {
             Button("Cancel", role: .cancel) {}
@@ -306,7 +357,7 @@ struct ScanSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 560)
+        .scrollContentBackground(.hidden)
         .onChange(of: settings) { $0.save() }
     }
 
@@ -346,8 +397,7 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .scrollContentBackground(.hidden)
         // Picks up access granted in System Settings while this window was open.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             fullDiskAccess = Permissions.hasFullDiskAccess

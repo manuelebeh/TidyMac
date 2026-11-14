@@ -58,7 +58,7 @@ struct AutomationSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 520)
+        .scrollContentBackground(.hidden)
         .onChange(of: rules) { Automations.save($0) }
         .sheet(item: $editing) { e in
             RuleEditor(rule: e.rule, isNew: e.isNew, save: { saved in

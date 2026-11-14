@@ -24,8 +24,11 @@ struct TidyMacApp: App {
         .windowResizability(.contentMinSize)
         .handlesExternalEvents(matching: ["open", "uninstall"])
 
-        Settings {
-            SettingsView()
+        .commands {
+            // ⌘, shows the Settings page of the main window.
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings...") { app.openSettings() }.keyboardShortcut(",")
+            }
         }
     }
 }
@@ -196,12 +199,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// Owns one controller per module so scan results survive switching modules.
 @MainActor
 final class AppState: ObservableObject {
-    @Published var module: Module = .smartCare
+    @Published var module: Module = .smartCare { didSet { showSettings = false } }
+    /// The Settings page is showing instead of the selected module.
+    @Published var showSettings = false
     /// Set by a `tidymac://uninstall` link; shows the Uninstaller on that app.
     @Published var uninstallTarget: URL?
     let screenCleaning = ScreenCleaningSession()
     /// Opens (or brings back) the main window; set once it has appeared.
     var openMain: (() -> Void)?
+
+    func openSettings() {
+        showSettings = true
+        openMain?()
+        NSApp.activate(ignoringOtherApps: true)
+    }
     let controllers: [Module: ModuleController] = Dictionary(uniqueKeysWithValues: Module.allCases.map { ($0, ModuleController(module: $0)) })
 }
 
@@ -217,7 +228,7 @@ struct RootView: View {
             ZStack {
                 DS.window
                 content
-                    .id(app.module)
+                    .id(app.showSettings ? "settings" : app.module.rawValue)
                     .transition(.opacity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -225,6 +236,7 @@ struct RootView: View {
         .background(DS.window)
         .ignoresSafeArea()
         .animation(Motion.animation(.easeInOut(duration: 0.2)), value: app.module)
+        .animation(Motion.animation(.easeInOut(duration: 0.2)), value: app.showSettings)
         .onAppear {
             AppDelegate.mainWindowOpened()
             // The menu bar panel lives outside SwiftUI's scenes and reopens the main window through this.
@@ -242,6 +254,10 @@ struct RootView: View {
     }
 
     @ViewBuilder private var content: some View {
+        if app.showSettings { SettingsPage() } else { module }
+    }
+
+    @ViewBuilder private var module: some View {
         switch app.module {
         case .spaceLens: SpaceLensScreen(app: app)
         case .activity: ActivityScreen(app: app)
@@ -291,8 +307,8 @@ struct Sidebar: View {
             VStack(spacing: 6) {
                 accessCard
                 SidebarRow(module: .myTools, app: app)
-                Button { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) } label: {
-                    SidebarLabel(symbol: "gearshape", title: String(localized: "Settings"), badge: nil, selected: false)
+                Button { app.showSettings = true } label: {
+                    SidebarLabel(symbol: "gearshape", title: String(localized: "Settings"), badge: nil, selected: app.showSettings)
                 }.buttonStyle(.plain)
             }
             .padding(.horizontal, 10).padding(.bottom, 12)
@@ -345,7 +361,7 @@ struct SidebarRow: View {
     var body: some View {
         Button { app.module = module } label: {
             SidebarLabel(symbol: module.symbol, title: module == .smartCare ? String(localized: "Overview") : module.name,
-                         badge: badge, selected: app.module == module)
+                         badge: badge, selected: app.module == module && !app.showSettings)
         }
         .buttonStyle(.plain)
     }
