@@ -55,4 +55,37 @@ final class SelfUpdateTests: XCTestCase {
         XCTAssertTrue(SelfUpdate.shouldAnnounce(newer, defaults))
         XCTAssertFalse(SelfUpdate.shouldAnnounce(release, defaults))
     }
+
+    func testPicksTheSignedZipFromTheRelease() {
+        let asset = { (name: String, url: String) in ["name": name, "browser_download_url": url] as [String: Any] }
+        let good = "https://github.com/manuelebeh/TidyMac/releases/download/v1.2.0/TidyMac-1.2.0.zip"
+        let data = try! JSONSerialization.data(withJSONObject: [
+            "tag_name": "v1.2.0", "html_url": release.page.absoluteString, "draft": false, "prerelease": false,
+            "assets": [asset("TidyMac-1.2.0.dmg", good.replacingOccurrences(of: ".zip", with: ".dmg")),
+                       asset("TidyMac-1.2.0.zip", "https://example.com/releases/TidyMac-1.2.0.zip"),
+                       asset("TidyMac-1.2.0.zip", good)],
+        ] as [String: Any])
+        XCTAssertEqual(SelfUpdate.parse(data)?.archive, URL(string: good))
+        XCTAssertNil(SelfUpdate.parse(payload())?.archive)
+    }
+
+    func testReadsTheDeveloperFromCodesignOutput() {
+        XCTAssertEqual(UpdateInstaller.teamIdentifier(in: "Identifier=x\nTeamIdentifier=ABCDE12345\nSealed Resources=none"), "ABCDE12345")
+        XCTAssertNil(UpdateInstaller.teamIdentifier(in: "TeamIdentifier=not set"))
+        XCTAssertNil(UpdateInstaller.teamIdentifier(in: "code object is not signed at all"))
+    }
+
+    func testAutomaticInstallNeedsTheCheck() {
+        defaults.set(true, forKey: GeneralSettings.installUpdatesKey)
+        XCTAssertFalse(GeneralSettings.installsUpdates(defaults))
+        defaults.set(true, forKey: GeneralSettings.checkUpdatesKey)
+        XCTAssertTrue(GeneralSettings.installsUpdates(defaults))
+    }
+
+    func testAppearanceAndMenuBarDefaults() {
+        XCTAssertEqual(GeneralSettings.appearance(defaults), .system)
+        XCTAssertTrue(GeneralSettings.showsMenuBarItem(defaults))
+        defaults.set("dark", forKey: GeneralSettings.appearanceKey)
+        XCTAssertEqual(GeneralSettings.appearance(defaults), .dark)
+    }
 }

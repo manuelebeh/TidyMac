@@ -6,6 +6,8 @@ public enum SelfUpdate {
     public struct Release: Equatable, Sendable {
         public let version: String
         public let page: URL
+        /// The signed, notarized zip attached to the release, when it has one.
+        public var archive: URL? = nil
     }
 
     public enum Outcome: Equatable, Sendable {
@@ -33,7 +35,19 @@ public enum SelfUpdate {
               root["draft"] as? Bool != true, root["prerelease"] as? Bool != true,
               let link = root["html_url"] as? String, let page = URL(string: link),
               page.scheme == "https", page.host == "github.com" else { return nil }
-        return Release(version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag, page: page)
+        return Release(version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag, page: page, archive: archive(in: root))
+    }
+
+    /// `TidyMac-<version>.zip`, served by GitHub over https. Anything else attached to the release is ignored.
+    static func archive(in release: [String: Any]) -> URL? {
+        let assets = release["assets"] as? [[String: Any]] ?? []
+        for a in assets {
+            guard let name = a["name"] as? String, name.hasPrefix("TidyMac-"), name.hasSuffix(".zip"),
+                  let link = a["browser_download_url"] as? String, let url = URL(string: link),
+                  url.scheme == "https", url.host == "github.com", url.lastPathComponent == name else { continue }
+            return url
+        }
+        return nil
     }
 
     public static func outcome(current: String, latest: Release?) -> Outcome {

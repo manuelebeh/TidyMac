@@ -24,8 +24,11 @@ struct TidyMacApp: App {
         .windowResizability(.contentMinSize)
         .handlesExternalEvents(matching: ["open", "uninstall"])
 
-        Settings {
-            SettingsView()
+        .commands {
+            // ⌘, shows the Settings page of the main window.
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings...") { app.openSettings() }.keyboardShortcut(",")
+            }
         }
     }
 }
@@ -35,7 +38,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The menu bar item (`TrayController`), which keeps running after the main window closes.
     @MainActor private var tray: TrayController?
 
+    /// Light or dark for every window and the menu bar panel; System follows macOS.
+    @MainActor static func applyAppearance() {
+        switch GeneralSettings.appearance() {
+        case .system: NSApp.appearance = nil
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+
+    /// An update that was downloaded in the background is swapped in once TidyMac has quit.
+    func applicationWillTerminate(_ notification: Notification) {
+        if GeneralSettings.installsUpdates() { UpdateInstaller.apply(relaunch: false) }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated { Self.applyAppearance() }
         // `--snapshot-tray <png>` renders the menu bar panel to an image and quits (for visual checks).
         let args = ProcessInfo.processInfo.arguments
         // `--scan <module>` prints what a module's scan finds and quits. It never runs any action.
@@ -179,7 +197,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// "Keep icon in Dock when TidyMac is not open". Without it, closing the main window leaves only the menu bar item.
     @MainActor static func updateDockIcon(closing: NSWindow? = nil) {
         let mainOpen = NSApp.windows.contains { $0 !== closing && $0.isVisible && $0.identifier?.rawValue.hasPrefix("main") == true }
-        let policy: NSApplication.ActivationPolicy = mainOpen || GeneralSettings.keepsDockIcon() ? .regular : .accessory
+        // Without the menu bar item and the Dock icon there would be no way back in.
+        let reachable = GeneralSettings.keepsDockIcon() || !GeneralSettings.showsMenuBarItem()
+        let policy: NSApplication.ActivationPolicy = mainOpen || reachable ? .regular : .accessory
         if NSApp.activationPolicy() != policy { NSApp.setActivationPolicy(policy) }
     }
 
@@ -196,12 +216,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// Owns one controller per module so scan results survive switching modules.
 @MainActor
 final class AppState: ObservableObject {
-    @Published var module: Module = .smartCare
+    @Published var module: Module = .smartCare { didSet { showSettings = false } }
+    /// The Settings page is showing instead of the selected module.
+    @Published var showSettings = false
     /// Set by a `tidymac://uninstall` link; shows the Uninstaller on that app.
     @Published var uninstallTarget: URL?
     let screenCleaning = ScreenCleaningSession()
     /// Opens (or brings back) the main window; set once it has appeared.
     var openMain: (() -> Void)?
+
+    func openSettings() {
+        showSettings = true
+        openMain?()
+        NSApp.activate(ignoringOtherApps: true)
+    }
     let controllers: [Module: ModuleController] = Dictionary(uniqueKeysWithValues: Module.allCases.map { ($0, ModuleController(module: $0)) })
 }
 
@@ -217,7 +245,7 @@ struct RootView: View {
             ZStack {
                 DS.window
                 content
-                    .id(app.module)
+                    .id(app.showSettings ? "settings" : app.module.rawValue)
                     .transition(.opacity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -225,6 +253,7 @@ struct RootView: View {
         .background(DS.window)
         .ignoresSafeArea()
         .animation(Motion.animation(.easeInOut(duration: 0.2)), value: app.module)
+        .animation(Motion.animation(.easeInOut(duration: 0.2)), value: app.showSettings)
         .onAppear {
             AppDelegate.mainWindowOpened()
             // The menu bar panel lives outside SwiftUI's scenes and reopens the main window through this.
@@ -242,6 +271,10 @@ struct RootView: View {
     }
 
     @ViewBuilder private var content: some View {
+        if app.showSettings { SettingsPage(app: app) } else { module }
+    }
+
+    @ViewBuilder private var module: some View {
         switch app.module {
         case .spaceLens: SpaceLensScreen(app: app)
         case .activity: ActivityScreen(app: app)
@@ -291,8 +324,8 @@ struct Sidebar: View {
             VStack(spacing: 6) {
                 accessCard
                 SidebarRow(module: .myTools, app: app)
-                Button { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) } label: {
-                    SidebarLabel(symbol: "gearshape", title: String(localized: "Settings"), badge: nil, selected: false)
+                Button { app.showSettings = true } label: {
+                    SidebarLabel(symbol: "gearshape", title: String(localized: "Settings"), badge: nil, selected: app.showSettings)
                 }.buttonStyle(.plain)
             }
             .padding(.horizontal, 10).padding(.bottom, 12)
@@ -345,7 +378,7 @@ struct SidebarRow: View {
     var body: some View {
         Button { app.module = module } label: {
             SidebarLabel(symbol: module.symbol, title: module == .smartCare ? String(localized: "Overview") : module.name,
-                         badge: badge, selected: app.module == module)
+                         badge: badge, selected: app.module == module && !app.showSettings)
         }
         .buttonStyle(.plain)
     }

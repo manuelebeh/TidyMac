@@ -1,26 +1,11 @@
 // Draws the app icon and writes Packaging/TidyMac.icns. Run it from the repository root after changing the design:
 //   swift Packaging/make-icon.swift
 //
-// The gauge and the sparkle are plain geometry on purpose: Apple's license does not allow SF Symbols in app icons.
+// The "T" and the dot are plain geometry on purpose: Apple's license does not allow SF Symbols in app icons.
 import AppKit
 
 func color(_ hex: Int) -> CGColor {
     CGColor(srgbRed: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
-}
-
-/// A four-pointed star whose sides curve in towards the centre.
-func sparkle(center c: CGPoint, radius r: CGFloat) -> CGPath {
-    let path = CGMutablePath()
-    let tips = [CGPoint(x: c.x, y: c.y + r), CGPoint(x: c.x + r, y: c.y), CGPoint(x: c.x, y: c.y - r), CGPoint(x: c.x - r, y: c.y)]
-    path.move(to: tips[0])
-    for i in 0..<4 {
-        let next = tips[(i + 1) % 4]
-        let mid = CGPoint(x: (tips[i].x + next.x) / 2, y: (tips[i].y + next.y) / 2)
-        // Pulling the control point most of the way to the centre gives the sharp, narrow points.
-        path.addQuadCurve(to: next, control: CGPoint(x: c.x + (mid.x - c.x) * 0.16, y: c.y + (mid.y - c.y) * 0.16))
-    }
-    path.closeSubpath()
-    return path
 }
 
 /// Drawn on a 1024-point canvas and scaled, with the margins and corner radius of Apple's macOS icon grid.
@@ -51,7 +36,7 @@ func render(pixels: Int) -> Data {
     ctx.drawRadialGradient(sheen, startCenter: CGPoint(x: 512, y: 960), startRadius: 0, endCenter: CGPoint(x: 512, y: 960), endRadius: 620, options: [])
     ctx.restoreGState()
 
-    // A bold glassy "T" (white fading to ice blue) with a small sparkle in its stem: tidy, and clean.
+    // A bold glassy "T" (white fading to ice blue) with a round dot low in its stem.
     let t = CGMutablePath()
     t.addRoundedRect(in: CGRect(x: 236, y: 596, width: 552, height: 176), cornerWidth: 70, cornerHeight: 70)
     t.addRoundedRect(in: CGRect(x: 424, y: 228, width: 176, height: 470), cornerWidth: 70, cornerHeight: 70)
@@ -72,8 +57,7 @@ func render(pixels: Int) -> Data {
 
     ctx.saveGState()
     ctx.setFillColor(color(0x2F7BF0))
-    ctx.addPath(sparkle(center: CGPoint(x: 512, y: 410), radius: 76))
-    ctx.fillPath()
+    ctx.fillEllipse(in: CGRect(x: 512 - 58, y: 318 - 58, width: 116, height: 116))
     ctx.restoreGState()
 
     return NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
