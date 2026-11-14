@@ -192,10 +192,13 @@ struct NotificationSettingsView: View {
             SettingsSection("General") {
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle("Remind to run regular Full Scan", isOn: $smartCareReminder)
-                    Picker("Remind to run regular Full Scan", selection: $smartCareInterval) {
-                        ForEach(HealthAlerts.Settings.smartCareIntervals, id: \.days) { Text($0.title).tag($0.days) }
+                    HStack {
+                        Spacer()
+                        Picker("Remind to run regular Full Scan", selection: $smartCareInterval) {
+                            ForEach(HealthAlerts.Settings.smartCareIntervals, id: \.days) { Text($0.title).tag($0.days) }
+                        }
+                        .labelsHidden().fixedSize().disabled(!smartCareReminder)
                     }
-                    .labelsHidden().fixedSize().disabled(!smartCareReminder)
                 }
                 Toggle("Notify when too low on free RAM", isOn: $memory)
                 Toggle("Warn about critical battery health", isOn: $battery)
@@ -231,12 +234,15 @@ struct NotificationSettingsView: View {
     private func limitRow(_ title: String, isOn: Binding<Bool>, limit: Binding<Int>, options: [Int]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Toggle(title, isOn: isOn)
-            Picker(title, selection: limit) {
-                ForEach(options, id: \.self) { Text(FileSize.format(Int64($0))).tag($0) }
+            HStack {
+                Spacer()
+                Picker(title, selection: limit) {
+                    ForEach(options, id: \.self) { Text(FileSize.format(Int64($0))).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+                .disabled(!isOn.wrappedValue)
             }
-            .labelsHidden()
-            .fixedSize()
-            .disabled(!isOn.wrappedValue)
         }
     }
 }
