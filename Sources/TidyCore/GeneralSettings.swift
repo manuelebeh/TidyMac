@@ -14,6 +14,18 @@ public enum GeneralSettings {
         }
     }
 
+    public enum Appearance: String, CaseIterable, Sendable {
+        case system, light, dark
+
+        public var title: String {
+            switch self {
+            case .system: String(localized: "System")
+            case .light: String(localized: "Light")
+            case .dark: String(localized: "Dark")
+            }
+        }
+    }
+
     static let prefix = "TidyMac.general"
     public static let soundsKey = "\(prefix).sounds"
     public static let reduceMotionKey = "\(prefix).reduceMotion"
@@ -21,12 +33,15 @@ public enum GeneralSettings {
     public static let assistantKey = "\(prefix).assistant"
     public static let cleanOnEjectKey = "\(prefix).cleanOnEject"
     public static let checkUpdatesKey = "\(prefix).checkUpdates"
+    public static let installUpdatesKey = "\(prefix).installUpdates"
+    public static let appearanceKey = "\(prefix).appearance"
+    public static let showInMenuBarKey = "\(prefix).showInMenuBar"
 
     /// Defaults keep TidyMac as it was before these settings existed; cleaning on ejection deletes files and the update
     /// check goes over the network, so both are opt-in.
     public static let defaults: [String: Any] = [
         soundsKey: true, reduceMotionKey: ReduceMotion.system.rawValue, keepInDockKey: true, assistantKey: true, cleanOnEjectKey: false,
-        checkUpdatesKey: false,
+        checkUpdatesKey: false, installUpdatesKey: false, appearanceKey: Appearance.system.rawValue, showInMenuBarKey: true,
     ]
 
     static func bool(_ key: String, _ d: UserDefaults) -> Bool { d.object(forKey: key) as? Bool ?? defaults[key] as? Bool ?? false }
@@ -36,6 +51,13 @@ public enum GeneralSettings {
     public static func showsAssistant(_ d: UserDefaults = .standard) -> Bool { bool(assistantKey, d) }
     public static func cleansOnEject(_ d: UserDefaults = .standard) -> Bool { bool(cleanOnEjectKey, d) }
     public static func checksForUpdates(_ d: UserDefaults = .standard) -> Bool { bool(checkUpdatesKey, d) }
+    /// Installing needs the check, so it never counts without it.
+    public static func installsUpdates(_ d: UserDefaults = .standard) -> Bool { checksForUpdates(d) && bool(installUpdatesKey, d) }
+    public static func showsMenuBarItem(_ d: UserDefaults = .standard) -> Bool { bool(showInMenuBarKey, d) }
+
+    public static func appearance(_ d: UserDefaults = .standard) -> Appearance {
+        d.string(forKey: appearanceKey).flatMap(Appearance.init(rawValue:)) ?? .system
+    }
 
     public static func reduceMotion(_ d: UserDefaults = .standard) -> ReduceMotion {
         d.string(forKey: reduceMotionKey).flatMap(ReduceMotion.init(rawValue:)) ?? .system
