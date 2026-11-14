@@ -88,4 +88,16 @@ final class SelfUpdateTests: XCTestCase {
         defaults.set("dark", forKey: GeneralSettings.appearanceKey)
         XCTAssertEqual(GeneralSettings.appearance(defaults), .dark)
     }
+
+    func testReleaseCandidatesComeBeforeTheirFinalRelease() {
+        XCTAssertTrue(SelfUpdate.isNewer("1.0.0", than: "1.0.0-rc.2"))
+        XCTAssertTrue(SelfUpdate.isNewer("1.0.0-rc.2", than: "1.0.0-rc.1"))
+        XCTAssertTrue(SelfUpdate.isNewer("1.0.0-rc.10", than: "1.0.0-rc.9"))
+        XCTAssertTrue(SelfUpdate.isNewer("1.0.0-rc.1", than: "0.1.0"))
+        XCTAssertTrue(SelfUpdate.isNewer("1.0.1-rc.1", than: "1.0.0"))
+        XCTAssertFalse(SelfUpdate.isNewer("1.0.0-rc.1", than: "1.0.0"))
+        XCTAssertFalse(SelfUpdate.isNewer("1.0.0-rc.1", than: "1.0.0-rc.1"))
+        XCTAssertFalse(SelfUpdate.isNewer("1.0.0", than: "1.0.0"))
+        XCTAssertTrue(SelfUpdate.isNewer("1.0.0-rc.1", than: "1.0.0-beta.3"))
+    }
 }

@@ -1,6 +1,7 @@
 name: Release
 
 # A tag such as v1.2.3 builds the release and leaves it as a draft to review and publish by hand.
+# A tag with a suffix, such as v1.0.0-rc.1, makes a pre-release.
 # Running the workflow by hand builds the same files as a downloadable artifact and publishes nothing.
 #
 # Signing and notarization need these secrets, kept in the `release` environment, and only a tag build uses them: a
@@ -102,4 +103,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" dist/* --draft --verify-tag --generate-notes --title "TidyMac $TAG"
+        run: |
+          # A tag such as v1.0.0-rc.1 is a release candidate: marked as a pre-release, so it is never "latest".
+          flags=()
+          if [[ "$TAG" == *-* ]]; then flags=(--prerelease --latest=false); fi
+          gh release create "$TAG" dist/* --draft --verify-tag --generate-notes --title "TidyMac $TAG" "${flags[@]}"

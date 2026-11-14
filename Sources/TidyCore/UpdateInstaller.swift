@@ -55,7 +55,7 @@ public enum UpdateInstaller {
             guard fm.fileExists(atPath: app.path) else { throw Failure.damaged }
             let info = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist"))
             guard let version = info?["CFBundleShortVersionString"] as? String, version == release.version,
-                  Version(version) > Version(SelfUpdate.currentVersion ?? "0") else { throw Failure.notNewer }
+                  SelfUpdate.isNewer(version, than: SelfUpdate.currentVersion ?? "0") else { throw Failure.notNewer }
             try verify(app, against: bundle)
         } catch {
             try? fm.removeItem(at: stagingRoot)
@@ -70,7 +70,7 @@ public enum UpdateInstaller {
     public static func pending(current: String = SelfUpdate.currentVersion ?? "0", defaults: UserDefaults = .standard,
                                fm: FileManager = .default) -> (version: String, app: URL)? {
         guard let path = defaults.string(forKey: stagedKey), let version = defaults.string(forKey: stagedVersionKey) else { return nil }
-        guard Version(version) > Version(current), fm.fileExists(atPath: path) else {
+        guard SelfUpdate.isNewer(version, than: current), fm.fileExists(atPath: path) else {
             clear(defaults: defaults, fm: fm)
             return nil
         }

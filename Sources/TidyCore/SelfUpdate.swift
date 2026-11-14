@@ -51,8 +51,39 @@ public enum SelfUpdate {
     }
 
     public static func outcome(current: String, latest: Release?) -> Outcome {
-        guard let latest, Version(latest.version) > Version(current) else { return .upToDate }
+        guard let latest, isNewer(latest.version, than: current) else { return .upToDate }
         return .available(latest)
+    }
+
+    /// Release order of TidyMac's own versions: 1.0.0-rc.1 < 1.0.0-rc.2 < 1.0.0 < 1.0.1. `Version` ignores a suffix, which
+    /// suits other apps' build numbers but would make a release candidate look equal to its final release.
+    public static func isNewer(_ latest: String, than current: String) -> Bool {
+        let (l, c) = (split(latest), split(current))
+        if Version(l.core) != Version(c.core) { return Version(l.core) > Version(c.core) }
+        switch (l.pre, c.pre) {
+        case (nil, nil): return false
+        case (nil, _): return true
+        case (_, nil): return false
+        case (let a?, let b?): return precedes(b, a)
+        }
+    }
+
+    private static func split(_ version: String) -> (core: String, pre: [String]?) {
+        guard let dash = version.firstIndex(of: "-") else { return (version, nil) }
+        return (String(version[..<dash]), version[version.index(after: dash)...].split(separator: ".").map(String.init))
+    }
+
+    /// Pre-release identifiers: numbers compare as numbers and come before words, and a shorter list comes first.
+    private static func precedes(_ a: [String], _ b: [String]) -> Bool {
+        for (x, y) in zip(a, b) where x != y {
+            switch (Int(x), Int(y)) {
+            case (let m?, let n?): return m < n
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case (nil, nil): return x < y
+            }
+        }
+        return a.count < b.count
     }
 
     public static func check(current: String = currentVersion ?? "0") async throws -> Outcome {
