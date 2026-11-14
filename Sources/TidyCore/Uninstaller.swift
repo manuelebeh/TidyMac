@@ -77,13 +77,38 @@ public struct Leftover: Identifiable, Hashable, Sendable {
 public enum Uninstaller {
     static let pluginExtensions: Set<String> = ["component", "vst", "vst3", "aaxplugin"]
 
-    /// Apps in /Applications and ~/Applications (one folder down for suites and Setapp), Steam games and audio plug-ins.
+    /// Settings › Applications › Where TidyMac looks for apps: folders the user added, as paths.
+    public static let extraFoldersKey = "TidyMac.uninstaller.folders"
+
+    public static func extraFolders(_ d: UserDefaults = .standard) -> [URL] {
+        (d.stringArray(forKey: extraFoldersKey) ?? []).map { URL(fileURLWithPath: $0) }
+    }
+
+    /// A folder that holds apps and may be searched: in the home folder (not the home folder itself), or on a drive.
+    /// Anything else is where removals are refused anyway.
+    public static func canSearch(_ folder: URL, home: URL = Paths.home) -> Bool {
+        let path = folder.standardizedFileURL.path, h = home.standardizedFileURL.path
+        guard path != h, path != "/", RemovalGuard.refusal(for: folder, home: home) == nil else { return false }
+        return path.hasPrefix(h + "/") || RemovalGuard.applicationRoots.contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+
+    /// The Applications folder of every drive that is plugged in.
+    static func driveFolders(volumes: URL = URL(fileURLWithPath: "/Volumes"), fm: FileManager = .default) -> [URL] {
+        ((try? fm.contentsOfDirectory(at: volumes, includingPropertiesForKeys: nil)) ?? [])
+            .map { $0.appendingPathComponent("Applications") }
+            .filter { var isDir: ObjCBool = false; return fm.fileExists(atPath: $0.path, isDirectory: &isDir) && isDir.boolValue }
+    }
+
+    /// Apps in /Applications and ~/Applications (one folder down for suites and Setapp), in the folders the user added and
+    /// on plugged-in drives, plus Steam games and audio plug-ins.
     public static func installedApps(home: URL = Paths.home, system: URL = URL(fileURLWithPath: "/"),
+                                     extraFolders: [URL] = Uninstaller.extraFolders(), drives: [URL]? = nil,
                                      fm: FileManager = .default) -> [InstalledApp] {
         let kids = { (d: URL) in (try? fm.contentsOfDirectory(at: d, includingPropertiesForKeys: nil)) ?? [] }
         let dirs = [system.appendingPathComponent("Applications"), home.appendingPathComponent("Applications")]
+            + extraFolders.filter { canSearch($0, home: home) } + (drives ?? driveFolders(fm: fm))
         // Suites such as Adobe's install their apps one folder down.
-        var bundles = dirs.flatMap { d in
+        var bundles = Array(Set(dirs.map(\.standardizedFileURL))).flatMap { d in
             kids(d).flatMap { k in k.pathExtension == "app" ? [k] : kids(k).filter { $0.pathExtension == "app" } }
         }
         bundles += kids(home.appendingPathComponent("Library/Application Support/Steam/steamapps/common"))
