@@ -6,7 +6,7 @@ import UserNotifications
 struct SettingsPage: View {
     @ObservedObject var app: AppState
     private enum Tab: String, CaseIterable, Identifiable {
-        case general, notifications, scanning, applications, automations, ignoreList, updates
+        case general, scanning, applications, notifications, automations
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -15,8 +15,6 @@ struct SettingsPage: View {
             case .scanning: String(localized: "Scanning")
             case .applications: String(localized: "Applications")
             case .automations: String(localized: "Automations")
-            case .ignoreList: String(localized: "Ignore List")
-            case .updates: String(localized: "Updates")
             }
         }
         var symbol: String {
@@ -26,8 +24,6 @@ struct SettingsPage: View {
             case .scanning: "magnifyingglass"
             case .applications: "app.badge.checkmark"
             case .automations: "clock.arrow.circlepath"
-            case .ignoreList: "eye.slash"
-            case .updates: "arrow.down.circle"
             }
         }
     }
@@ -62,8 +58,6 @@ struct SettingsPage: View {
                 case .scanning: ScanSettingsView()
                 case .applications: ApplicationSettingsView()
                 case .automations: AutomationSettingsView()
-                case .ignoreList: IgnoreListSettingsView()
-                case .updates: UpdateSettingsView()
                 }
             }
             .frame(maxWidth: 760, maxHeight: .infinity, alignment: .top)
@@ -73,7 +67,7 @@ struct SettingsPage: View {
     }
 }
 
-/// Settings › Updates. Asks GitHub only when requested, or once a day if that is turned on, and never installs anything.
+/// The Updates sections of Settings › General. Asks GitHub only when requested, or once a day if that is turned on, and never installs anything.
 struct UpdateSettingsView: View {
     private enum Status: Equatable { case idle, checking, failed, finished(SelfUpdate.Outcome) }
 
@@ -89,7 +83,7 @@ struct UpdateSettingsView: View {
     }
 
     var body: some View {
-        Form {
+        Group {
             Section {
                 LabeledContent("Version", value: versionLabel)
                 HStack {
@@ -100,6 +94,8 @@ struct UpdateSettingsView: View {
                 if let installError { Text(installError).font(.caption).foregroundStyle(.red) }
                 Toggle("Check for new versions once a day", isOn: $checksDaily)
                 Toggle("Install new versions automatically", isOn: $installsAutomatically).disabled(!checksDaily)
+            } header: {
+                Text("Updates")
             } footer: {
                 Text("A check asks GitHub for the latest release of TidyMac and sends nothing about your Mac. An automatic install downloads the signed release, checks it was made by the same developer, and swaps it in the next time you quit TidyMac.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -109,8 +105,6 @@ struct UpdateSettingsView: View {
                 Link("Report a problem", destination: SelfUpdate.issuesPage)
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
     }
 
     @ViewBuilder private var statusView: some View {
@@ -168,10 +162,7 @@ struct NotificationSettingsView: View {
     @AppStorage("\(k).smartCareInterval") private var smartCareInterval = d.smartCareInterval
     @AppStorage("\(k).hungApps") private var hungApps = d.hungApps
     @AppStorage("\(k).heavyChrome") private var heavyChrome = d.heavyChrome
-    @AppStorage(GeneralSettings.cleanOnEjectKey) private var cleanOnEject = false
 
-    @State private var openAtLogin = HealthMonitor.opensAtLogin
-    @State private var loginError: String?
     @State private var authorization: UNAuthorizationStatus?
 
     private let freeSpaceOptions = [5, 10, 20, 50].map { $0 * 1_000_000_000 }
@@ -224,19 +215,6 @@ struct NotificationSettingsView: View {
             } footer: {
                 Text("Checks launch agents and daemons every 15 minutes while TidyMac or its menu is running.")
                     .font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                Toggle("Open at Login", isOn: Binding(get: { openAtLogin }, set: { on in
-                    do { try HealthMonitor.setOpensAtLogin(on); loginError = nil } catch { loginError = error.localizedDescription }
-                    openAtLogin = HealthMonitor.opensAtLogin
-                }))
-                if let loginError { Text(loginError).font(.caption).foregroundStyle(.red) }
-                described(String(localized: "Clean up junk automatically on ejection"), isOn: $cleanOnEject,
-                          String(localized: "Ejecting a drive from the menu first empties that drive's Trash. Those files are deleted for good."))
-            } header: {
-                Text("Menu")
-            } footer: {
-                Text("Open at Login keeps the menu and its alerts running after a restart.").font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -353,9 +331,22 @@ struct IgnoreListSettingsView: View {
 /// Settings › Scanning: modules for Full Scan, categories for Cleanup.
 struct ScanSettingsView: View {
     @State private var settings = ScanSettings.load()
+    @State private var ignored = IgnoreList.entries().count
+    @State private var showIgnoreList = false
 
     var body: some View {
         Form {
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Ignore List")
+                        Text("Items you excluded from scan results.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text("\(ignored)").foregroundStyle(.secondary).monospacedDigit()
+                    Button("Manage...") { showIgnoreList = true }
+                }
+            }
             Section {
                 ForEach(ScanSettings.smartCareModules, id: \.id) { m in
                     toggle(m.title, isOn: !settings.disabledSmartCare.contains(m.id),
@@ -383,6 +374,18 @@ struct ScanSettingsView: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .onChange(of: settings) { $0.save() }
+        .sheet(isPresented: $showIgnoreList, onDismiss: { ignored = IgnoreList.entries().count }) {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Ignore List").font(.system(size: 17, weight: .semibold))
+                    Spacer()
+                    Button("Done") { showIgnoreList = false }.keyboardShortcut(.defaultAction)
+                }
+                .padding([.horizontal, .top], 20)
+                IgnoreListSettingsView()
+            }
+            .frame(width: 720, height: 480)
+        }
     }
 
     /// The last module or category that is still on cannot be turned off: a scan of nothing would look like a clean Mac.
@@ -401,6 +404,9 @@ struct GeneralSettingsView: View {
     @AppStorage(GeneralSettings.showInMenuBarKey) private var showInMenuBar = true
     @AppStorage(GeneralSettings.assistantKey) private var assistant = true
     @AppStorage(GeneralSettings.appearanceKey) private var appearance = GeneralSettings.Appearance.system.rawValue
+    @AppStorage(GeneralSettings.cleanOnEjectKey) private var cleanOnEject = false
+    @State private var openAtLogin = HealthMonitor.opensAtLogin
+    @State private var loginError: String?
     @State private var fullDiskAccess = Permissions.hasFullDiskAccess
 
     var body: some View {
@@ -422,11 +428,27 @@ struct GeneralSettingsView: View {
                 Picker("Reduce Motion:", selection: $reduceMotion) {
                     ForEach(GeneralSettings.ReduceMotion.allCases, id: \.self) { Text($0.title).tag($0.rawValue) }
                 }
+                Toggle("Show Assistant recommendations", isOn: $assistant)
+            }
+            Section {
+                Toggle("Open at Login", isOn: Binding(get: { openAtLogin }, set: { on in
+                    do { try HealthMonitor.setOpensAtLogin(on); loginError = nil } catch { loginError = error.localizedDescription }
+                    openAtLogin = HealthMonitor.opensAtLogin
+                }))
+                if let loginError { Text(loginError).font(.caption).foregroundStyle(.red) }
                 Toggle("Show TidyMac in the menu bar", isOn: $showInMenuBar)
                     .onChange(of: showInMenuBar) { _ in TrayController.updateVisibility(); AppDelegate.updateDockIcon() }
                 Toggle("Keep icon in Dock when TidyMac is not open", isOn: $keepInDock)
                     .onChange(of: keepInDock) { _ in AppDelegate.updateDockIcon() }
-                Toggle("Show Assistant recommendations", isOn: $assistant)
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle("Clean up junk automatically on ejection", isOn: $cleanOnEject)
+                    Text("Ejecting a drive from the menu first empties that drive's Trash. Those files are deleted for good.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Menu")
+            } footer: {
+                Text("Open at Login keeps the menu and its alerts running after a restart.").font(.caption).foregroundStyle(.secondary)
             }
             Section("Full Disk Access") {
                 HStack {
@@ -436,6 +458,7 @@ struct GeneralSettingsView: View {
                     if !fullDiskAccess { Button("Enable") { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) } }
                 }
             }
+            UpdateSettingsView()
             if Bundle.main.bundleIdentifier != nil {
                 Section {
                     HStack {

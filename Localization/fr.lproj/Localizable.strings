@@ -847,3 +847,5 @@
 "TidyMac only looks in your home folder and on drives." = "TidyMac ne cherche que dans votre dossier personnel et sur les disques.";
 "Uninstall from Finder's right-click menu" = "Désinstaller depuis le clic droit du Finder";
 "Where TidyMac looks for apps" = "Où TidyMac cherche les apps";
+"Items you excluded from scan results." = "Éléments exclus des résultats de scan.";
+"Manage..." = "Gérer...";
