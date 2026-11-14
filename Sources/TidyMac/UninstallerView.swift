@@ -242,7 +242,14 @@ struct UninstallerSheet: View {
         Task {
             let r = await Task.detached { await Executor.run([bundle] + files) }.value
             message = r.failed.isEmpty ? String(localized: "\(a.name) removed, \(formatSize(r.freed)) freed") : String(localized: "\(r.failed.count) items could not be removed")
-            if r.succeeded.contains(where: { $0.url == a.url }) { apps.removeAll { $0.id == a.id }; select(nil) }
+            if r.succeeded.contains(where: { $0.url == a.url }) {
+                apps.removeAll { $0.id == a.id }; select(nil)
+                // TidyMac removed itself: nothing is left to keep running.
+                if a.url.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    NSApp.terminate(nil)
+                }
+            }
         }
     }
 }

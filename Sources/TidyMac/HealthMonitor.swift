@@ -95,11 +95,19 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
 
     /// Settings › Updates, when the daily check is on. A failed check stays silent until the next one.
     private func announceUpdate() async {
-        guard case .available(let release)? = try? await SelfUpdate.check(), SelfUpdate.shouldAnnounce(release) else { return }
+        guard case .available(let release)? = try? await SelfUpdate.check() else { return }
+        // With automatic installs the update is downloaded and checked now, and lands when TidyMac is next quit.
+        var staged = false
+        if GeneralSettings.installsUpdates(), release.archive != nil { staged = (try? await UpdateInstaller.stage(release)) != nil }
+        guard SelfUpdate.shouldAnnounce(release) else { return }
         let content = UNMutableNotificationContent()
         content.title = String(localized: "TidyMac \(release.version) is available")
-        content.body = String(localized: "Click to open the download page.")
-        content.userInfo = ["open": release.page.absoluteString]
+        if staged {
+            content.body = String(localized: "It will be installed the next time you quit TidyMac.")
+        } else {
+            content.body = String(localized: "Click to open the download page.")
+            content.userInfo = ["open": release.page.absoluteString]
+        }
         guard let center else { print("alert: \(content.title) - \(content.body)"); return }
         try? await center.add(UNNotificationRequest(identifier: "update:\(release.version)", content: content, trigger: nil))
     }

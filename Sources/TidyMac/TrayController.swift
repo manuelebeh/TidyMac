@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import TidyCore
 
 /// The menu bar item and its panel. SwiftUI's MenuBarExtra window grows with its content but never shrinks back,
 /// which left an invisible strip under the menu, so TidyMac shows its own panel, hanging under the menu bar item
@@ -40,6 +41,7 @@ final class TrayController: NSObject {
         item.button?.target = self
         item.button?.action = #selector(toggle)
         updateIcon()
+        updateVisibility()
         // Whatever resizes the panel, its top stays under the menu bar.
         NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: panel, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -52,6 +54,15 @@ final class TrayController: NSObject {
     }
 
     var isOpen: Bool { panel.isVisible }
+
+    /// Settings › General › Show TidyMac in the menu bar.
+    static func updateVisibility() { shared?.updateVisibility() }
+
+    private func updateVisibility() {
+        let shown = GeneralSettings.showsMenuBarItem()
+        if !shown { close() }
+        item.isVisible = shown
+    }
 
     @objc func toggle() { isOpen ? close() : open() }
 

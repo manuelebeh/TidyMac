@@ -4,6 +4,7 @@ import UserNotifications
 
 /// The Settings page inside the main window: a row of sections, and the form of the one picked.
 struct SettingsPage: View {
+    @ObservedObject var app: AppState
     private enum Tab: String, CaseIterable, Identifiable {
         case general, notifications, scanning, automations, ignoreList, updates
         var id: String { rawValue }
@@ -54,7 +55,7 @@ struct SettingsPage: View {
             .padding(.bottom, 8)
             Group {
                 switch tab {
-                case .general: GeneralSettingsView()
+                case .general: GeneralSettingsView(app: app)
                 case .notifications: NotificationSettingsView()
                 case .scanning: ScanSettingsView()
                 case .automations: AutomationSettingsView()
@@ -74,7 +75,10 @@ struct UpdateSettingsView: View {
     private enum Status: Equatable { case idle, checking, failed, finished(SelfUpdate.Outcome) }
 
     @AppStorage(GeneralSettings.checkUpdatesKey) private var checksDaily = false
+    @AppStorage(GeneralSettings.installUpdatesKey) private var installsAutomatically = false
     @State private var status = Status.idle
+    @State private var installing = false
+    @State private var installError: String?
 
     private var versionLabel: String {
         guard let version = SelfUpdate.currentVersion else { return String(localized: "Development build") }
@@ -90,9 +94,11 @@ struct UpdateSettingsView: View {
                     Spacer()
                     Button("Check Now") { Task { await check() } }.disabled(status == .checking)
                 }
+                if let installError { Text(installError).font(.caption).foregroundStyle(.red) }
                 Toggle("Check for new versions once a day", isOn: $checksDaily)
+                Toggle("Install new versions automatically", isOn: $installsAutomatically).disabled(!checksDaily)
             } footer: {
-                Text("A check asks GitHub for the latest release of TidyMac and sends nothing about your Mac. New versions are installed by you, never automatically.")
+                Text("A check asks GitHub for the latest release of TidyMac and sends nothing about your Mac. An automatic install downloads the signed release, checks it was made by the same developer, and swaps it in the next time you quit TidyMac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
@@ -110,7 +116,28 @@ struct UpdateSettingsView: View {
         case .checking: ProgressView().controlSize(.small)
         case .failed: Label("Could not reach GitHub. Try again later.", systemImage: "exclamationmark.triangle")
         case .finished(.upToDate): Label("TidyMac is up to date.", systemImage: "checkmark.circle")
-        case .finished(.available(let release)): Link("Download TidyMac \(release.version)", destination: release.page)
+        case .finished(.available(let release)):
+            HStack {
+                Link("Download TidyMac \(release.version)", destination: release.page)
+                if release.archive != nil {
+                    Spacer()
+                    Button("Install and Restart") { Task { await install(release) } }.disabled(installing)
+                }
+            }
+        }
+    }
+
+    private func install(_ release: SelfUpdate.Release) async {
+        installing = true; installError = nil
+        defer { installing = false }
+        do {
+            try await UpdateInstaller.stage(release)
+            UpdateInstaller.apply(relaunch: true)
+            NSApp.terminate(nil)
+        } catch UpdateInstaller.Failure.folderNotWritable {
+            installError = String(localized: "TidyMac cannot replace itself in this folder. Download the update instead.")
+        } catch {
+            installError = String(localized: "The update could not be installed. Download it from the project page instead.")
         }
     }
 
@@ -370,19 +397,36 @@ struct ScanSettingsView: View {
 
 /// Settings › General.
 struct GeneralSettingsView: View {
+    @ObservedObject var app: AppState
     @AppStorage(GeneralSettings.soundsKey) private var sounds = true
     @AppStorage(GeneralSettings.reduceMotionKey) private var reduceMotion = GeneralSettings.ReduceMotion.system.rawValue
     @AppStorage(GeneralSettings.keepInDockKey) private var keepInDock = true
+    @AppStorage(GeneralSettings.showInMenuBarKey) private var showInMenuBar = true
     @AppStorage(GeneralSettings.assistantKey) private var assistant = true
+    @AppStorage(GeneralSettings.appearanceKey) private var appearance = GeneralSettings.Appearance.system.rawValue
     @State private var fullDiskAccess = Permissions.hasFullDiskAccess
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                HStack(spacing: 14) {
+                    ForEach(GeneralSettings.Appearance.allCases, id: \.self) { mode in
+                        AppearanceTile(mode: mode, selected: appearance == mode.rawValue) {
+                            appearance = mode.rawValue
+                            AppDelegate.applyAppearance()
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+            }
             Section("General") {
                 Toggle("Play sounds for main TidyMac actions", isOn: $sounds)
                 Picker("Reduce Motion:", selection: $reduceMotion) {
                     ForEach(GeneralSettings.ReduceMotion.allCases, id: \.self) { Text($0.title).tag($0.rawValue) }
                 }
+                Toggle("Show TidyMac in the menu bar", isOn: $showInMenuBar)
+                    .onChange(of: showInMenuBar) { _ in TrayController.updateVisibility(); AppDelegate.updateDockIcon() }
                 Toggle("Keep icon in Dock when TidyMac is not open", isOn: $keepInDock)
                     .onChange(of: keepInDock) { _ in AppDelegate.updateDockIcon() }
                 Toggle("Show Assistant recommendations", isOn: $assistant)
@@ -395,12 +439,80 @@ struct GeneralSettingsView: View {
                     if !fullDiskAccess { Button("Enable") { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) } }
                 }
             }
+            if Bundle.main.bundleIdentifier != nil {
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Uninstall TidyMac")
+                            Text("Removes the app and the files it keeps, such as its settings and caches.").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Uninstall...") { app.uninstallTarget = Bundle.main.bundleURL }
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         // Picks up access granted in System Settings while this window was open.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             fullDiskAccess = Permissions.hasFullDiskAccess
+        }
+    }
+}
+
+/// A small preview of the window in one appearance, with its name under it.
+struct AppearanceTile: View {
+    let mode: GeneralSettings.Appearance
+    let selected: Bool
+    let action: () -> Void
+
+    private func preview(dark: Bool) -> some View {
+        let bg = dark ? Color(white: 0.14) : Color(white: 0.96)
+        let side = dark ? Color(white: 0.2) : Color(white: 0.88)
+        let bar = dark ? Color.white.opacity(0.22) : Color.black.opacity(0.16)
+        return ZStack(alignment: .topLeading) {
+            bg
+            HStack(spacing: 0) {
+                side.frame(width: 22)
+                VStack(alignment: .leading, spacing: 5) {
+                    Capsule().fill(DS.accent).frame(width: 30, height: 5)
+                    Capsule().fill(bar).frame(width: 50, height: 4)
+                    Capsule().fill(bar).frame(width: 38, height: 4)
+                }
+                .padding(8)
+            }
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Group {
+                    if mode == .system {
+                        preview(dark: false).overlay(preview(dark: true).mask(HalfMask()))
+                    } else {
+                        preview(dark: mode == .dark)
+                    }
+                }
+                .frame(width: 92, height: 60)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(selected ? DS.accent : Color.secondary.opacity(0.35), lineWidth: selected ? 2 : 1))
+                Text(mode.title).font(.system(size: 12, weight: selected ? .semibold : .regular))
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(mode.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// The right half, for the System tile.
+    private struct HalfMask: Shape {
+        func path(in rect: CGRect) -> Path {
+            var p = Path()
+            p.move(to: CGPoint(x: rect.maxX, y: rect.minY)); p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY)); p.closeSubpath()
+            return p
         }
     }
 }

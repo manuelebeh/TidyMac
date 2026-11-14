@@ -38,7 +38,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The menu bar item (`TrayController`), which keeps running after the main window closes.
     @MainActor private var tray: TrayController?
 
+    /// Light or dark for every window and the menu bar panel; System follows macOS.
+    @MainActor static func applyAppearance() {
+        switch GeneralSettings.appearance() {
+        case .system: NSApp.appearance = nil
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+
+    /// An update that was downloaded in the background is swapped in once TidyMac has quit.
+    func applicationWillTerminate(_ notification: Notification) {
+        if GeneralSettings.installsUpdates() { UpdateInstaller.apply(relaunch: false) }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated { Self.applyAppearance() }
         // `--snapshot-tray <png>` renders the menu bar panel to an image and quits (for visual checks).
         let args = ProcessInfo.processInfo.arguments
         // `--scan <module>` prints what a module's scan finds and quits. It never runs any action.
@@ -182,7 +197,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// "Keep icon in Dock when TidyMac is not open". Without it, closing the main window leaves only the menu bar item.
     @MainActor static func updateDockIcon(closing: NSWindow? = nil) {
         let mainOpen = NSApp.windows.contains { $0 !== closing && $0.isVisible && $0.identifier?.rawValue.hasPrefix("main") == true }
-        let policy: NSApplication.ActivationPolicy = mainOpen || GeneralSettings.keepsDockIcon() ? .regular : .accessory
+        // Without the menu bar item and the Dock icon there would be no way back in.
+        let reachable = GeneralSettings.keepsDockIcon() || !GeneralSettings.showsMenuBarItem()
+        let policy: NSApplication.ActivationPolicy = mainOpen || reachable ? .regular : .accessory
         if NSApp.activationPolicy() != policy { NSApp.setActivationPolicy(policy) }
     }
 
@@ -254,7 +271,7 @@ struct RootView: View {
     }
 
     @ViewBuilder private var content: some View {
-        if app.showSettings { SettingsPage() } else { module }
+        if app.showSettings { SettingsPage(app: app) } else { module }
     }
 
     @ViewBuilder private var module: some View {
