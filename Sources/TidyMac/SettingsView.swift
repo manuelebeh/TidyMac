@@ -6,13 +6,14 @@ import UserNotifications
 struct SettingsPage: View {
     @ObservedObject var app: AppState
     private enum Tab: String, CaseIterable, Identifiable {
-        case general, notifications, scanning, automations, ignoreList, updates
+        case general, notifications, scanning, applications, automations, ignoreList, updates
         var id: String { rawValue }
         var title: String {
             switch self {
             case .general: String(localized: "General")
             case .notifications: String(localized: "Notifications")
             case .scanning: String(localized: "Scanning")
+            case .applications: String(localized: "Applications")
             case .automations: String(localized: "Automations")
             case .ignoreList: String(localized: "Ignore List")
             case .updates: String(localized: "Updates")
@@ -23,6 +24,7 @@ struct SettingsPage: View {
             case .general: "gearshape"
             case .notifications: "bell"
             case .scanning: "magnifyingglass"
+            case .applications: "app.badge.checkmark"
             case .automations: "clock.arrow.circlepath"
             case .ignoreList: "eye.slash"
             case .updates: "arrow.down.circle"
@@ -58,6 +60,7 @@ struct SettingsPage: View {
                 case .general: GeneralSettingsView(app: app)
                 case .notifications: NotificationSettingsView()
                 case .scanning: ScanSettingsView()
+                case .applications: ApplicationSettingsView()
                 case .automations: AutomationSettingsView()
                 case .ignoreList: IgnoreListSettingsView()
                 case .updates: UpdateSettingsView()
@@ -165,7 +168,6 @@ struct NotificationSettingsView: View {
     @AppStorage("\(k).smartCareInterval") private var smartCareInterval = d.smartCareInterval
     @AppStorage("\(k).hungApps") private var hungApps = d.hungApps
     @AppStorage("\(k).heavyChrome") private var heavyChrome = d.heavyChrome
-    @AppStorage("\(k).trashedApps") private var trashedApps = d.trashedApps
     @AppStorage(GeneralSettings.cleanOnEjectKey) private var cleanOnEject = false
 
     @State private var openAtLogin = HealthMonitor.opensAtLogin
@@ -211,11 +213,6 @@ struct NotificationSettingsView: View {
                 Toggle("Warn when connected device batteries are running low", isOn: $bluetooth)
             }
             Section("Applications") {
-                described(String(localized: "Offer to uninstall applications correctly"), isOn: $trashedApps,
-                          String(localized: "If you put an application into Trash, you will be offered to remove the files it left behind."))
-                if trashedApps, SystemMonitor.trashedApps() == nil {
-                    Text("Allow Full Disk Access so TidyMac can see apps in the Trash.").font(.caption).foregroundStyle(.secondary)
-                }
                 described(String(localized: "Notify about hung applications"), isOn: $hungApps,
                           String(localized: "If any of your apps stop responding, force quit them right from the notification."))
                 Toggle("Notify when Chrome uses too much memory", isOn: $heavyChrome)
@@ -515,4 +512,81 @@ struct AppearanceTile: View {
             return p
         }
     }
+}
+
+/// Settings › Applications: how the Uninstaller finds apps and what happens when one is deleted by hand.
+struct ApplicationSettingsView: View {
+    private static let trashedKey = "\(HealthAlerts.Settings.defaultsKey).trashedApps"
+    @AppStorage(trashedKey) private var reviewLeftovers = HealthAlerts.Settings().trashedApps
+    @State private var folders = Uninstaller.extraFolders().map(\.path)
+    @State private var refused = false
+
+    var body: some View {
+        Form {
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Uninstall from Finder's right-click menu")
+                        Text("Right-click an app, then choose Services > Uninstall with TidyMac. If it is missing, turn it on in System Settings > Keyboard > Keyboard Shortcuts > Services.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Button("Open Settings") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                    }
+                }
+            }
+            Section {
+                folderRow(String(localized: "Applications"), path: "/Applications", removable: false)
+                folderRow("~/Applications", path: Paths.home("Applications").path, removable: false)
+                ForEach(folders, id: \.self) { folderRow(Paths.abbreviate(URL(fileURLWithPath: $0)), path: $0, removable: true) }
+                HStack {
+                    Button("Add Folder...") { addFolder() }
+                    if refused { Text("TidyMac only looks in your home folder and on drives.").font(.caption).foregroundStyle(.red) }
+                }
+            } header: {
+                Text("Where TidyMac looks for apps")
+            } footer: {
+                Text("Drives you plug in are included automatically.").font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle("Review leftovers when an app is deleted", isOn: $reviewLeftovers)
+                    Text("If you put an application into Trash, you will be offered to remove the files it left behind.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if reviewLeftovers, SystemMonitor.trashedApps() == nil {
+                    Text("Allow Full Disk Access so TidyMac can see apps in the Trash.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+    }
+
+    private func folderRow(_ title: String, path: String, removable: Bool) -> some View {
+        HStack {
+            Label(title, systemImage: "folder")
+            Spacer()
+            if removable {
+                Button { folders.removeAll { $0 == path }; save() } label: { Image(systemName: "minus.circle") }
+                    .buttonStyle(.plain).help("Stop looking here")
+            }
+        }
+    }
+
+    private func addFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = true
+        panel.prompt = String(localized: "Add")
+        guard panel.runModal() == .OK else { return }
+        refused = false
+        for url in panel.urls {
+            if Uninstaller.canSearch(url) { if !folders.contains(url.standardizedFileURL.path) { folders.append(url.standardizedFileURL.path) } }
+            else { refused = true }
+        }
+        save()
+    }
+
+    private func save() { UserDefaults.standard.set(folders, forKey: Uninstaller.extraFoldersKey) }
 }

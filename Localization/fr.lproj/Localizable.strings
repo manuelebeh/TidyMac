@@ -446,7 +446,6 @@
 "Notify when too low on free RAM" = "Signaler lorsque la RAM libre est trop faible";
 "OK" = "OK";
 "Off" = "Désactivé";
-"Offer to uninstall applications correctly" = "Proposer de désinstaller correctement les applications";
 "Old" = "Ancien";
 "On a Schedule" = "Selon un calendrier";
 "On day" = "Le jour";
@@ -840,3 +839,11 @@
 "The update could not be installed. Download it from the project page instead." = "La mise à jour n’a pas pu être installée. Téléchargez-la depuis la page du projet.";
 "TidyMac cannot replace itself in this folder. Download the update instead." = "TidyMac ne peut pas se remplacer dans ce dossier. Téléchargez plutôt la mise à jour.";
 "Uninstall TidyMac" = "Désinstaller TidyMac";
+"Add Folder..." = "Ajouter un dossier...";
+"Drives you plug in are included automatically." = "Les disques que vous branchez sont inclus automatiquement.";
+"Review leftovers when an app is deleted" = "Vérifier les restes quand une app est supprimée";
+"Right-click an app, then choose Services > Uninstall with TidyMac. If it is missing, turn it on in System Settings > Keyboard > Keyboard Shortcuts > Services." = "Faites un clic droit sur une app, puis choisissez Services > Uninstall with TidyMac. S’il manque, activez-le dans Réglages Système > Clavier > Raccourcis clavier > Services.";
+"Stop looking here" = "Ne plus chercher ici";
+"TidyMac only looks in your home folder and on drives." = "TidyMac ne cherche que dans votre dossier personnel et sur les disques.";
+"Uninstall from Finder's right-click menu" = "Désinstaller depuis le clic droit du Finder";
+"Where TidyMac looks for apps" = "Où TidyMac cherche les apps";
