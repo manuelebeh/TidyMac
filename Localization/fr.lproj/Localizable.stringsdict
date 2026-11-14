@@ -162,22 +162,6 @@
 			<string>%lld analyses effectuées</string>
 		</dict>
 	</dict>
-	<key>%lld selected · %@</key>
-	<dict>
-		<key>NSStringLocalizedFormatKey</key>
-		<string>%1$#@n@ · %2$@</string>
-		<key>n</key>
-		<dict>
-			<key>NSStringFormatSpecTypeKey</key>
-			<string>NSStringPluralRuleType</string>
-			<key>NSStringFormatValueTypeKey</key>
-			<string>lld</string>
-			<key>one</key>
-			<string>%lld sélectionné</string>
-			<key>other</key>
-			<string>%lld sélectionnés</string>
-		</dict>
-	</dict>
 	<key>%lld suspicious items found</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
@@ -208,6 +192,54 @@
 			<string>%lld élément supprimé.</string>
 			<key>other</key>
 			<string>%lld éléments supprimés.</string>
+		</dict>
+	</dict>
+	<key>%lld items found</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld élément trouvé</string>
+			<key>other</key>
+			<string>%lld éléments trouvés</string>
+		</dict>
+	</dict>
+	<key>%lld items · %@ found</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@n@ · %2$@ trouvés</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld élément</string>
+			<key>other</key>
+			<string>%lld éléments</string>
+		</dict>
+	</dict>
+	<key>%lld selected</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld sélectionné</string>
+			<key>other</key>
+			<string>%lld sélectionnés</string>
 		</dict>
 	</dict>
 </dict>

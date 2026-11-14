@@ -260,7 +260,7 @@ public struct CleanupEngine: ScanEngine {
 
     // MARK: AI Clutter
 
-    /// Only caches, logs and temp folders — never config, history or project memory.
+    /// Only caches, logs and temp folders - never config, history or project memory.
     static let aiPaths: [(String, String)] = [
         ("Library/Caches/com.anthropic.claudefordesktop", "Claude"),
         ("Library/Caches/com.anthropic.claudefordesktop.ShipIt", "Claude"),

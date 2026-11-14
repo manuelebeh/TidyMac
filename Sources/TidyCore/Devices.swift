@@ -92,7 +92,7 @@ extension SystemMonitor {
     public struct BluetoothDevice: Identifiable, Sendable, Equatable {
         public var id: String { name }
         public let name: String
-        /// "Mouse", "Keyboard", "Headphones"…, as System Information reports it.
+        /// "Mouse", "Keyboard", "Headphones"..., as System Information reports it.
         public let kind: String?
         /// e.g. [("Left", 80), ("Right", 75), ("Case", 40)] for AirPods, [("", 60)] for a mouse. Empty: no battery data.
         public let batteries: [Battery]

@@ -12,9 +12,7 @@ struct TidyMacApp: App {
     var body: some Scene {
         WindowGroup("TidyMac", id: "main") {
             RootView(app: app)
-                .frame(minWidth: 1000, idealWidth: 1200, minHeight: 640, idealHeight: 720)
-                // Sets the window's appearance, so sheets get a dark background to match their light text.
-                .preferredColorScheme(.dark)
+                .frame(minWidth: 980, idealWidth: 1180, minHeight: 640, idealHeight: 740)
                 // A notification opens tidymac://open/<module>; reuse the open window instead of adding one.
                 .handlesExternalEvents(preferring: ["open", "uninstall"], allowing: ["*"])
                 .onOpenURL { url in
@@ -47,9 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let start = Date()
                 let groups = IgnoreList.apply(await engine.scan { _ in })
                 for g in groups {
-                    print("== \(g.title) — \(g.items.count) items, \(FileSize.format(g.totalSize)), \(g.items.filter(\.selectedByDefault).count) preselected")
+                    print("== \(g.title) - \(g.items.count) items, \(FileSize.format(g.totalSize)), \(g.items.filter(\.selectedByDefault).count) preselected")
                     for item in g.items.prefix(8) {
-                        print("   [\(item.selectedByDefault ? "x" : " ")] \(item.title)\(item.badge.map { " <\($0)>" } ?? "") — \(item.subtitle ?? "") \(item.size.map(FileSize.format) ?? "")")
+                        print("   [\(item.selectedByDefault ? "x" : " ")] \(item.title)\(item.badge.map { " <\($0)>" } ?? "") - \(item.subtitle ?? "") \(item.size.map(FileSize.format) ?? "")")
                     }
                 }
                 print(String(format: "scan took %.1fs", Date().timeIntervalSince(start)))
@@ -91,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let i = args.firstIndex(of: "--snapshot-tray") ?? args.firstIndex(of: "--snapshot-screen-clean"), i + 1 < args.count {
             MainActor.assumeIsolated {
-                // `--snapshot-tray <png> [card] [--light]` opens that card's details (storage, memory, cpu, drives, devices…).
+                // `--snapshot-tray <png> [card] [--light]` opens that card's details (storage, memory, cpu, drives, devices...).
                 let monitor = MonitorModel(background: false)
                 if args[i] == "--snapshot-tray" { monitor.loadAllNow() }
                 let card = i + 2 < args.count ? TrayView.Card(rawValue: args[i + 2]) : nil
@@ -147,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 for d in SystemMonitor.externalDrives() { print("external: \(d.name) \(d.isDiskImage ? "(disk image)" : d.format ?? "") \(FileSize.format(d.available)) free of \(FileSize.format(d.total))") }
                 for b in SystemMonitor.bluetoothDevices() { print("bluetooth: \(b.name) \(b.batteries.map { "\($0.label)\($0.percent)%" })") }
                 var state = HealthAlerts.State()
-                for a in HealthAlerts.conditions(r, settings: .load(), state: &state) { print("  [\(a.kind.rawValue)] \(a.title) — \(a.body)") }
+                for a in HealthAlerts.conditions(r, settings: .load(), state: &state) { print("  [\(a.kind.rawValue)] \(a.title) - \(a.body)") }
                 if Bundle.main.bundleIdentifier != nil {
                     let s = await UNUserNotificationCenter.current().notificationSettings()
                     let names: [UNAuthorizationStatus: String] = [.notDetermined: "not asked yet", .denied: "denied", .authorized: "allowed", .provisional: "provisional"]
@@ -212,25 +210,21 @@ struct RootView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        ZStack {
-            ModuleBackground(module: app.module)
-            HStack(spacing: 0) {
-                Sidebar(selection: $app.module)
-                    .frame(width: 252)
-                Group {
-                    switch app.module {
-                    case .spaceLens: SpaceLensScreen(app: app)
-                    case .activity: ActivityScreen(app: app)
-                    case .myTools: MyToolsScreen(screenCleaning: app.screenCleaning)
-                    default: ModuleScreen(controller: app.controllers[app.module]!)
-                    }
-                }
-                .id(app.module)
-                .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 16)), removal: .opacity))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        HStack(spacing: 0) {
+            Sidebar(app: app)
+                .frame(width: 240)
+            Rectangle().fill(DS.border).frame(width: 1)
+            ZStack {
+                DS.window
+                content
+                    .id(app.module)
+                    .transition(.opacity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .animation(Motion.animation(.easeInOut(duration: 0.35)), value: app.module)
+        .background(DS.window)
+        .ignoresSafeArea()
+        .animation(Motion.animation(.easeInOut(duration: 0.2)), value: app.module)
         .onAppear {
             AppDelegate.mainWindowOpened()
             // The menu bar panel lives outside SwiftUI's scenes and reopens the main window through this.
@@ -246,66 +240,136 @@ struct RootView: View {
             ScreenCleaningSuccess(session: app.screenCleaning)
         }
     }
+
+    @ViewBuilder private var content: some View {
+        switch app.module {
+        case .spaceLens: SpaceLensScreen(app: app)
+        case .activity: ActivityScreen(app: app)
+        case .myTools: MyToolsScreen(screenCleaning: app.screenCleaning)
+        case .smartCare: OverviewScreen(app: app, controller: app.controllers[.smartCare]!)
+        default: ModuleScreen(controller: app.controllers[app.module]!)
+        }
+    }
 }
 
-/// Rows 50 pt tall every 60 pt, a plain glyph per module and a translucent pill under the selection, which slides
-/// to the new row. The selected glyph takes the module's colours.
+/// Grouped navigation: a brand header, sections with their rows (each showing what a scan found), and at the bottom
+/// the Full Disk Access state and Settings.
 struct Sidebar: View {
-    @Binding var selection: Module
-    @Namespace private var pill
-    @State private var hovered: Module?
-    private let main: [Module] = [.smartCare, .cleanup, .protection, .performance, .applications, .clutter, .spaceLens]
+    @ObservedObject var app: AppState
+    @ObservedObject private var access = FullDiskAccessWatcher.shared
+
+    private let sections: [(title: String?, modules: [Module])] = [
+        (nil, [.smartCare]),
+        (String(localized: "Clean"), [.cleanup, .clutter, .applications]),
+        (String(localized: "Protect"), [.protection, .performance]),
+        (String(localized: "Analyze"), [.spaceLens, .activity]),
+    ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // The first row starts 67 pt from the top of the window, title bar included.
-            Spacer().frame(height: 29)
-            ForEach(main) { row($0) }
-            Spacer(minLength: 20)
-            row(.myTools)
-            row(.activity)
-            Spacer().frame(height: 11)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 9) {
+                Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 24, height: 24)
+                Text("TidyMac").font(.system(size: 15, weight: .semibold))
+            }
+            .padding(.leading, 18).padding(.top, 38).padding(.bottom, 18)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let title = section.title {
+                                Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                                    .padding(.leading, 10).padding(.bottom, 3)
+                            }
+                            ForEach(section.modules) { SidebarRow(module: $0, app: app) }
+                        }
+                    }
+                }
+                .padding(.horizontal, 10)
+            }
+
+            VStack(spacing: 6) {
+                accessCard
+                SidebarRow(module: .myTools, app: app)
+                Button { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) } label: {
+                    SidebarLabel(symbol: "gearshape", title: String(localized: "Settings"), badge: nil, selected: false)
+                }.buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10).padding(.bottom, 12)
         }
-        .padding(.horizontal, 16)
-        .overlay(alignment: .trailing) {
-            LinearGradient(colors: [.white.opacity(0), .white.opacity(0.08), .white.opacity(0.08), .white.opacity(0)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(width: 1)
-                .padding(.vertical, 60)
-        }
-        .animation(Motion.animation(.spring(response: 0.38, dampingFraction: 0.82)), value: selection)
-        .animation(Motion.animation(.easeOut(duration: 0.15)), value: hovered)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(DS.sidebar)
     }
 
-    func row(_ m: Module) -> some View {
-        let active = selection == m
-        return Button { selection = m } label: {
-            HStack(spacing: 19) {
-                Image(systemName: m.symbol)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(active ? AnyShapeStyle(LinearGradient(colors: [m.aurora[0], m.aurora[2], m.aurora[4]],
-                                                                            startPoint: .topLeading, endPoint: .bottomTrailing))
-                                            : AnyShapeStyle(.white.opacity(0.85)))
-                    .shadow(color: active ? m.aurora[2].opacity(0.6) : .black.opacity(0.25), radius: active ? 5 : 1, y: 1)
-                    .frame(width: 24, height: 24)
-                Text(m.name).font(.system(size: 14)).foregroundStyle(.white)
-                Spacer()
-            }
-            .padding(.horizontal, 19)
-            .frame(height: 50)
-            .background {
-                if active {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.09))
-                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(
-                            LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.05)], startPoint: .top, endPoint: .bottom)))
-                        .matchedGeometryEffect(id: "selection", in: pill)
-                } else if hovered == m {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.05))
+    private var accessCard: some View {
+        Button { if !access.granted { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) } } label: {
+            HStack(spacing: 10) {
+                Image(systemName: access.granted ? "checkmark.shield.fill" : "lock.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(access.granted ? DS.safe : DS.caution)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(access.granted ? String(localized: "Full scan") : String(localized: "Limited scan"))
+                        .font(.system(size: 12.5, weight: .semibold))
+                    Text(access.granted ? String(localized: "Protected folders included") : String(localized: "Let TidyMac look deeper"))
+                        .font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(1)
                 }
+                Spacer(minLength: 0)
+                if !access.granted { Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary) }
             }
-            .contentShape(Rectangle())
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card()
         }
         .buttonStyle(.plain)
-        .onHover { hovered = $0 ? m : (hovered == m ? nil : hovered) }
+        .padding(.bottom, 6)
+    }
+}
+
+/// One navigation row. It watches its module's controller so the badge shows what the last scan found.
+struct SidebarRow: View {
+    let module: Module
+    @ObservedObject var app: AppState
+    @ObservedObject private var controller: ModuleController
+
+    init(module: Module, app: AppState) {
+        self.module = module
+        self.app = app
+        _controller = ObservedObject(wrappedValue: app.controllers[module]!)
+    }
+
+    private var badge: String? {
+        guard controller.phase == .results, controller.totalSize > 0 else { return nil }
+        return formatSize(controller.totalSize)
+    }
+
+    var body: some View {
+        Button { app.module = module } label: {
+            SidebarLabel(symbol: module.symbol, title: module == .smartCare ? String(localized: "Overview") : module.name,
+                         badge: badge, selected: app.module == module)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct SidebarLabel: View {
+    let symbol: String, title: String
+    let badge: String?
+    let selected: Bool
+    @State private var hover = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol).font(.system(size: 13.5, weight: .medium))
+                .foregroundStyle(selected ? DS.accent : Color.secondary)
+                .frame(width: 20)
+            Text(title).font(.system(size: 13.5, weight: selected ? .semibold : .regular)).lineLimit(1)
+            Spacer(minLength: 4)
+            if let badge { Text(badge).font(.system(size: 11.5)).foregroundStyle(.secondary).monospacedDigit() }
+        }
+        .padding(.horizontal, 10).frame(height: 32)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(selected ? DS.selection : hover ? DS.selection.opacity(0.5) : Color.clear))
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
+        .animation(Motion.animation(.easeOut(duration: 0.12)), value: selected)
     }
 }

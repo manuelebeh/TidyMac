@@ -2,8 +2,8 @@ import SwiftUI
 import Combine
 
 /// The menu bar item and its panel. SwiftUI's MenuBarExtra window grows with its content but never shrinks back,
-/// which left an invisible strip under the menu, so TidyMac shows its own panel, pinned to the top right of the
-/// screen. It closes on a click elsewhere, on the item again, or on Escape.
+/// which left an invisible strip under the menu, so TidyMac shows its own panel, hanging under the menu bar item
+/// (kept inside the screen). It closes on a click elsewhere, on the item again, or on Escape.
 @MainActor
 final class TrayController: NSObject {
     private(set) static weak var shared: TrayController?
@@ -62,8 +62,10 @@ final class TrayController: NSObject {
         let screen = item.button?.window?.screen ?? NSScreen.main
         let visible = screen?.visibleFrame ?? .zero
         top = visible.maxY - Self.margin
-        panel.setFrame(NSRect(x: visible.maxX - Self.margin - size.width, y: visible.maxY - Self.margin - size.height,
-                              width: size.width, height: size.height), display: true)
+        // Centred under the item, then kept inside the screen.
+        let anchor = item.button?.window?.frame.midX ?? visible.maxX
+        let x = min(max(anchor - size.width / 2, visible.minX + Self.margin), visible.maxX - Self.margin - size.width)
+        panel.setFrame(NSRect(x: x, y: visible.maxY - Self.margin - size.height, width: size.width, height: size.height), display: true)
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
         NSAnimationContext.runAnimationGroup { $0.duration = Motion.reduced ? 0 : 0.15; panel.animator().alphaValue = 1 }

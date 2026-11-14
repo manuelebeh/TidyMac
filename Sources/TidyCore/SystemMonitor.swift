@@ -106,7 +106,7 @@ public enum SystemMonitor {
             if isCharged { return String(localized: "Fully charged") }
             if isCharging { return String(localized: "Charging") }
             if isPluggedIn { return String(localized: "Not charging") }
-            guard let m = minutesRemaining else { return String(localized: "Calculating…") }
+            guard let m = minutesRemaining else { return String(localized: "Calculating...") }
             return String(localized: "\(m / 60):\(String(format: "%02d", m % 60)) remaining")
         }
 

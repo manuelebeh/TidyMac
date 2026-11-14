@@ -40,7 +40,7 @@ final class AutomationRunner {
     }
 
     private func post(id: String, title: String, body: String, category: String?, info: [String: String]) {
-        guard let center else { print("automation: \(title) — \(body)"); return }
+        guard let center else { print("automation: \(title) - \(body)"); return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

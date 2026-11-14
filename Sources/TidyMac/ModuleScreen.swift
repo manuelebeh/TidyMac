@@ -13,7 +13,6 @@ final class ModuleController: ObservableObject {
     @Published var groups: [ResultGroup] = []
     @Published var selected: Set<String> = []
     @Published var report: ActionReport?
-    @Published var reviewing = false
     /// Running apps that hold files about to be removed; non-empty shows the quit sheet.
     @Published var appsToQuit: [NSRunningApplication] = []
     @Published var clutterRoot = Paths.home
@@ -124,10 +123,9 @@ struct ModuleScreen: View {
     var module: Module { controller.module }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            if controller.phase == .intro && !access.granted {
-                FullDiskAccessBanner().frame(maxHeight: .infinity, alignment: .top).padding(.top, 40)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            header
+                .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 16)
             Group {
                 switch controller.phase {
                 case .intro: IntroView(controller: controller)
@@ -137,67 +135,72 @@ struct ModuleScreen: View {
                 }
             }
             .id(controller.phase == .running ? .scanning : controller.phase)
-            .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.97)), removal: .opacity))
+            .transition(.opacity)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.bottom, 96)
-            EdgeButton { bottomButton }
         }
-        .animation(Motion.animation(.easeInOut(duration: 0.35)), value: controller.phase)
+        .animation(Motion.animation(.easeInOut(duration: 0.2)), value: controller.phase)
         .onChange(of: access.granted) { if $0 { controller.retryBlockedItems() } }
         .onAppear { if access.granted { controller.retryBlockedItems() } }
-        .sheet(isPresented: $controller.reviewing) { ReviewSheet(controller: controller) }
         .sheet(isPresented: Binding(get: { !controller.appsToQuit.isEmpty }, set: { if !$0 { controller.appsToQuit = [] } })) {
             QuitAppsSheet(apps: controller.appsToQuit, onContinue: controller.continueAfterQuitting,
                           onCancel: { controller.appsToQuit = [] })
         }
     }
 
-    @ViewBuilder var bottomButton: some View {
+    private var subtitle: String? {
         switch controller.phase {
-        case .intro: ScanButton(title: String(localized: "Scan"), module: module) { controller.scan() }
-        case .scanning: ScanButton(title: String(localized: "Stop"), module: module, busy: true) { controller.stop() }
-        case .running: ScanButton(title: "", module: module, busy: true, dimmed: true) {}
         case .results:
-            ScanButton(title: controller.selected.isEmpty ? String(localized: "Scan") : module.actionTitle, module: module,
-                       subtitle: controller.selected.isEmpty ? String(localized: "Nothing selected") :
-                           controller.selectedSize > 0 ? formatSize(controller.selectedSize) : String(localized: "\(controller.selected.count) items")) {
-                controller.selected.isEmpty ? controller.scan() : controller.run()
+            let items = controller.groups.flatMap(\.items)
+            if items.isEmpty { return String(localized: "Your Mac is in great shape!") }
+            return controller.totalSize > 0 ? String(localized: "\(items.count) items · \(formatSize(controller.totalSize)) found") : String(localized: "\(items.count) items found")
+        case .scanning: return controller.progressTitle
+        case .running: return String(localized: "Working on it...")
+        default: return nil
+        }
+    }
+
+    private var header: some View {
+        ScreenHeader(title: module.headline, subtitle: subtitle) {
+            switch controller.phase {
+            case .intro: EmptyView()
+            case .scanning: Button("Stop") { controller.stop() }.buttonStyle(SecondaryButtonStyle())
+            case .running: EmptyView()
+            case .results:
+                Button("Scan") { controller.scan() }.buttonStyle(SecondaryButtonStyle())
+            case .done: Button("Done") { controller.phase = .intro }.buttonStyle(PrimaryButtonStyle())
             }
-        case .done: ScanButton(title: String(localized: "Done"), module: module) { controller.phase = .intro }
         }
     }
 }
 
+/// Before a scan: one centred composition, with the scan as its action.
 struct IntroView: View {
     @ObservedObject var controller: ModuleController
+    @ObservedObject private var access = FullDiskAccessWatcher.shared
     var module: Module { controller.module }
     @State private var showUninstaller = false
 
     var body: some View {
-        HStack(spacing: 70) {
-            GlassIcon(module: module).appear(offset: CGSize(width: -30, height: 0), scale: 0.88)
-            VStack(alignment: .leading, spacing: 14) {
-                Text(module.headline).font(.system(size: 42, weight: .light)).foregroundStyle(.white)
-                    .appear(delay: 0.08, offset: CGSize(width: 24, height: 0))
-                Text(module.tagline).font(.system(size: 17)).foregroundStyle(.white.opacity(0.72))
-                    .frame(maxWidth: 380, alignment: .leading).fixedSize(horizontal: false, vertical: true)
-                    .appear(delay: 0.14, offset: CGSize(width: 24, height: 0))
-                VStack(alignment: .leading, spacing: 24) {
-                    ForEach(Array(module.features.enumerated()), id: \.element.1) { i, f in
-                        FeatureRow(symbol: f.0, title: f.1, module: module)
-                            .appear(delay: 0.2 + 0.06 * Double(i), offset: CGSize(width: 24, height: 0))
+        VStack(spacing: 0) {
+            if !access.granted { FullDiskAccessBanner().padding(.horizontal, 32) }
+            Spacer(minLength: 0)
+            EmptyState(symbol: module.symbol, tint: module.tint, title: module.headline, message: module.tagline,
+                       actionTitle: String(localized: "Scan")) { controller.scan() } extra: {
+                VStack(spacing: 16) {
+                    FeaturePills(features: module.features, tint: module.tint)
+                    if module == .clutter {
+                        Button { pickFolder() } label: {
+                            Label(controller.clutterRoot.path.replacingOccurrences(of: Paths.home.path, with: "~"), systemImage: "folder.fill")
+                                .lineLimit(1).truncationMode(.middle)
+                        }.buttonStyle(SecondaryButtonStyle())
+                    }
+                    if module == .applications {
+                        Button("Open Uninstaller") { showUninstaller = true }.buttonStyle(SecondaryButtonStyle())
                     }
                 }
-                .padding(.top, 30)
-                if module == .clutter {
-                    Button { pickFolder() } label: {
-                        Label(controller.clutterRoot.lastPathComponent, systemImage: "folder.fill")
-                    }.buttonStyle(PillButtonStyle()).padding(.top, 14)
-                }
-                if module == .applications {
-                    Button("Open Uninstaller") { showUninstaller = true }.buttonStyle(PillButtonStyle()).padding(.top, 14)
-                }
             }
+            Spacer(minLength: 0)
+            Spacer(minLength: 0).frame(height: 40)
         }
         .sheet(isPresented: $showUninstaller) { UninstallerSheet(module: module) }
     }
@@ -213,173 +216,197 @@ struct IntroView: View {
 struct ProgressScreen: View {
     @ObservedObject var controller: ModuleController
     var body: some View {
-        VStack(spacing: 28) {
-            GlassIcon(module: controller.module, size: 200, pulsing: true)
+        VStack(spacing: 18) {
+            IconChip(symbol: controller.module.symbol, tint: controller.module.tint, size: 64)
+            ProgressView().progressViewStyle(.linear).frame(width: 320).tint(DS.accent)
             Text(controller.phase == .running ? String(localized: "Working on it...") : controller.progressTitle)
-                .font(.system(size: 26, weight: .light)).foregroundStyle(.white)
-                .id(controller.phase)
-                .transition(.opacity)
-            Text(controller.current).font(.callout).foregroundStyle(.white.opacity(0.65)).lineLimit(1)
+                .font(.system(size: 15, weight: .medium))
+            Text(controller.current).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
                 .truncationMode(.middle).frame(maxWidth: 520)
                 .animation(nil, value: controller.current)
         }
+        .padding(.bottom, 60)
     }
 }
 
+/// Everything the scan found, in one list: filters with counts on top, one card per group, the action at the bottom.
 struct ResultsView: View {
     @ObservedObject var controller: ModuleController
     @ObservedObject private var access = FullDiskAccessWatcher.shared
+    @State private var filter: Filter = .all
+    @State private var sort: Sort = .size
     var module: Module { controller.module }
 
-    var header: String {
-        if controller.groups.allSatisfy(\.isEmpty) { return String(localized: "Your Mac is in great shape!") }
-        switch module {
-        case .smartCare: return String(localized: "Your tasks are ready to run. Look what we found:")
-        case .cleanup: return String(localized: "There are \(formatSize(controller.totalSize)) of junk files on your Mac.")
-        default: return String(localized: "Here is what we found.")
+    enum Filter { case all, recommended, check }
+    enum Sort { case size, name }
+
+    private var allItems: [ResultItem] { controller.groups.flatMap(\.items) }
+    private var recommended: [ResultItem] { allItems.filter(\.selectedByDefault) }
+    private var check: [ResultItem] { allItems.filter { !$0.selectedByDefault } }
+
+    private func visible(_ group: ResultGroup) -> [ResultItem] {
+        var items = group.items.filter {
+            switch filter { case .all: true; case .recommended: $0.selectedByDefault; case .check: !$0.selectedByDefault }
         }
+        switch sort {
+        case .size: items.sort { ($0.size ?? 0) > ($1.size ?? 0) }
+        case .name: items.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+        return items
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            HStack {
-                Text(header).font(.system(size: 26, weight: .light)).foregroundStyle(.white)
-                    .appear(offset: CGSize(width: 0, height: -10))
-                Spacer()
-                Button("Review All") { controller.reviewing = true }.buttonStyle(PillButtonStyle())
-                Button("Start Over") { controller.phase = .intro }.buttonStyle(PillButtonStyle())
-            }
-            if controller.scannedWithoutAccess {
-                if access.granted {
-                    FullDiskAccessBanner(message: String(localized: "Full Disk Access is on. Scan again to include protected folders."),
-                                         symbol: "checkmark.shield.fill", actionTitle: String(localized: "Scan Again")) { controller.scan() }
-                } else {
-                    FullDiskAccessBanner(message: String(localized: "Protected folders were skipped. Grant Full Disk Access to include them."))
-                }
-            }
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 16)], spacing: 16) {
-                    ForEach(Array(controller.groups.enumerated()), id: \.element.id) { i, g in
-                        Tile(group: g, controller: controller).appear(delay: 0.05 * Double(min(i, 10)), offset: CGSize(width: 0, height: 22), scale: 0.96)
+        VStack(spacing: 0) {
+            if allItems.isEmpty {
+                emptyState
+            } else {
+                toolbar.padding(.horizontal, 32).padding(.bottom, 10)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 18) {
+                        if controller.scannedWithoutAccess {
+                            if access.granted {
+                                FullDiskAccessBanner(message: String(localized: "Full Disk Access is on. Scan again to include protected folders."),
+                                                     symbol: "checkmark.shield.fill", actionTitle: String(localized: "Scan Again")) { controller.scan() }
+                            } else {
+                                FullDiskAccessBanner(message: String(localized: "Protected folders were skipped. Grant Full Disk Access to include them."))
+                            }
+                        }
+                        ForEach(controller.groups) { g in
+                            let items = visible(g)
+                            if !items.isEmpty { GroupCard(group: g, items: items, controller: controller) }
+                        }
                     }
+                    .padding(.horizontal, 32).padding(.bottom, 24)
                 }
-                .padding(4)
+                footer
             }
         }
-        .padding(.horizontal, 40).padding(.top, 50)
+    }
+
+    private var emptyState: some View {
+        EmptyState(symbol: "checkmark.seal.fill", tint: DS.safe, title: String(localized: "Your Mac is in great shape!"),
+                   actionTitle: String(localized: "Start Over"), primary: false) { controller.phase = .intro }
+            .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.bottom, 60)
+    }
+
+    private var toolbar: some View {
+        HStack(spacing: 4) {
+            FilterChip(title: String(localized: "All"), count: allItems.count, selected: filter == .all) { filter = .all }
+            FilterChip(title: String(localized: "Recommended"), count: recommended.count, selected: filter == .recommended) { filter = .recommended }
+            if !check.isEmpty {
+                FilterChip(title: String(localized: "Check First"), count: check.count, selected: filter == .check) { filter = .check }
+            }
+            Spacer()
+            Button(String(localized: "Select Recommended")) { controller.selected = Set(recommended.map(\.id)) }
+                .buttonStyle(.plain).font(.system(size: 12.5)).foregroundStyle(DS.accent)
+                .padding(.trailing, 10)
+            Menu {
+                Picker("Sort", selection: $sort) {
+                    Text("Largest").tag(Sort.size)
+                    Text("Name").tag(Sort.name)
+                }.pickerStyle(.inline)
+            } label: {
+                Label(sort == .size ? String(localized: "Largest") : String(localized: "Name"), systemImage: "arrow.up.arrow.down")
+                    .font(.system(size: 12.5))
+            }
+            .menuStyle(.borderlessButton).fixedSize()
+        }
+    }
+
+    private var footer: some View {
+        HStack(spacing: 12) {
+            if controller.selected.isEmpty {
+                Text("Nothing selected").foregroundStyle(.secondary)
+            } else {
+                Text("\(controller.selected.count) selected").fontWeight(.medium)
+                if controller.selectedSize > 0 { Text("·").foregroundStyle(.tertiary); Text(formatSize(controller.selectedSize)).monospacedDigit() }
+            }
+            Spacer()
+            Button("Start Over") { controller.phase = .intro }.buttonStyle(SecondaryButtonStyle())
+            Button(module.actionTitle) { controller.run() }
+                .buttonStyle(PrimaryButtonStyle()).disabled(controller.selected.isEmpty)
+        }
+        .font(.system(size: 13))
+        .padding(.horizontal, 32).padding(.vertical, 14)
+        .background(DS.sidebar.opacity(0.9))
+        .overlay(alignment: .top) { Rectangle().fill(DS.border).frame(height: 1) }
     }
 }
 
-struct Tile: View {
+/// A group of results: header with its select-all box and total, then one row per item.
+struct GroupCard: View {
     let group: ResultGroup
+    let items: [ResultItem]
+    @ObservedObject var controller: ModuleController
+
+    private var state: Bool? {
+        let n = items.filter { controller.selected.contains($0.id) }.count
+        return n == 0 ? false : n == items.count ? true : nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                CheckBox(state: state) {
+                    let ids = Set(items.map(\.id))
+                    if state == true { controller.selected.subtract(ids) } else { controller.selected.formUnion(ids) }
+                }
+                IconChip(symbol: group.symbol, tint: controller.module.tint, size: 30)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(group.title).font(.system(size: 14, weight: .semibold))
+                    if !group.description.isEmpty {
+                        Text(group.description).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                Spacer()
+                Text(group.totalSize > 0 ? formatSize(items.reduce(0) { $0 + ($1.size ?? 0) }) : "\(items.count)")
+                    .font(.system(size: 13, weight: .semibold)).monospacedDigit()
+            }
+            .padding(14)
+            Divider()
+            ForEach(items) { item in
+                ItemRow(item: item, controller: controller)
+                if item.id != items.last?.id { Divider().padding(.leading, 44) }
+            }
+        }
+        .card()
+    }
+}
+
+struct ItemRow: View {
+    let item: ResultItem
     @ObservedObject var controller: ModuleController
     @State private var hover = false
 
-    var value: String {
-        if group.isEmpty { return String(localized: "Nothing found") }
-        guard group.totalSize > 0 else { return String(localized: "\(controller.selectedCount(of: group)) of \(group.items.count)") }
-        let size = controller.selectedSize(of: group)
-        return size > 0 ? formatSize(size) : String(localized: "\(formatSize(group.totalSize)) found")
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: group.symbol).font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(LinearGradient(colors: controller.module.aurora, startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .opacity(group.isEmpty ? 0.35 : 0.9))
-                Spacer()
-                if !group.isEmpty {
-                    Toggle("", isOn: Binding(get: { controller.selectedCount(of: group) > 0 }, set: { _ in controller.toggle(group) }))
-                        .toggleStyle(.checkbox).labelsHidden()
+        let on = controller.selected.contains(item.id)
+        HStack(alignment: .center, spacing: 12) {
+            CheckBox(state: on) { controller.toggle(item) }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title).font(.system(size: 13.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
+                if let s = item.subtitle {
+                    Text(s).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
                 }
             }
-            Text(group.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
-            Text(value).font(.system(size: 22, weight: .light)).foregroundStyle(.white)
-                .contentTransition(.numericText())
-                .animation(Motion.animation(.easeOut(duration: 0.25)), value: value)
-            Text(group.isEmpty ? "" : group.verb).font(.caption).foregroundStyle(.white.opacity(0.65))
-            Spacer(minLength: 0)
-            if !group.isEmpty {
-                Button("Review") { controller.reviewing = true }.buttonStyle(PillButtonStyle())
+            Spacer(minLength: 8)
+            if let b = item.badge {
+                Text(b).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 7).padding(.vertical, 2).background(Capsule().fill(DS.selection)).fixedSize()
+            }
+            VStack(alignment: .trailing, spacing: 4) {
+                if let size = item.size, size > 0 { Text(formatSize(size)).font(.system(size: 13, weight: .medium)).monospacedDigit() }
+                StatusBadge(kind: item.selectedByDefault ? .safe : .check)
             }
         }
-        .padding(16)
-        .frame(height: 210, alignment: .topLeading)
-        .glassTile(highlighted: hover)
-        .scaleEffect(hover ? 1.015 : 1)
-        .shadow(color: .black.opacity(hover ? 0.25 : 0), radius: 14, y: 8)
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(hover ? DS.selection.opacity(0.5) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture { controller.toggle(item) }
         .onHover { hover = $0 }
-        .animation(Motion.animation(.spring(response: 0.3, dampingFraction: 0.8)), value: hover)
-    }
-}
-
-/// Two-pane review: groups on the left, items of the selected group on the right.
-struct ReviewSheet: View {
-    @ObservedObject var controller: ModuleController
-    @State private var current: String?
-
-    var body: some View {
-        let groups = controller.groups.filter { !$0.isEmpty }
-        let shown = groups.first { $0.id == (current ?? groups.first?.id) }
-        VStack(spacing: 0) {
-            HStack {
-                Text("Review \(controller.tool?.title ?? controller.module.name)").font(.title2.weight(.semibold))
-                Spacer()
-                Text("\(controller.selected.count) selected · \(formatSize(controller.selectedSize))").foregroundStyle(.secondary)
-                Button("Done") { controller.reviewing = false }.keyboardShortcut(.defaultAction)
-            }
-            .padding()
-            Divider()
-            HSplitView {
-                List(groups, selection: Binding(get: { current ?? groups.first?.id }, set: { current = $0 })) { g in
-                    HStack {
-                        Toggle("", isOn: Binding(get: { controller.selectedCount(of: g) == g.items.count },
-                                                 set: { _ in controller.toggle(g) })).labelsHidden()
-                        Image(systemName: g.symbol).frame(width: 20)
-                        Text(g.title)
-                        Spacer()
-                        Text(g.totalSize > 0 ? formatSize(g.totalSize) : "\(g.items.count)").foregroundStyle(.secondary)
-                    }.tag(g.id)
-                }
-                .frame(minWidth: 260, maxHeight: .infinity)
-                VStack(alignment: .leading, spacing: 8) {
-                    if let g = shown {
-                        Text(g.title).font(.title3.weight(.semibold))
-                        Text(g.description).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        List(g.items) { item in
-                            HStack(alignment: .top) {
-                                Toggle("", isOn: Binding(get: { controller.selected.contains(item.id) },
-                                                         set: { _ in controller.toggle(item) })).labelsHidden()
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack {
-                                        Text(item.title).lineLimit(1)
-                                        if let b = item.badge {
-                                            Text(b).font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 1)
-                                                .background(Capsule().fill(controller.module.accent.opacity(0.4)))
-                                        }
-                                    }
-                                    if let s = item.subtitle { Text(s).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-                                }
-                                Spacer()
-                                if let size = item.size, size > 0 { Text(formatSize(size)).monospacedDigit().foregroundStyle(.secondary) }
-                            }
-                            .contextMenu {
-                                if let u = item.url { Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([u]) } }
-                                Button("Add to Ignore List") { controller.ignore(item) }
-                            }
-                        }
-                        Text("Right-click an item to add it to the Ignore List. Manage the list in Settings (⌘,).")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .padding()
-                .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
+        .contextMenu {
+            if let u = item.url { Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([u]) } }
+            Button("Add to Ignore List") { controller.ignore(item) }
         }
-        .frame(width: 900, height: 580)
     }
 }
 
@@ -388,37 +415,29 @@ struct DoneView: View {
     @ObservedObject private var access = FullDiskAccessWatcher.shared
     var body: some View {
         let r = controller.report ?? ActionReport()
-        VStack(spacing: 18) {
-            GlassIcon(module: controller.module, size: 180)
-                .overlay(alignment: .bottomTrailing) {
-                    Image(systemName: r.failed.isEmpty ? "checkmark" : "exclamationmark")
-                        .font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
-                        .frame(width: 52, height: 52)
-                        .background(Circle().fill(r.failed.isEmpty ? Color(hex: 0x2FC96D) : .orange))
-                        .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 2))
-                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-                        .appear(delay: 0.35, offset: .zero, scale: 0.2)
+        let ok = r.failed.isEmpty
+        ScrollView {
+            VStack(spacing: 14) {
+                IconChip(symbol: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", tint: ok ? DS.safe : DS.caution, size: 64)
+                    .appear(scale: 0.8)
+                Text(ok ? String(localized: "Well done!") : String(localized: "Some items were not processed"))
+                    .font(.system(size: 20, weight: .semibold))
+                Text(r.freed > 0 ? String(localized: "\(formatSize(r.freed)) freed · \(r.succeeded.count) items") : String(localized: "\(r.succeeded.count) items done"))
+                    .font(.system(size: 14)).foregroundStyle(.secondary)
+                if !r.needsAccess.isEmpty && !access.granted {
+                    FullDiskAccessBanner(message: String(localized: "macOS blocked \(r.needsAccess.count) of these items. Stay on this screen and grant Full Disk Access: they will be removed as soon as you do."))
+                        .frame(maxWidth: 640)
                 }
-                .appear(scale: 0.85)
-            Text(r.failed.isEmpty ? String(localized: "Well done!") : String(localized: "Some items were not processed"))
-                .font(.system(size: 30, weight: .light)).foregroundStyle(.white)
-                .appear(delay: 0.15)
-            Text(r.freed > 0 ? String(localized: "\(formatSize(r.freed)) freed · \(r.succeeded.count) items") : String(localized: "\(r.succeeded.count) items done"))
-                .font(.title3).foregroundStyle(.white.opacity(0.8))
-                .appear(delay: 0.22)
-            if !r.needsAccess.isEmpty && !access.granted {
-                FullDiskAccessBanner(message: String(localized: "macOS blocked \(r.needsAccess.count) of these items. Stay on this screen and grant Full Disk Access: they will be removed as soon as you do."))
-                    .frame(maxWidth: 640)
-            }
-            if !r.failed.isEmpty {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
+                if !r.failed.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array(r.failed.enumerated()), id: \.offset) { _, f in
-                            Text("\(f.0.title): \(f.1)").font(.caption).foregroundStyle(.white.opacity(0.75))
+                            Text("\(f.0.title): \(f.1)").font(.system(size: 12)).foregroundStyle(.secondary)
                         }
                     }
-                }.frame(maxWidth: 520, maxHeight: 120)
+                    .padding(14).frame(maxWidth: 560, alignment: .leading).card()
+                }
             }
+            .frame(maxWidth: .infinity).padding(.top, 50).padding(.horizontal, 32)
         }
     }
 }
