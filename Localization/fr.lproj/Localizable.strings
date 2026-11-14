@@ -842,7 +842,7 @@
 "Add Folder..." = "Ajouter un dossier...";
 "Drives you plug in are included automatically." = "Les disques que vous branchez sont inclus automatiquement.";
 "Review leftovers when an app is deleted" = "Vérifier les restes quand une app est supprimée";
-"Right-click an app, then choose Services > Uninstall with TidyMac. If it is missing, turn it on in System Settings > Keyboard > Keyboard Shortcuts > Services." = "Faites un clic droit sur une app, puis choisissez Services > Uninstall with TidyMac. S’il manque, activez-le dans Réglages Système > Clavier > Raccourcis clavier > Services.";
+"In Finder, right-click an app and look under Quick Actions or Services at the bottom of the menu. If you don't see Uninstall with TidyMac, open Keyboard Shortcuts, choose Services, then Files and Folders, and tick it." = "Dans le Finder, faites un clic droit sur une app et cherchez Actions rapides ou Services en bas du menu. Si Uninstall with TidyMac n’apparaît pas, ouvrez Raccourcis clavier, choisissez Services, puis Fichiers et dossiers, et cochez-le.";
 "Stop looking here" = "Ne plus chercher ici";
 "TidyMac only looks in your home folder and on drives." = "TidyMac ne cherche que dans votre dossier personnel et sur les disques.";
 "Uninstall from Finder's right-click menu" = "Désinstaller depuis le clic droit du Finder";

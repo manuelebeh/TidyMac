@@ -548,7 +548,7 @@ struct ApplicationSettingsView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Uninstall from Finder's right-click menu")
-                        Text("Right-click an app, then choose Services > Uninstall with TidyMac. If it is missing, turn it on in System Settings > Keyboard > Keyboard Shortcuts > Services.")
+                        Text("In Finder, right-click an app and look under Quick Actions or Services at the bottom of the menu. If you don't see Uninstall with TidyMac, open Keyboard Shortcuts, choose Services, then Files and Folders, and tick it.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
