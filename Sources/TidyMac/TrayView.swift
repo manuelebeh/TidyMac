@@ -255,9 +255,35 @@ enum HungApps {
 /// The menu bar icon, with a dot when an issue needs attention.
 /// It stays a template image so macOS tints it for light and dark menu bars.
 enum MenuBarIcon {
+    /// The app icon's "T" with its sparkle cut out of the stem, drawn in one colour for the menu bar to tint.
+    private static func glyph() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: NSRect(x: 1.5, y: 11, width: 15, height: 4.6), xRadius: 2.2, yRadius: 2.2).fill()
+            NSBezierPath(roundedRect: NSRect(x: 6.5, y: 1.8, width: 5, height: 12.5), xRadius: 2.2, yRadius: 2.2).fill()
+            // A four-pointed star, cut out of the stem.
+            let c = NSPoint(x: 9, y: 6.6), r: CGFloat = 2.7
+            let star = NSBezierPath()
+            let tips = [NSPoint(x: c.x, y: c.y + r), NSPoint(x: c.x + r, y: c.y), NSPoint(x: c.x, y: c.y - r), NSPoint(x: c.x - r, y: c.y)]
+            star.move(to: tips[0])
+            for i in 0..<4 {
+                let next = tips[(i + 1) % 4]
+                let mid = NSPoint(x: (tips[i].x + next.x) / 2, y: (tips[i].y + next.y) / 2)
+                star.curve(to: next, controlPoint1: NSPoint(x: c.x + (mid.x - c.x) * 0.2, y: c.y + (mid.y - c.y) * 0.2),
+                           controlPoint2: NSPoint(x: c.x + (mid.x - c.x) * 0.2, y: c.y + (mid.y - c.y) * 0.2))
+            }
+            star.close()
+            NSGraphicsContext.current?.compositingOperation = .clear
+            star.fill()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            return true
+        }
+        image.accessibilityDescription = "TidyMac"
+        return image
+    }
+
     static func image(attention: Bool) -> NSImage {
-        let base = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "TidyMac")!
-            .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))!
+        let base = glyph()
         guard attention else { base.isTemplate = true; return base }
         let d: CGFloat = 6
         let image = NSImage(size: NSSize(width: base.size.width + 2, height: base.size.height), flipped: false) { rect in
@@ -323,7 +349,7 @@ struct TrayView: View {
         .frame(width: Self.width)
         .background(TrayBackground())
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(DS.border))
         .background(WindowReader { window = $0; fitWindow() })
         .onAppear { monitor.start() }
         .onDisappear { monitor.stop(); detail = nil; panel.hide() }
@@ -369,13 +395,13 @@ struct TrayView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Text("Mac Health:")
-                    Text(state?.title ?? "…").foregroundStyle(state?.color(scheme) ?? .secondary)
+                    Text(state?.title ?? "...").foregroundStyle(state?.color(scheme) ?? .secondary)
                 }
                 .font(.system(size: 18, weight: .semibold))
                 Text(monitor.machine).font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Spacer()
-            HealthGlow(color: state?.glow ?? .secondary)
+            HealthGlow(color: state?.color(scheme) ?? .secondary)
         }
         .contentShape(Rectangle())
         .onTapGesture { open(.smartCare) }
@@ -388,7 +414,7 @@ struct TrayView: View {
     var protectionCard: some View {
         let last = History.entries.last { $0.scanned != nil }
         let threats = last?.threats ?? 0
-        let shield: Color = last == nil ? .secondary : threats > 0 ? TrayStyle.warning : Color(hex: 0x22C503)
+        let shield: Color = last == nil ? .secondary : threats > 0 ? TrayStyle.warning : DS.safe
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: threats > 0 ? "exclamationmark.shield.fill" : "checkmark.shield.fill")
@@ -512,10 +538,7 @@ struct TrayView: View {
             ForEach(monitor.visibleIssues) { issue in
                 let look = Self.look(issue.kind)
                 HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: look.symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
-                        .frame(width: 30, height: 30)
-                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(LinearGradient(colors: look.module.aurora, startPoint: .topLeading, endPoint: .bottomTrailing)))
+                    IconChip(symbol: look.symbol, tint: look.module.tint, size: 32)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(issue.title).font(.system(size: 13, weight: .semibold))
                         Text(issue.detail).font(.system(size: 13)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -567,7 +590,7 @@ struct TrayView: View {
 
     var footer: some View {
         VStack(spacing: 0) {
-            Rectangle().fill(.primary.opacity(0.08)).frame(height: 1)
+            Rectangle().fill(DS.border).frame(height: 1)
             ZStack {
                 Button("Show TidyMac") { open(nil) }.buttonStyle(TrayTextStyle())
                 HStack(spacing: 6) {
@@ -584,7 +607,7 @@ struct TrayView: View {
                     } label: { Image(systemName: "ellipsis") }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                         .frame(width: 26, height: 26)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.primary.opacity(0.16)))
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(DS.selection))
                         .help("More")
                 }
             }
@@ -610,9 +633,9 @@ struct TrayView: View {
 
 /// Colours and small pieces shared by the menu and its detail panel.
 enum TrayStyle {
-    static let link = Color(hex: 0x4FB0FF)
-    static let selected = Color(hex: 0x4D7DFF)
-    static let warning = Color(hex: 0xF5B942)
+    static let link = DS.accent
+    static let selected = DS.accent
+    static let warning = DS.caution
 
     static func color(_ s: Metric.Severity) -> Color {
         switch s {
@@ -630,21 +653,18 @@ enum TrayStyle {
     }
 }
 
-/// Card surface of the menu: faint glass with a hairline edge, a blue edge when selected.
+/// Card surface of the menu: same neutral card as the main window, an accent edge when selected.
 struct TrayCard: ViewModifier {
     var radius: CGFloat = 10
     var selected = false
     var hover = false
-    @Environment(\.colorScheme) private var scheme
 
     func body(content: Content) -> some View {
-        let dark = scheme == .dark
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
-            .background(shape.fill(dark ? Color.white.opacity(hover ? 0.11 : 0.07) : Color.white.opacity(hover ? 0.75 : 0.58)))
+            .background(shape.fill(hover ? DS.cardHover : DS.card))
             .clipShape(shape)
-            .overlay(shape.strokeBorder(selected ? TrayStyle.selected : dark ? Color.white.opacity(0.09) : Color.black.opacity(0.07),
-                                        lineWidth: selected ? 2 : 1))
+            .overlay(shape.strokeBorder(selected ? TrayStyle.selected : DS.border, lineWidth: selected ? 2 : 1))
     }
 }
 
@@ -748,8 +768,8 @@ struct TrayButtonStyle: ButtonStyle {
             label
                 .font(.system(size: 13, weight: .semibold))
                 .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(.primary.opacity(pressed ? 0.22 : hover ? 0.16 : 0.1)))
-                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(.primary.opacity(0.18)))
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(pressed ? DS.selection : hover ? DS.cardHover : DS.card))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(DS.border))
                 .onHover { hover = $0 }
                 .animation(Motion.animation(.easeOut(duration: 0.12)), value: hover)
         }
@@ -769,7 +789,8 @@ struct TraySquareStyle: ButtonStyle {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.primary)
                 .frame(width: 26, height: 26)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.primary.opacity(pressed ? 0.32 : hover ? 0.24 : 0.16)))
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(pressed ? DS.border : hover ? DS.selection : DS.card))
+                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(DS.border))
                 .contentShape(Rectangle())
                 .onHover { hover = $0 }
                 .animation(Motion.animation(.easeOut(duration: 0.12)), value: hover)
@@ -796,35 +817,18 @@ struct TrayTextStyle: ButtonStyle {
     }
 }
 
-/// The Full Scan live background in Dark Mode, a pale version of it in Light Mode.
+/// The same calm surface as the main window.
 struct TrayBackground: View {
-    @Environment(\.colorScheme) private var scheme
-    var body: some View {
-        LiveBackground(palette: scheme == .dark ? Module.smartCare.live : Module.smartCare.live.light(base: 0xF6EEFC))
-            .ignoresSafeArea()
-    }
+    var body: some View { DS.window.ignoresSafeArea() }
 }
 
-/// The Mac in the menu header, a cyan laptop standing on a glow in the colour of its Mac Health state. The glow breathes slowly.
+/// The Mac in the menu header, on a chip tinted by its Mac Health state.
 struct HealthGlow: View {
     let color: Color
 
     var body: some View {
-        Cycle(period: 4.8) { wave, _ in
-            ZStack {
-                Ellipse().fill(RadialGradient(colors: [color.opacity(0.9), color.opacity(0)], center: .center, startRadius: 0, endRadius: 34))
-                    .frame(width: 70, height: 24)
-                    .offset(y: 17)
-                    .blur(radius: 5)
-                    .opacity(0.5 + 0.4 * wave)
-                    .scaleEffect(0.94 + 0.12 * wave)
-                Image(systemName: "laptopcomputer").font(.system(size: 40, weight: .regular))
-                    .foregroundStyle(LinearGradient(colors: [Color(hex: 0xB4F0FF), Color(hex: 0x3DA8F2)], startPoint: .top, endPoint: .bottom))
-                    .shadow(color: Color(hex: 0x55CEFE).opacity(0.45), radius: 6, y: 2)
-            }
-        }
-        .frame(width: 66, height: 48)
-        .animation(Motion.animation(.easeInOut(duration: 0.6)), value: color)
+        IconChip(symbol: "laptopcomputer", tint: color, size: 46)
+            .animation(Motion.animation(.easeInOut(duration: 0.4)), value: color)
     }
 }
 

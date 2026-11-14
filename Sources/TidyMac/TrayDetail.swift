@@ -1,7 +1,7 @@
 import SwiftUI
 import TidyCore
 
-/// The details of a menu card, in a panel of their own on the left of the menu. It is a child window of the menu,
+/// The details of a menu card, in a panel of their own beside the menu, on its left when there is room. It is a child window of the menu,
 /// so it moves and closes with it, and it never becomes key, so clicking it does not dismiss the menu.
 @MainActor
 final class TrayDetailPanel: ObservableObject {
@@ -62,7 +62,11 @@ final class TrayDetailPanel: ObservableObject {
         guard let panel, let parent, let host else { return }
         let size = host.fittingSize
         if panel.frame.size != size { panel.setContentSize(size) }
-        panel.setFrameTopLeftPoint(NSPoint(x: parent.frame.minX - Self.gap - size.width, y: parent.frame.maxY))
+        // On the left of the menu; on its right when the menu is too close to the left edge of the screen.
+        let left = parent.frame.minX - Self.gap - size.width
+        let room = (parent.screen ?? NSScreen.main)?.visibleFrame.minX ?? 0
+        let x = left >= room ? left : parent.frame.maxX + Self.gap
+        panel.setFrameTopLeftPoint(NSPoint(x: x, y: parent.frame.maxY))
     }
 }
 
@@ -93,7 +97,7 @@ struct TrayDetail: View {
         .frame(width: TrayView.width, alignment: .leading)
         .background(TrayBackground())
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(DS.border))
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -125,11 +129,11 @@ struct TrayDetail: View {
         let used = s.total - s.available
         let low = monitor.issues.contains { $0.kind == .lowDiskSpace } || (s.total > 0 && s.available < s.total / 50)
         HStack(spacing: 26) {
-            Donut(parts: [(Double(used), .white)], total: Double(max(s.total, 1))) {
+            Donut(parts: [(Double(used), DS.accent)], total: Double(max(s.total, 1))) {
                 BigFigure(size: s.available, color: low ? TrayStyle.warning : .primary, caption: String(localized: "of \(formatSize(s.total)) available"))
             }
             VStack(alignment: .leading, spacing: 12) {
-                LegendRow(color: .white, title: String(localized: "Used"), value: formatSize(used))
+                LegendRow(color: DS.accent, title: String(localized: "Used"), value: formatSize(used))
                 LegendRow(color: .primary.opacity(0.25), title: String(localized: "Available"), value: formatSize(s.available))
             }
         }
@@ -157,7 +161,7 @@ struct TrayDetail: View {
         return VStack(alignment: .leading, spacing: 10) {
             Label("Trash", systemImage: "trash.fill").font(.system(size: 15, weight: .semibold)).labelStyle(TrayStyle.TightLabel())
             if let t = monitor.trash {
-                ThinBar(fraction: Double(t.size) / Double(max(limit, 1)), color: t.size > limit ? TrayStyle.warning : .white)
+                ThinBar(fraction: Double(t.size) / Double(max(limit, 1)), color: t.size > limit ? TrayStyle.warning : DS.accent)
                 Text(String(localized: "Used: \(t.size == 0 ? "Empty" : formatSize(t.size)) of \(formatSize(limit))")).font(.system(size: 11)).foregroundStyle(.secondary)
             } else {
                 Text("Allow Full Disk Access to analyze Trash contents.").font(.system(size: 11)).foregroundStyle(.secondary)
@@ -326,7 +330,7 @@ struct TrayDetail: View {
                     Text("Check your internet connection and try again.").font(.system(size: 12)).foregroundStyle(.secondary)
                 } else {
                     Text("How it works").font(.system(size: 15, weight: .semibold))
-                    Text(monitor.testingSpeed ? String(localized: "Running, about 20 seconds… TidyMac measures your download and upload speed with macOS’s networkQuality.")
+                    Text(monitor.testingSpeed ? String(localized: "Running, about 20 seconds... TidyMac measures your download and upload speed with macOS’s networkQuality.")
                                               : String(localized: "TidyMac measures your download and upload speed with macOS’s networkQuality."))
                         .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
@@ -348,7 +352,7 @@ struct TrayDetail: View {
                     Spacer()
                     Button("Eject") { monitor.eject([d]) }.buttonStyle(TrayLinkStyle()).disabled(monitor.ejecting.contains(d.id))
                 }
-                ThinBar(fraction: d.total > 0 ? Double(d.total - d.available) / Double(d.total) : 0, color: d.almostFull ? TrayStyle.warning : .white)
+                ThinBar(fraction: d.total > 0 ? Double(d.total - d.available) / Double(d.total) : 0, color: d.almostFull ? TrayStyle.warning : DS.accent)
                 Text(d.almostFull ? String(localized: "Almost Full · \(formatSize(d.available)) available") : String(localized: "\(formatSize(d.available)) available of \(formatSize(d.total))"))
                     .font(.system(size: 11)).foregroundStyle(d.almostFull ? TrayStyle.warning : .secondary)
             }
@@ -629,9 +633,9 @@ struct SpeedTestButton: View {
         Button(action: action) {
             Cycle(period: 1.2, paused: !testing) { _, phase in
                 ZStack {
-                    Circle().fill(Color(hex: 0x0C063F).opacity(0.55)).frame(width: 156, height: 156)
-                    Circle().fill(Color(hex: 0x20194E).opacity(hover ? 1 : 0.85)).frame(width: 128, height: 128)
-                        .overlay(Circle().strokeBorder(.white.opacity(hover ? 0.16 : 0.08)))
+                    Circle().fill(DS.selection).frame(width: 156, height: 156)
+                    Circle().fill(hover ? DS.cardHover : DS.card).frame(width: 128, height: 128)
+                        .overlay(Circle().strokeBorder(DS.border))
                     if testing {
                         Circle().trim(from: 0, to: 0.25)
                             .stroke(TrayStyle.link, style: StrokeStyle(lineWidth: 3, lineCap: .round))
@@ -639,7 +643,7 @@ struct SpeedTestButton: View {
                             .rotationEffect(.degrees(phase * 360))
                     }
                     Text(testing ? String(localized: "Testing...") : done ? String(localized: "Test again") : String(localized: "Test speed")).font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(.primary)
                 }
             }
         }
