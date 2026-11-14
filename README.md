@@ -8,6 +8,7 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 
 ## Features
 
+- **Overview**: disk usage and the five areas of your Mac at a glance, with one button to scan them all.
 - **Full Scan**: one scan across cleanup, protection, performance, applications and clutter, then one button to run it all.
 - **Cleanup**: system junk, developer tool caches (npm, pnpm, Bun, Cargo, Gradle, uv and more), simulator runtimes, unused Docker data, AI tool caches and logs, mail attachments, Trash bins.
 - **Protection**: suspicious launch agents and daemons, built-in protections that are turned off (Gatekeeper, FileVault, firewall, System Integrity Protection), browser privacy data, application permissions.
@@ -19,13 +20,13 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 - **History**: Mac health with recommendations, space cleaned, time saved, malware scan history. Recommendations also cover pending app updates, apps unused for six months, a restart after a week of uptime and a failing drive; skip one for the day or hide them all. Opening History runs the update check at most once a day.
 - **Screen Cleaning Mode**: locks the keyboard and trackpad and blanks the screen so you can wipe it.
 - **Menu bar**: Mac Health at a glance, live storage, memory, battery, CPU and network with charts, Wi-Fi security, a speed test, top consumers, external drives with eject, connected Bluetooth devices, drive health, and recommendations you can act on or ignore for a while. The icon gets a dot when something needs attention.
-- **Background alerts**: notifications for low disk space, a full Trash, heavy memory use, critical battery health, new threats, overfilled external drives, low device batteries, hung apps (with Force Quit All), Chrome using too much memory, apps moved to the Trash, and a Full Scan reminder every 3, 7, 14 or 30 days. Thresholds are configurable in Settings (⌘,).
+- **Background alerts**: notifications for low disk space, a full Trash, heavy memory use, critical battery health, new threats, overfilled external drives, low device batteries, hung apps (with Force Quit All), Chrome using too much memory, apps moved to the Trash, and a Full Scan reminder every 3, 7, 14 or 30 days. Thresholds are configurable in Settings › Notifications.
 - **Automations**: rules in Settings › Automations clean the categories you choose on a schedule, or when disk space runs low, the Trash grows or a drive is connected. There are none until you add one. A rule asks through a notification first unless you set it to clean automatically, and nothing that needs your administrator password runs this way.
-- **Updates**: Settings › Updates shows the version and looks for a new release when you ask. It asks GitHub for the latest release and sends nothing about your Mac. A daily check with a notification is off by default. TidyMac never installs anything by itself.
-- **General settings**: sounds when a scan or cleanup finishes, Reduce Motion (System, Enabled, Disabled), keep the Dock icon after the window closes, show or hide the recommendations, and empty a drive's Trash when you eject it from the menu (off by default, the files are deleted for good).
-- **Integrations**: right-click an app in Finder › Services (or Quick Actions) › Uninstall with TidyMac. Shortcuts can do the same with "Open URLs" on `tidymac://uninstall?path=/Applications/Name.app`. On launch outside the Applications folder, TidyMac offers to move itself there.
+- **Updates**: Settings › General shows the version and looks for a new release when you ask. It asks GitHub for the latest release and sends nothing about your Mac. A daily check with a notification is off by default. "Install new versions automatically" is off by default too: it downloads the release zip, checks that it is signed by the same developer as the running copy and accepted by Gatekeeper, and swaps it in the next time you quit TidyMac, with the old copy going to the Trash. "Install and Restart" does the same right away.
+- **Settings**: a page inside the main window (⌘,) with five tabs: General, Scanning, Applications, Notifications and Automations. General has the appearance (System, Light or Dark), sounds, Reduce Motion, recommendations, Open at Login, whether TidyMac shows in the menu bar and in the Dock, emptying a drive's Trash when you eject it from the menu (off by default, the files are deleted for good), Full Disk Access, updates, and a button that uninstalls TidyMac itself with the files it keeps.
+- **Integrations**: right-click an app in Finder › Services (or Quick Actions) › Uninstall with TidyMac. Shortcuts can do the same with "Open URLs" on `tidymac://uninstall?path=/Applications/Name.app`. The Uninstaller also looks in folders you add and on plugged-in drives (Settings › Applications), and offers to clean up after an app you move to the Trash. On launch outside the Applications folder, TidyMac offers to move itself there.
 - **Languages**: English and French. TidyMac follows the language set for it in System Settings › General › Language & Region.
-- **Ignore List**: right-click an item in the review sheet to keep it out of future scans; manage the list by category in Settings › Ignore List.
+- **Ignore List**: right-click an item in the review sheet to keep it out of future scans; manage the list by category in Settings › Scanning.
 
 ## Install
 
@@ -60,6 +61,7 @@ Run it as an app bundle rather than with `swift run`: notifications and Open at 
 - Before any removal, a last check refuses system folders, other users' files and the live data of iCloud sync, including through symbolic links. Items macOS protects (SIP, locked files) are not offered, so no password is asked for a removal that cannot work.
 - A duplicate only goes to the Trash after both files are read again, to confirm the copy being kept is still there, separate and identical. Hard links are not counted as duplicates.
 - Nothing is removed until you review the results and confirm. The one exception is an Automations rule you set to clean automatically: it removes what its categories preselect, and for Trash Bins that means deleting those files for good.
+- An update is only installed when its signature, developer and notarization check out, and only when TidyMac quits or you ask for it. Nothing is installed unless you turn that on or click Install and Restart.
 - Malware detection is a heuristic over launch items (missing or unsigned executables, hidden or temporary locations). It is not an antivirus engine.
 - Language files and universal binaries inside app bundles are left alone, since changing them breaks code signatures.
 
