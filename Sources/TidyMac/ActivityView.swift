@@ -1,51 +1,39 @@
 import SwiftUI
 import TidyCore
 
-/// History: Mac Health with today's recommendations on the left, and what TidyMac has done
-/// so far in four cards on the right.
+/// History: how the Mac is doing, what TidyMac has done for it so far, and what it suggests next.
+/// A scrolling page of cards in three rows: health and storage, time and security, recommendations and recent runs.
 struct ActivityScreen: View {
     @ObservedObject var app: AppState
     @State private var summary = ActivitySummary()
+    @State private var recent: [History.Entry] = []
     @State private var health: MacHealth?
     @State private var machine = "Mac"
-    @State private var showAll = false
     @State private var showUnused = false
     @State private var confirmRestart = false
     @AppStorage(GeneralSettings.assistantKey) private var showsAssistant = true
-    private let module = Module.activity
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("History").font(.system(size: 34, weight: .light)).foregroundStyle(.white)
-                if let since = summary.since {
-                    Text("From \(since.formatted(date: .abbreviated, time: .omitted))").foregroundStyle(.white.opacity(0.6))
+        VStack(alignment: .leading, spacing: 0) {
+            ScreenHeader(title: String(localized: "History"),
+                         subtitle: summary.since.map { String(localized: "From \($0.formatted(date: .abbreviated, time: .omitted))") }) { EmptyView() }
+                .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 18)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    row { healthCard; storageCard }
+                    row { timeCard; malwareCard }
+                    if showsAssistant { row { recommendationsCard; recentCard } } else { recentCard }
                 }
+                .padding(.horizontal, 32).padding(.bottom, 32)
             }
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 14) {
-                    HealthCard(health: health, machine: machine)
-                    if showsAssistant { recommendations }
-                }
-                .frame(width: 300)
-                Grid(horizontalSpacing: 16, verticalSpacing: 16) {
-                    GridRow { storageCard; timeCard }
-                    GridRow { malwareCard; recentCard }
-                }
-            }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 40).padding(.top, 40)
         .task {
-            summary = ActivitySummary()
+            reload()
             await loadHealth()
             machine = await Task.detached { SystemMonitor.machineName() }.value
             // The update check behind "Install application updates" runs at most once a day.
             await AppFacts.refreshIfStale()
             await loadHealth()
-        }
-        .sheet(isPresented: $showAll) {
-            RecommendationsSheet(health: health, go: { showAll = false; go($0) }, skip: skip)
         }
         .sheet(isPresented: $showUnused) { UninstallerSheet(module: .applications, filter: .unused) }
         .alert("Restart your Mac now?", isPresented: $confirmRestart) {
@@ -54,6 +42,16 @@ struct ActivityScreen: View {
         } message: {
             Text("Save your work first. Apps with unsaved changes may ask before they quit.")
         }
+    }
+
+    /// Two cards side by side, the same height.
+    private func row<A: View>(@ViewBuilder _ content: () -> A) -> some View {
+        HStack(alignment: .top, spacing: 16) { content() }.fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func reload() {
+        summary = ActivitySummary()
+        recent = Array(History.entries.suffix(6).reversed())
     }
 
     func loadHealth() async {
@@ -69,107 +67,215 @@ struct ActivityScreen: View {
         var skipped = SkippedRecommendations.load()
         skipped.skip(ids)
         skipped.save()
-        let left = (health?.recommendations ?? []).filter { !ids.contains($0.id) }
-        health = MacHealth(recommendations: left)
-        if left.isEmpty { showAll = false }
+        health = MacHealth(recommendations: (health?.recommendations ?? []).filter { !ids.contains($0.id) })
     }
 
-    // MARK: Recommendations
+    // MARK: Row 1
 
-    @ViewBuilder var recommendations: some View {
-        let recs = health?.recommendations ?? []
-        HStack {
-            Text(recs.isEmpty ? String(localized: "Today's Recommendation") : String(localized: "\(recs.count) Recommendations"))
-                .font(.callout).foregroundStyle(.white.opacity(0.7))
-            Spacer()
-            if recs.count > 1 { Button("View All") { showAll = true }.buttonStyle(.plain).font(.callout.weight(.semibold)).foregroundStyle(.white) }
-        }
-        if let r = recs.first {
-            ZStack(alignment: .bottom) {
-                // The cards behind hint that more recommendations are waiting.
-                if recs.count > 2 { card.padding(.horizontal, 24).offset(y: 16).opacity(0.4) }
-                if recs.count > 1 { card.padding(.horizontal, 12).offset(y: 8).opacity(0.6) }
-                RecommendationRow(rec: r, go: { go(r.target) }, skip: { skip([r.id]) })
-                    .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: 0x2B2541)))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.12)))
-            }
-        } else if health != nil {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("You’re all good!").font(.headline).foregroundStyle(.white)
-                Text("There are no recommendations for today.").font(.callout).foregroundStyle(.white.opacity(0.7))
-            }
-            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16).fill(.white.opacity(0.08)))
-        }
-    }
-
-    var card: some View { RoundedRectangle(cornerRadius: 16).fill(Color(hex: 0x2B2541)).frame(height: 90) }
-
-    // MARK: Cards
-
-    var storageCard: some View {
-        StatCard(info: String(localized: "Everything you remove on this Mac with TidyMac adds up here. From junk files and clutter to uninstalled apps — the total local storage cleanup is shown in MB or GB."),
-                 symbol: "internaldrive.fill", empty: summary.freed == 0 ? (String(localized: "Clean up storage and watch your free gigabytes add up."), String(localized: "Go to Full Scan"), .smartCare) : nil,
-                 go: go) {
-            Text("Local Storage Cleaned").font(.callout).foregroundStyle(.white.opacity(0.7))
-            Text(formatSize(summary.freed)).font(.system(size: 30, weight: .light)).foregroundStyle(.white)
-            Delta(text: String(localized: "+\(formatSize(summary.freedThisMonth)) this month"))
-            let total = max(summary.freedBy.map(\.1).max() ?? 1, 1)
-            ForEach(summary.freedBy, id: \.0) { part, bytes in
+    private var healthCard: some View {
+        let s = SystemMonitor.storage()
+        let used = max(s.total - s.available, 0)
+        let color = health?.state.color() ?? .secondary
+        return HistoryCard(title: String(localized: "Mac Health:"), symbol: "laptopcomputer", tint: color) {
+            VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack { Text(part.title); Spacer(); Text(formatSize(bytes)).monospacedDigit() }
-                        .font(.caption).foregroundStyle(.white.opacity(0.8))
-                    Bar(fraction: Double(bytes) / Double(total), color: Module.cleanup.accent)
+                    Text(health?.state.title ?? "...").font(.system(size: 30, weight: .semibold)).foregroundStyle(color)
+                    Text(machine).font(.system(size: 12)).foregroundStyle(.secondary)
+                }
+                if let health { Text(health.description).font(.system(size: 12.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(s.name).font(.system(size: 12.5, weight: .semibold))
+                        Spacer()
+                        Text("\(formatSize(used)) of \(formatSize(s.total)) used").font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                    UsageBar(segments: [.init(fraction: s.total > 0 ? Double(used) / Double(s.total) : 0, color: DS.accent)], height: 8)
                 }
             }
         }
     }
 
-    var timeCard: some View {
-        StatCard(info: String(localized: "TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Full Scan, adds to your total here."),
-                 symbol: "stopwatch.fill", empty: summary.minutesSaved == 0 ? (String(localized: "Start using TidyMac to see your recent time saved."), String(localized: "Go to Full Scan"), .smartCare) : nil,
-                 go: go) {
-            Text("Total Time Saved").font(.callout).foregroundStyle(.white.opacity(0.7))
-            Text(ActivitySummary.format(minutes: summary.minutesSaved)).font(.system(size: 30, weight: .light)).foregroundStyle(.white)
-            Delta(text: String(localized: "+\(ActivitySummary.format(minutes: summary.minutesThisMonth)) this month"))
-            Text(summary.timeSavedHint).font(.caption).foregroundStyle(.white.opacity(0.6))
-            Text("Saved by Activity").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.7)).padding(.top, 4)
-            ForEach(summary.savedBy.prefix(3), id: \.0) { c, m in
-                HStack { Text(c.title); Spacer(); Text(ActivitySummary.format(minutes: m)).monospacedDigit() }
-                    .font(.caption).foregroundStyle(.white.opacity(0.8))
+    private static func color(_ part: ActivityCategory.Storage) -> Color {
+        switch part {
+        case .systemJunk: DS.accent
+        case .applications: Module.applications.tint
+        case .personalFiles: Module.clutter.tint
+        }
+    }
+
+    private var storageCard: some View {
+        HistoryCard(title: String(localized: "Local Storage Cleaned"), symbol: "internaldrive.fill", tint: DS.accent,
+                    info: String(localized: "Everything you remove on this Mac with TidyMac adds up here. From junk files and clutter to uninstalled apps - the total local storage cleanup is shown in MB or GB.")) {
+            if summary.freed == 0 {
+                CardEmpty(message: String(localized: "Clean up storage and watch your free gigabytes add up."),
+                          action: String(localized: "Go to Full Scan")) { app.module = .smartCare }
+            } else {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(formatSize(summary.freed)).font(.system(size: 30, weight: .semibold)).monospacedDigit()
+                        Delta(text: String(localized: "+\(formatSize(summary.freedThisMonth)) this month"))
+                    }
+                    let total = max(Double(summary.freed), 1)
+                    UsageBar(segments: summary.freedBy.filter { $0.1 > 0 }.map { .init(fraction: Double($0.1) / total, color: Self.color($0.0)) }, height: 8)
+                    VStack(spacing: 8) {
+                        ForEach(summary.freedBy, id: \.0) { part, bytes in
+                            HStack(spacing: 8) {
+                                Circle().fill(Self.color(part)).frame(width: 8, height: 8)
+                                Text(part.title).font(.system(size: 12.5))
+                                Spacer()
+                                Text(formatSize(bytes)).font(.system(size: 12.5, weight: .medium)).monospacedDigit()
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
-    var malwareCard: some View {
-        StatCard(info: String(localized: "TidyMac counts how many background items were checked and how many looked suspicious — whether through Full Scan, Protection or the Malware Finder tool."),
-                 symbol: "hand.raised.fill", empty: summary.malwareScans == 0 ? (String(localized: "No scans yet. It’s time to protect your Mac."), String(localized: "Go to Protection"), .protection) : nil,
-                 go: go) {
-            Text("Scanned for Malware").font(.callout).foregroundStyle(.white.opacity(0.7))
-            Text("\(summary.itemsScanned) items").font(.system(size: 30, weight: .light)).foregroundStyle(.white)
-            Text("Malware History").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.7)).padding(.top, 4)
+    // MARK: Row 2
+
+    private var timeCard: some View {
+        HistoryCard(title: String(localized: "Total Time Saved"), symbol: "stopwatch.fill", tint: Module.performance.tint,
+                    info: String(localized: "TidyMac estimates the time you’ve saved by skipping manual Mac maintenance: figuring out what to remove, where to find it, and removing it. Each cleanup, including Full Scan, adds to your total here.")) {
+            if summary.minutesSaved == 0 {
+                CardEmpty(message: String(localized: "Start using TidyMac to see your recent time saved."),
+                          action: String(localized: "Go to Full Scan")) { app.module = .smartCare }
+            } else {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ActivitySummary.format(minutes: summary.minutesSaved)).font(.system(size: 30, weight: .semibold))
+                        Delta(text: String(localized: "+\(ActivitySummary.format(minutes: summary.minutesThisMonth)) this month"))
+                    }
+                    Text(summary.timeSavedHint).font(.system(size: 12.5)).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Saved by Activity").font(.system(size: 11.5, weight: .semibold)).foregroundStyle(.secondary)
+                        ForEach(summary.savedBy.prefix(3), id: \.0) { c, m in
+                            HStack {
+                                Text(c.title).font(.system(size: 12.5)).lineLimit(1)
+                                Spacer()
+                                Text(ActivitySummary.format(minutes: m)).font(.system(size: 12.5, weight: .medium)).monospacedDigit()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var malwareCard: some View {
+        HistoryCard(title: String(localized: "Scanned for Malware"), symbol: "hand.raised.fill", tint: Module.protection.tint,
+                    info: String(localized: "TidyMac counts how many background items were checked and how many looked suspicious - whether through Full Scan, Protection or the Malware Finder tool.")) {
+            if summary.malwareScans == 0 {
+                CardEmpty(message: String(localized: "No scans yet. It’s time to protect your Mac."),
+                          action: String(localized: "Go to Protection")) { app.module = .protection }
+            } else {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("\(summary.itemsScanned) items").font(.system(size: 30, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Malware History").font(.system(size: 11.5, weight: .semibold)).foregroundStyle(.secondary)
+                        factRow("magnifyingglass", String(localized: "\(summary.malwareScans) scans run"))
+                        factRow(summary.threatsFound == 0 ? "checkmark.shield.fill" : "exclamationmark.triangle.fill",
+                                summary.threatsFound == 0 ? String(localized: "No threats found") : String(localized: "\(summary.threatsFound) suspicious items found"),
+                                tint: summary.threatsFound == 0 ? DS.safe : DS.caution)
+                        if let d = summary.lastMalwareScan {
+                            factRow("clock", String(localized: "Last scan \(RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date()))"))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func factRow(_ symbol: String, _ text: String, tint: Color = .secondary) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(tint).frame(width: 16)
+            Text(text).font(.system(size: 12.5))
+        }
+    }
+
+    // MARK: Row 3
+
+    private var recommendationsCard: some View {
+        let recs = health?.recommendations ?? []
+        let title = recs.isEmpty ? String(localized: "Today's Recommendation") : String(localized: "\(recs.count) Recommendations")
+        return HistoryCard(title: title, symbol: "lightbulb.fill", tint: DS.caution, trailing: AnyView(
             Group {
-                Text("\(summary.malwareScans) scans run")
-                Text(summary.threatsFound == 0 ? String(localized: "No threats found") : String(localized: "\(summary.threatsFound) suspicious items found"))
-                if let d = summary.lastMalwareScan { Text("Last scan \(RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date()))") }
+                if recs.count > 1 {
+                    Button("Hide All") { skip(recs.map(\.id)) }.buttonStyle(.plain)
+                        .font(.system(size: 12.5)).foregroundStyle(DS.accent)
+                        .help("Hide every recommendation until tomorrow")
+                }
+            })) {
+            if recs.isEmpty {
+                if health != nil {
+                    CardEmpty(symbol: "checkmark.seal.fill", tint: DS.safe, title: String(localized: "You’re all good!"),
+                              message: String(localized: "There are no recommendations for today."))
+                }
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(recs.enumerated()), id: \.element.id) { i, r in
+                        recommendationRow(r)
+                        if i < recs.count - 1 { Divider().padding(.vertical, 10) }
+                    }
+                }
             }
-            .font(.caption).foregroundStyle(.white.opacity(0.8))
         }
     }
 
-    var recentCard: some View {
-        StatCard(info: String(localized: "Your latest runs, with the time each one saved."),
-                 symbol: "clock.arrow.circlepath", empty: summary.recentSaves.isEmpty ? (String(localized: "Your recent saves will show up here."), String(localized: "Go to Toolkit"), .myTools) : nil,
-                 go: go) {
-            Text("Recent Saves").font(.callout).foregroundStyle(.white.opacity(0.7))
-            ForEach(Array(summary.recentSaves.enumerated()), id: \.offset) { _, save in
-                HStack {
-                    Text(save.0.formatted(date: .abbreviated, time: .shortened))
-                    Spacer()
-                    Text(ActivitySummary.format(minutes: save.1)).monospacedDigit()
+    private func recommendationRow(_ r: MacHealth.Recommendation) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            IconChip(symbol: r.severe ? "exclamationmark.triangle.fill" : "sparkles", tint: r.severe ? DS.caution : DS.accent, size: 32)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(r.title).font(.system(size: 13, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
+                Text(r.detail).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 14) {
+                    Button("Go") { go(r.target) }.buttonStyle(SecondaryButtonStyle())
+                    Button("Skip for now") { skip([r.id]) }.buttonStyle(.plain)
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
                 }
-                .font(.caption).foregroundStyle(.white.opacity(0.8))
+                .padding(.top, 6)
+            }
+        }
+    }
+
+    private var recentCard: some View {
+        HistoryCard(title: String(localized: "Recent Saves"), symbol: "clock.arrow.circlepath", tint: Module.clutter.tint,
+                    info: String(localized: "Your latest runs, with the time each one saved.")) {
+            if recent.isEmpty {
+                CardEmpty(message: String(localized: "Your recent saves will show up here."),
+                          action: String(localized: "Go to Toolkit")) { app.module = .myTools }
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(recent.enumerated()), id: \.offset) { i, e in
+                        entryRow(e)
+                        if i < recent.count - 1 { Divider().padding(.vertical, 9) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func entryRow(_ e: History.Entry) -> some View {
+        let scan = e.scanned != nil
+        let parts = (e.categories ?? [:]).compactMap { k, v in ActivityCategory(rawValue: k).map { ($0, v.bytes) } }.sorted { $0.1 > $1.1 }
+        let title: String = scan ? ActivityCategory.malwares.title
+            : parts.first.map { parts.count > 1 ? "\($0.0.title) +\(parts.count - 1)" : $0.0.title } ?? String(localized: "\(e.items) items done")
+        let result: String = scan
+            ? ((e.threats ?? 0) == 0 ? String(localized: "No threats found") : String(localized: "\(e.threats ?? 0) suspicious items found"))
+            : e.freed > 0 ? formatSize(e.freed) : String(localized: "\(e.items) items done")
+        return HStack(spacing: 12) {
+            IconChip(symbol: scan ? "hand.raised.fill" : "sparkles", tint: scan ? Module.protection.tint : DS.accent, size: 30)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                Text(e.date.formatted(date: .abbreviated, time: .shortened)).font(.system(size: 11.5)).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(result).font(.system(size: 12.5, weight: .medium)).monospacedDigit().lineLimit(1)
+                if !scan, e.minutesSaved > 0 {
+                    Text(ActivitySummary.format(minutes: e.minutesSaved)).font(.system(size: 11.5)).foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -189,161 +295,65 @@ struct ActivityScreen: View {
         case .backup: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Time-Machine-Settings.extension")!)
         }
     }
-
-    func go(_ module: Module) { app.module = module }
 }
 
-struct HealthCard: View {
-    let health: MacHealth?
-    let machine: String
-    @State private var info = false
-
-    var stateColor: Color { health?.state.color() ?? .white }
-
-    var body: some View {
-        let s = SystemMonitor.storage()
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Mac Health:").font(.callout).foregroundStyle(.white.opacity(0.7))
-            HStack(spacing: 6) {
-                Text(health?.state.title ?? "…").font(.system(size: 24, weight: .medium)).foregroundStyle(stateColor)
-                if let health {
-                    Button { info = true } label: { Image(systemName: "info.circle").foregroundStyle(.white.opacity(0.6)) }
-                        .buttonStyle(.plain)
-                        .popover(isPresented: $info) { Text(health.description).padding().frame(width: 260) }
-                }
-            }
-            Text(machine).font(.caption).foregroundStyle(.white.opacity(0.6))
-            Spacer()
-            HStack {
-                Text(s.name).font(.callout.weight(.semibold))
-                Spacer()
-                Text("\(formatSize(s.total - s.available)) of \(formatSize(s.total)) used").font(.caption)
-            }
-            .foregroundStyle(.white)
-            Bar(fraction: s.total > 0 ? Double(s.total - s.available) / Double(s.total) : 0, color: .white)
-        }
-        .padding(18)
-        .frame(height: 230)
-        .background(alignment: .topTrailing) {
-            // A glowing ring around the Mac in the colour of its health state.
-            ZStack {
-                Circle().stroke(LinearGradient(colors: [stateColor, stateColor.opacity(0.1)], startPoint: .top, endPoint: .bottom), lineWidth: 6)
-                    .blur(radius: 2).shadow(color: stateColor, radius: 12)
-                Image(systemName: "laptopcomputer").font(.system(size: 56)).foregroundStyle(.white.opacity(0.85))
-            }
-            .frame(width: 210, height: 210).offset(x: 80, y: -50)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .background(RoundedRectangle(cornerRadius: 18).fill(.white.opacity(0.08)))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.12)))
-    }
-}
-
-struct RecommendationRow: View {
-    let rec: MacHealth.Recommendation
-    let go: () -> Void
-    var skip: (() -> Void)?
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: rec.severe ? "exclamationmark.triangle.fill" : "sparkles")
-                .foregroundStyle(rec.severe ? .orange : .white).frame(width: 30, height: 30)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Module.myTools.accent.opacity(0.45)))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(rec.title).font(.callout.weight(.semibold)).foregroundStyle(.white).fixedSize(horizontal: false, vertical: true)
-                Text(rec.detail).font(.caption).foregroundStyle(.white.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
-                if let skip {
-                    Button("Skip for now", action: skip).buttonStyle(.plain).font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.85)).padding(.top, 2)
-                }
-            }
-            Spacer(minLength: 0)
-            Button("Go", action: go).buttonStyle(PillButtonStyle())
-        }
-    }
-}
-
-struct RecommendationsSheet: View {
-    let health: MacHealth?
-    let go: (MacHealth.Recommendation.Target) -> Void
-    let skip: ([String]) -> Void
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Recommendations").font(.title2.weight(.semibold))
-                Spacer()
-                Button("Hide All") { skip(health?.recommendations.map(\.id) ?? []) }
-                    .help("Hide every recommendation until tomorrow")
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
-            }
-            ScrollView {
-                VStack(spacing: 10) {
-                    ForEach(health?.recommendations ?? []) { r in
-                        RecommendationRow(rec: r, go: { go(r.target) }, skip: { skip([r.id]) })
-                            .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: 0x2B2541)))
-                    }
-                }
-            }
-        }
-        .padding(20)
-        .frame(width: 520, height: 460)
-        .environment(\.colorScheme, .dark)
-    }
-}
-
-/// One dashboard card: an info button, the figures, or an empty state with a button that leads somewhere useful.
-struct StatCard<Content: View>: View {
-    let info: String
+/// One History card: a small icon and title on top (with an optional info popover), then its content.
+struct HistoryCard<Content: View>: View {
+    let title: String
     let symbol: String
-    let empty: (String, String, Module)?
-    let go: (Module) -> Void
-    @ViewBuilder let content: Content
+    var tint: Color = DS.accent
+    var info: String? = nil
+    var trailing: AnyView = AnyView(EmptyView())
+    @ViewBuilder var content: Content
     @State private var showInfo = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let empty {
-                Spacer()
-                Image(systemName: symbol).font(.system(size: 46)).foregroundStyle(.white.opacity(0.8)).frame(maxWidth: .infinity)
-                Text(empty.0).font(.callout).multilineTextAlignment(.center).foregroundStyle(.white.opacity(0.8))
-                    .frame(maxWidth: .infinity).padding(.top, 10)
-                Spacer()
-                Button { go(empty.2) } label: { Text(empty.1).frame(maxWidth: .infinity) }.buttonStyle(PillButtonStyle())
-            } else {
-                content
-                Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                IconChip(symbol: symbol, tint: tint, size: 28)
+                Text(title).font(.system(size: 13.5, weight: .semibold)).lineLimit(1)
+                Spacer(minLength: 8)
+                trailing
+                if let info {
+                    Button { showInfo = true } label: { Image(systemName: "info.circle").foregroundStyle(.secondary) }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showInfo) { Text(info).padding().frame(width: 280) }
+                }
             }
+            content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 250, maxHeight: 250, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 18).fill(.white.opacity(0.08)))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.12)))
-        .overlay(alignment: .topTrailing) {
-            Button { showInfo = true } label: { Image(systemName: "info.circle").foregroundStyle(.white.opacity(0.5)) }
-                .buttonStyle(.plain).padding(12)
-                .popover(isPresented: $showInfo) { Text(info).padding().frame(width: 280) }
+        .frame(maxWidth: .infinity, minHeight: 210, alignment: .topLeading)
+        .card(radius: 16)
+    }
+}
+
+/// What a card shows before there is anything to count: a sentence, and a way to start.
+struct CardEmpty: View {
+    var symbol: String? = nil
+    var tint: Color = DS.accent
+    var title: String? = nil
+    let message: String
+    var action: String? = nil
+    var run: () -> Void = {}
+
+    var body: some View {
+        VStack(spacing: 10) {
+            if let symbol { IconChip(symbol: symbol, tint: tint, size: 40) }
+            if let title { Text(title).font(.system(size: 14, weight: .semibold)) }
+            Text(message).font(.system(size: 12.5)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if let action { Button(action, action: run).buttonStyle(SecondaryButtonStyle()).padding(.top, 4) }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.vertical, 8)
     }
 }
 
 struct Delta: View {
     let text: String
     var body: some View {
-        Label(text, systemImage: "arrow.up.right").font(.caption.weight(.medium)).foregroundStyle(Color(hex: 0x7EE8C8))
+        Label(text, systemImage: "arrow.up.right").font(.system(size: 12, weight: .medium)).foregroundStyle(DS.safe)
             .help("Monthly change")
-    }
-}
-
-struct Bar: View {
-    let fraction: Double
-    let color: Color
-    var body: some View {
-        GeometryReader { g in
-            ZStack(alignment: .leading) {
-                Capsule().fill(.white.opacity(0.15))
-                Capsule().fill(color).frame(width: g.size.width * min(max(fraction, 0), 1))
-            }
-        }
-        .frame(height: 5)
     }
 }
