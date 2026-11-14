@@ -16,13 +16,13 @@ struct AutomationSettingsView: View {
     }
 
     var body: some View {
-        Form {
+        SettingsForm {
             if authorization == .denied {
-                Section {
+                SettingsSection {
                     Label("Notifications are turned off for TidyMac. Rules that ask before cleaning cannot reach you.", systemImage: "bell.slash")
                 }
             }
-            Section {
+            SettingsSection {
                 if rules.isEmpty {
                     Text("No automations yet. Add one to clean junk on a schedule, or when your Mac needs it.")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -57,8 +57,6 @@ struct AutomationSettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
         .onChange(of: rules) { Automations.save($0) }
         .sheet(item: $editing) { e in
             RuleEditor(rule: e.rule, isNew: e.isNew, save: { saved in

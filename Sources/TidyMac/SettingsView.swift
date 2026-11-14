@@ -60,9 +60,8 @@ struct SettingsPage: View {
                 case .automations: AutomationSettingsView()
                 }
             }
-            .frame(maxWidth: 760, maxHeight: .infinity, alignment: .top)
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .toggleStyle(SettingsToggleStyle())
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
 }
@@ -84,7 +83,7 @@ struct UpdateSettingsView: View {
 
     var body: some View {
         Group {
-            Section {
+            SettingsSection {
                 LabeledContent("Version", value: versionLabel)
                 HStack {
                     statusView
@@ -100,7 +99,7 @@ struct UpdateSettingsView: View {
                 Text("A check asks GitHub for the latest release of TidyMac and sends nothing about your Mac. An automatic install downloads the signed release, checks it was made by the same developer, and swaps it in the next time you quit TidyMac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section {
+            SettingsSection {
                 Link("Project page", destination: SelfUpdate.projectPage)
                 Link("Report a problem", destination: SelfUpdate.issuesPage)
             }
@@ -169,9 +168,9 @@ struct NotificationSettingsView: View {
     private let trashOptions = [500_000_000, 1_000_000_000, 2_000_000_000, 5_000_000_000, 10_000_000_000]
 
     var body: some View {
-        Form {
+        SettingsForm {
             if authorization == .denied {
-                Section {
+                SettingsSection {
                     HStack {
                         Label("Notifications are turned off for TidyMac.", systemImage: "bell.slash")
                         Spacer()
@@ -181,7 +180,7 @@ struct NotificationSettingsView: View {
                     }
                 }
             }
-            Section("Disk Space") {
+            SettingsSection("Disk Space") {
                 limitRow(String(localized: "Warn when free space is less than"), isOn: $lowDisk, limit: $freeSpaceLimit, options: freeSpaceOptions)
                 limitRow(String(localized: "Notify if Trash size exceeds"), isOn: $trashSize, limit: $trashLimit, options: trashOptions)
                 if trashSize, SystemMonitor.trash() == nil {
@@ -190,7 +189,7 @@ struct NotificationSettingsView: View {
                 Toggle("Suggest to clean up overfilled external drives", isOn: $externalDrives)
                 Toggle("Notify when a drive is connected to the Mac", isOn: $driveConnected)
             }
-            Section("General") {
+            SettingsSection("General") {
                 HStack {
                     Toggle("Remind to run regular Full Scan", isOn: $smartCareReminder)
                     Spacer()
@@ -203,12 +202,12 @@ struct NotificationSettingsView: View {
                 Toggle("Warn about critical battery health", isOn: $battery)
                 Toggle("Warn when connected device batteries are running low", isOn: $bluetooth)
             }
-            Section("Applications") {
+            SettingsSection("Applications") {
                 described(String(localized: "Notify about hung applications"), isOn: $hungApps,
                           String(localized: "If any of your apps stop responding, force quit them right from the notification."))
                 Toggle("Notify when Chrome uses too much memory", isOn: $heavyChrome)
             }
-            Section {
+            SettingsSection {
                 Toggle("Notify about detected threats", isOn: $threats)
             } header: {
                 Text("Protection")
@@ -217,8 +216,6 @@ struct NotificationSettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
         .task {
             guard Bundle.main.bundleIdentifier != nil else { return }
             authorization = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
@@ -335,8 +332,8 @@ struct ScanSettingsView: View {
     @State private var showIgnoreList = false
 
     var body: some View {
-        Form {
-            Section {
+        SettingsForm {
+            SettingsSection {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Ignore List")
@@ -347,7 +344,7 @@ struct ScanSettingsView: View {
                     Button("Manage...") { showIgnoreList = true }
                 }
             }
-            Section {
+            SettingsSection {
                 ForEach(ScanSettings.smartCareModules, id: \.id) { m in
                     toggle(m.title, isOn: !settings.disabledSmartCare.contains(m.id),
                            isLast: settings.disabledSmartCare.count == ScanSettings.smartCareModules.count - 1) {
@@ -357,7 +354,7 @@ struct ScanSettingsView: View {
             } header: {
                 Text("Modules to scan using Full Scan:")
             }
-            Section {
+            SettingsSection {
                 ForEach(CleanupEngine.categories, id: \.id) { c in
                     toggle(c.title, isOn: !settings.disabledCleanup.contains(c.id),
                            isLast: settings.disabledCleanup.count == CleanupEngine.categories.count - 1) {
@@ -371,8 +368,6 @@ struct ScanSettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
         .onChange(of: settings) { $0.save() }
         .sheet(isPresented: $showIgnoreList, onDismiss: { ignored = IgnoreList.entries().count }) {
             VStack(spacing: 0) {
@@ -410,8 +405,8 @@ struct GeneralSettingsView: View {
     @State private var fullDiskAccess = Permissions.hasFullDiskAccess
 
     var body: some View {
-        Form {
-            Section("Appearance") {
+        SettingsForm {
+            SettingsSection("Appearance") {
                 HStack(spacing: 14) {
                     ForEach(GeneralSettings.Appearance.allCases, id: \.self) { mode in
                         AppearanceTile(mode: mode, selected: appearance == mode.rawValue) {
@@ -423,14 +418,19 @@ struct GeneralSettingsView: View {
                 }
                 .padding(.vertical, 4)
             }
-            Section("General") {
+            SettingsSection("General") {
                 Toggle("Play sounds for main TidyMac actions", isOn: $sounds)
-                Picker("Reduce Motion:", selection: $reduceMotion) {
-                    ForEach(GeneralSettings.ReduceMotion.allCases, id: \.self) { Text($0.title).tag($0.rawValue) }
+                HStack {
+                    Text("Reduce Motion:")
+                    Spacer()
+                    Picker("Reduce Motion:", selection: $reduceMotion) {
+                        ForEach(GeneralSettings.ReduceMotion.allCases, id: \.self) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .labelsHidden().fixedSize()
                 }
                 Toggle("Show Assistant recommendations", isOn: $assistant)
             }
-            Section {
+            SettingsSection {
                 Toggle("Open at Login", isOn: Binding(get: { openAtLogin }, set: { on in
                     do { try HealthMonitor.setOpensAtLogin(on); loginError = nil } catch { loginError = error.localizedDescription }
                     openAtLogin = HealthMonitor.opensAtLogin
@@ -450,7 +450,7 @@ struct GeneralSettingsView: View {
             } footer: {
                 Text("Open at Login keeps the menu and its alerts running after a restart.").font(.caption).foregroundStyle(.secondary)
             }
-            Section("Full Disk Access") {
+            SettingsSection("Full Disk Access") {
                 HStack {
                     Label(fullDiskAccess ? String(localized: "Full Disk Access enabled for TidyMac") : String(localized: "Full Disk Access disabled for TidyMac"),
                           systemImage: fullDiskAccess ? "checkmark.shield" : "exclamationmark.shield")
@@ -460,7 +460,7 @@ struct GeneralSettingsView: View {
             }
             UpdateSettingsView()
             if Bundle.main.bundleIdentifier != nil {
-                Section {
+                SettingsSection {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Uninstall TidyMac")
@@ -472,8 +472,6 @@ struct GeneralSettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
         // Picks up access granted in System Settings while this window was open.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             fullDiskAccess = Permissions.hasFullDiskAccess
@@ -545,8 +543,8 @@ struct ApplicationSettingsView: View {
     @State private var refused = false
 
     var body: some View {
-        Form {
-            Section {
+        SettingsForm {
+            SettingsSection {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Uninstall from Finder's right-click menu")
@@ -559,7 +557,7 @@ struct ApplicationSettingsView: View {
                     }
                 }
             }
-            Section {
+            SettingsSection {
                 folderRow(String(localized: "Applications"), path: "/Applications", removable: false)
                 folderRow("~/Applications", path: Paths.home("Applications").path, removable: false)
                 ForEach(folders, id: \.self) { folderRow(Paths.abbreviate(URL(fileURLWithPath: $0)), path: $0, removable: true) }
@@ -572,7 +570,7 @@ struct ApplicationSettingsView: View {
             } footer: {
                 Text("Drives you plug in are included automatically.").font(.caption).foregroundStyle(.secondary)
             }
-            Section {
+            SettingsSection {
                 VStack(alignment: .leading, spacing: 2) {
                     Toggle("Review leftovers when an app is deleted", isOn: $reviewLeftovers)
                     Text("If you put an application into Trash, you will be offered to remove the files it left behind.")
@@ -583,8 +581,6 @@ struct ApplicationSettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
     }
 
     private func folderRow(_ title: String, path: String, removable: Bool) -> some View {
