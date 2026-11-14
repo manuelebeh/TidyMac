@@ -6,6 +6,15 @@ A native macOS app to clean, protect and speed up your Mac, built with SwiftUI. 
 
 TidyMac is an independent project. It is not affiliated with or endorsed by any other Mac utility vendor.
 
+## Screenshots
+
+TidyMac follows your Mac's light or dark appearance, or the one you pick in Settings.
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png"><img src="docs/screenshots/overview-light.png" alt="The Overview screen with disk usage and the five areas of your Mac" width="49%"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/history-dark.png"><img src="docs/screenshots/history-light.png" alt="The History screen: Mac health, space cleaned, time saved, malware scans and recommendations" width="49%"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/toolkit-dark.png"><img src="docs/screenshots/toolkit-light.png" alt="The Toolkit: a grid of single-purpose tools" width="49%"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-dark.png"><img src="docs/screenshots/settings-light.png" alt="The Settings page with appearance, menu bar and startup options" width="49%"></picture>
+
 ## Features
 
 - **Overview**: disk usage and the five areas of your Mac at a glance, with one button to scan them all.
