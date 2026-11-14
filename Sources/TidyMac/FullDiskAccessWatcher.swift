@@ -28,12 +28,7 @@ struct FullDiskAccessBanner: View {
     var action: () -> Void = { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol).foregroundStyle(.yellow)
-            Text(message).font(.callout).foregroundStyle(.white)
-            Button(actionTitle, action: action).buttonStyle(PillButtonStyle())
-        }
-        .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Capsule().fill(.black.opacity(0.25)))
+        InfoBanner(message: message, symbol: symbol, tint: symbol == "lock.shield.fill" ? DS.caution : DS.safe,
+                   actionTitle: actionTitle, action: action)
     }
 }
