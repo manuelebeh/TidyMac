@@ -92,6 +92,8 @@ By contributing, you agree that your contribution is released under the same lic
 3. The Release workflow runs the tests, then creates a draft release with the DMG, the ZIP, `SHA256SUMS.txt` and `tidymac.rb`. Review it and publish it. The app's update check only sees published releases.
 4. Copy `tidymac.rb` to `Casks/` in a repository named `homebrew-tap`, so that `brew install --cask manuelebeh/tap/tidymac` installs that version.
 
+A version with a suffix, such as `1.0.0-rc.1`, makes a pre-release: tag it `v1.0.0-rc.1`. The workflow marks the draft as a pre-release and not as the latest one. The app's update check ignores pre-releases, so people on a stable version are never offered a release candidate, and a release candidate is offered the final release once it is published. Skip step 4 for a pre-release, so that the Homebrew tap keeps pointing at the last stable version.
+
 Running the workflow by hand from the Actions tab builds the same files as an artifact and publishes nothing. `Packaging/package.sh` does the same locally, into `dist/`.
 
 Signing and notarization need a paid Apple Developer account and a Developer ID Application certificate. The workflow uses them once these secrets exist. Without them, the app is signed ad hoc and people have to approve it by hand in System Settings.
