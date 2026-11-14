@@ -106,7 +106,8 @@ public enum Uninstaller {
                                      fm: FileManager = .default) -> [InstalledApp] {
         let kids = { (d: URL) in (try? fm.contentsOfDirectory(at: d, includingPropertiesForKeys: nil)) ?? [] }
         let dirs = [system.appendingPathComponent("Applications"), home.appendingPathComponent("Applications")]
-            + extraFolders.filter { canSearch($0, home: home) } + (drives ?? driveFolders(fm: fm))
+            + extraFolders.filter { canSearch($0, home: home) }
+            + (drives ?? driveFolders(volumes: system.appendingPathComponent("Volumes"), fm: fm))
         // Suites such as Adobe's install their apps one folder down.
         var bundles = Array(Set(dirs.map(\.standardizedFileURL))).flatMap { d in
             kids(d).flatMap { k in k.pathExtension == "app" ? [k] : kids(k).filter { $0.pathExtension == "app" } }
