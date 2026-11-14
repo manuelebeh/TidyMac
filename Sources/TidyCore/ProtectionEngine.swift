@@ -74,14 +74,14 @@ public struct ProtectionEngine: ScanEngine {
     }
 
     /// Not a signature engine: flags third-party launch items whose executable is missing,
-    /// unsigned, or lives in a temporary/hidden location — the usual adware persistence pattern.
+    /// unsigned, or lives in a temporary/hidden location - the usual adware persistence pattern.
     @Sendable static func suspiciousLaunchItems() -> ResultGroup {
         var items: [ResultItem] = []
         for li in LaunchItems.all() where !li.label.hasPrefix("com.apple.") {
             guard let exe = li.executable else { continue }
             if li.isBroken { continue } // reported by Cleanup as a broken login item
             var reasons: [String] = []
-            // Jobs that start a system tool (sh, open, osascript…) are judged by the paths they pass it.
+            // Jobs that start a system tool (sh, open, osascript...) are judged by the paths they pass it.
             let isSystemTool = !exe.hasPrefix("/") || ["/bin/", "/usr/bin/", "/usr/sbin/", "/sbin/", "/System/"].contains { exe.hasPrefix($0) }
             let paths = isSystemTool ? li.arguments.dropFirst().filter { $0.hasPrefix("/") } : [exe]
             if !isSystemTool, FileManager.default.isReadableFile(atPath: exe) {
@@ -94,7 +94,7 @@ public struct ProtectionEngine: ScanEngine {
             }
             guard !reasons.isEmpty else { continue }
             items.append(ResultItem(id: "threat:\(li.plist.path)", title: li.label,
-                                    subtitle: "\(exe) — \(reasons.joined(separator: ", "))", url: li.plist,
+                                    subtitle: "\(exe) - \(reasons.joined(separator: ", "))", url: li.plist,
                                     action: .removeLaunchItem(li.plist, admin: li.isSystemWide),
                                     selectedByDefault: false, badge: String(localized: "Suspicious")))
         }

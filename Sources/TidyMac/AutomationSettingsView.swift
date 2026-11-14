@@ -35,12 +35,12 @@ struct AutomationSettingsView: View {
                             if let r = results[rule.id] { Text(r).font(.caption) }
                         }
                         Spacer()
-                        Button(String(localized: "Run Now")) { runNow(rule) }.disabled(results[rule.id] == String(localized: "Running…"))
+                        Button(String(localized: "Run Now")) { runNow(rule) }.disabled(results[rule.id] == String(localized: "Running..."))
                         Button("Edit") { editing = Editing(rule: rule, isNew: false) }
                         Toggle(rule.name, isOn: $rule.enabled).labelsHidden().toggleStyle(.switch).controlSize(.small)
                     }
                     .contextMenu {
-                        Button("Edit…") { editing = Editing(rule: rule, isNew: false) }
+                        Button("Edit...") { editing = Editing(rule: rule, isNew: false) }
                         Button("Delete", role: .destructive) { delete(rule.id) }
                     }
                 }
@@ -73,7 +73,7 @@ struct AutomationSettingsView: View {
 
     /// Follows the rule's mode, so a rule that asks first only posts what it found.
     private func runNow(_ rule: Automations.Rule) {
-        results[rule.id] = "Running…"
+        results[rule.id] = "Running..."
         Task { results[rule.id] = await AutomationRunner.shared.run(rule) }
     }
 

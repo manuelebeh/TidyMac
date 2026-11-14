@@ -112,7 +112,7 @@ struct UninstallerSheet: View {
                             if let caption = caption(a) { Text(caption).font(.caption).foregroundStyle(.secondary) }
                         }
                         Spacer()
-                        Text(a.size > 0 ? formatSize(a.size) : "…").foregroundStyle(.secondary)
+                        Text(a.size > 0 ? formatSize(a.size) : "...").foregroundStyle(.secondary)
                     }.tag(a.id)
                 }
                 .overlay { if shown.isEmpty && !apps.isEmpty { Text(emptyText).foregroundStyle(.secondary).padding() } }

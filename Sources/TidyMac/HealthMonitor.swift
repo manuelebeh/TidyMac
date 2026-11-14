@@ -100,7 +100,7 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         content.title = String(localized: "TidyMac \(release.version) is available")
         content.body = String(localized: "Click to open the download page.")
         content.userInfo = ["open": release.page.absoluteString]
-        guard let center else { print("alert: \(content.title) — \(content.body)"); return }
+        guard let center else { print("alert: \(content.title) - \(content.body)"); return }
         try? await center.add(UNNotificationRequest(identifier: "update:\(release.version)", content: content, trigger: nil))
     }
 
@@ -114,14 +114,14 @@ final class HealthMonitor: NSObject, UNUserNotificationCenterDelegate {
         content.body = String(localized: "\(FileSize.format(drive.available)) available of \(FileSize.format(drive.total)). Click to show the drive in Finder.")
         content.categoryIdentifier = "drive"
         content.userInfo = ["reveal": drive.url.path]
-        guard let center else { print("alert: \(content.title) — \(content.body)"); return }
+        guard let center else { print("alert: \(content.title) - \(content.body)"); return }
         center.add(UNNotificationRequest(identifier: "mount:\(drive.url.path)", content: content, trigger: nil))
         // Its free space is checked right away rather than at the next minute.
         Task { await check() }
     }
 
     func post(_ a: HealthAlerts.Alert) {
-        guard let center else { print("alert: \(a.title) — \(a.body)"); return }
+        guard let center else { print("alert: \(a.title) - \(a.body)"); return }
         let content = UNMutableNotificationContent()
         content.title = a.title
         content.body = a.body

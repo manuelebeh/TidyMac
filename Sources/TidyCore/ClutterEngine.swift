@@ -32,7 +32,7 @@ public struct ClutterEngine: ScanEngine {
     ]
 
     /// Regular files under `root`, skipping hidden files, packages, ~/Library, source repositories
-    /// (folders with a `.git`) and generated build folders — the same user-file scope as Declutter.
+    /// (folders with a `.git`) and generated build folders - the same user-file scope as Declutter.
     public static func index(_ root: URL) -> [FileInfo] {
         let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .totalFileAllocatedSizeKey, .contentModificationDateKey, .contentAccessDateKey]
         guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys,

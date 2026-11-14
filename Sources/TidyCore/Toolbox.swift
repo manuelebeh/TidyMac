@@ -54,7 +54,7 @@ public enum Toolbox {
 
     public static let tools: [Tool] = [
         Tool(id: "screenCleaning", title: String(localized: "Screen Cleaning Mode"),
-             description: String(localized: "Ready to give your screen a proper clean? Keyboard locks — no accidental taps."),
+             description: String(localized: "Ready to give your screen a proper clean? Keyboard locks - no accidental taps."),
              symbol: "sparkles.tv", module: "smartCare", scanTitle: "",
              keywords: keywords("screen, clean, wipe, keyboard lock, display"), kind: .screenCleaning),
         Tool(id: "aiClutter", title: String(localized: "AI Clutter"),

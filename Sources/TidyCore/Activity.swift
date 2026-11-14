@@ -202,7 +202,7 @@ public struct ActivitySummary: Sendable {
     public var timeSavedHint: String {
         switch minutesThisMonth {
         case 0: String(localized: "Time savings dipped. Easy to improve!")
-        case ..<60: String(localized: "Going steady — let's save more time!")
+        case ..<60: String(localized: "Going steady - let's save more time!")
         case ..<420: String(localized: "Good progress on time saved!")
         default: String(localized: "That’s a solid time-saving win!")
         }

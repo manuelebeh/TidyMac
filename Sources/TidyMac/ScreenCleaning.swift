@@ -105,7 +105,7 @@ struct ScreenCleaningOverlay: View {
     @State private var sweep = false
     @State private var introVisible = true
     private let message = [
-        String(localized: "Thank you for this moment of care 🌱 Your Mac is in good hands — inside and out."),
+        String(localized: "Thank you for this moment of care 🌱 Your Mac is in good hands - inside and out."),
         String(localized: "Every swipe counts ✨ When you're done, let us help you find and remove duplicate files too."),
         String(localized: "While you clean the outside, Storage Map can show you what's taking up space inside 🌱"),
         String(localized: "Files unopened for over a year are most of the clutter 🥰 Large and Old Files can help you take care of them."),
@@ -122,7 +122,7 @@ struct ScreenCleaningOverlay: View {
                 if main {
                     VStack(spacing: 10) {
                         Text("Screen Cleaning Mode").font(.system(size: 34, weight: .light))
-                        Text("Your screen is ready — wipe it clean and make it shine.").font(.system(size: 16))
+                        Text("Your screen is ready - wipe it clean and make it shine.").font(.system(size: 16))
                     }
                     .foregroundStyle(.white.opacity(0.85))
                     .opacity(introVisible ? 1 : 0)
@@ -157,7 +157,7 @@ struct ScreenCleaningSuccess: View {
             Image(systemName: "sparkles").font(.system(size: 44)).foregroundStyle(.yellow)
             Text("Your screen is shining!").font(.title.weight(.semibold))
             Text(remindersOn ? String(localized: "Great! We'll remind you in 2 weeks.")
-                 : String(localized: "A clean screen, a happy Mac. Give your screen a clean every couple of weeks — we can send you a gentle nudge when it's time."))
+                 : String(localized: "A clean screen, a happy Mac. Give your screen a clean every couple of weeks - we can send you a gentle nudge when it's time."))
                 .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(width: 360)
             HStack {
                 if !remindersOn { Button("Turn On Reminders") { session.turnOnReminders(); remindersOn = true } }
