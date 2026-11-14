@@ -20,20 +20,17 @@ struct SpaceLensScreen: View {
     private let module = Module.spaceLens
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        VStack(alignment: .leading, spacing: 0) {
             if path.isEmpty {
-                HStack(spacing: 70) {
-                    GlassIcon(module: module)
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text(module.headline).font(.system(size: 38, weight: .light)).foregroundStyle(.white)
-                        Text(module.tagline).font(.system(size: 15)).foregroundStyle(.white.opacity(0.75)).frame(maxWidth: 360, alignment: .leading)
-                        VStack(alignment: .leading, spacing: 16) {
-                            ForEach(module.features, id: \.1) { FeatureRow(symbol: $0.0, title: $0.1, module: module) }
-                        }.padding(.top, 12)
-                    }
+                ScreenHeader(title: module.headline) { EmptyView() }
+                    .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 16)
+                Spacer(minLength: 0)
+                EmptyState(symbol: module.symbol, tint: module.tint, title: module.headline, message: module.tagline,
+                           actionTitle: String(localized: "Scan")) { selected = [:]; message = nil; path = [Paths.home] } extra: {
+                    FeaturePills(features: module.features, tint: module.tint)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.bottom, 90)
-                EdgeButton { ScanButton(title: String(localized: "Scan"), module: module) { selected = [:]; message = nil; path = [Paths.home] } }
+                Spacer(minLength: 0)
+                Spacer(minLength: 0).frame(height: 40)
             } else {
                 map
             }
@@ -54,42 +51,42 @@ struct SpaceLensScreen: View {
     var map: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 6) {
-                Button { path.removeLast() } label: { Image(systemName: "chevron.left") }.buttonStyle(PillButtonStyle())
+                Button { path.removeLast() } label: { Image(systemName: "chevron.left") }.buttonStyle(SecondaryButtonStyle())
                 ForEach(Array(path.enumerated()), id: \.offset) { i, u in
                     Button(i == 0 ? String(localized: "Home") : u.lastPathComponent) { path = Array(path.prefix(i + 1)) }
-                        .buttonStyle(.plain).foregroundStyle(.white.opacity(i == path.count - 1 ? 1 : 0.6))
-                    if i < path.count - 1 { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.white.opacity(0.5)) }
+                        .buttonStyle(.plain).foregroundStyle(.primary.opacity(i == path.count - 1 ? 1 : 0.6))
+                    if i < path.count - 1 { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
                 }
                 Spacer()
                 if loading { ProgressView().controlSize(.small) }
                 if let purgeable, purgeable > 0 { purgeableChip(purgeable) }
-                Text(formatSize(nodes.reduce(0) { $0 + $1.size })).foregroundStyle(.white.opacity(0.8))
+                Text(formatSize(nodes.reduce(0) { $0 + $1.size })).foregroundStyle(.primary.opacity(0.8))
             }
             HStack(spacing: 20) {
                 list.frame(width: 320)
                 bubbles
             }
             HStack {
-                Button("View Log") { showLog = true }.buttonStyle(.plain).foregroundStyle(.white.opacity(0.8))
-                if let message { Text(message).foregroundStyle(.white.opacity(0.8)) }
+                Button("View Log") { showLog = true }.buttonStyle(.plain).foregroundStyle(.primary.opacity(0.8))
+                if let message { Text(message).foregroundStyle(.primary.opacity(0.8)) }
                 Spacer()
                 let size = selected.values.reduce(0, +)
                 Button("Review and Remove \(selected.count) (\(formatSize(size)))") { reviewing = true }
-                    .buttonStyle(PillButtonStyle()).disabled(selected.isEmpty)
+                    .buttonStyle(SecondaryButtonStyle()).disabled(selected.isEmpty)
                     .help("This includes items from all selected folders.")
             }
         }
-        .padding(.horizontal, 30).padding(.top, 44).padding(.bottom, 20)
+        .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 20)
     }
 
     func purgeableChip(_ size: Int64) -> some View {
         Button { purgeableInfo = true } label: {
             Label("Purgeable Space: \(formatSize(size))", systemImage: "info.circle").font(.callout)
         }
-        .buttonStyle(.plain).foregroundStyle(.white.opacity(0.8))
+        .buttonStyle(.plain).foregroundStyle(.primary.opacity(0.8))
         .popover(isPresented: $purgeableInfo) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Purgeable space includes files your macOS marks as safe to remove when storage runs low — like caches, temporary data, and redownloadable content. Clean it in the Performance module.")
+                Text("Purgeable space includes files your macOS marks as safe to remove when storage runs low - like caches, temporary data, and redownloadable content. Clean it in the Performance module.")
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Clean Purgeable Space") { purgeableInfo = false; app.module = .performance }
             }
@@ -104,22 +101,22 @@ struct SpaceLensScreen: View {
                     let protection = SpaceLens.protection(of: n.url)
                     HStack {
                         if protection == .essential {
-                            Image(systemName: "lock.fill").foregroundStyle(.white.opacity(0.6)).frame(width: 18)
+                            Image(systemName: "lock.fill").foregroundStyle(.secondary).frame(width: 18)
                                 .help("This is an essential system item and it cannot be deleted.")
                         } else {
                             Toggle("", isOn: Binding(get: { selected[n.url] != nil }, set: { _ in toggle(n) })).labelsHidden()
                         }
-                        Image(systemName: n.isDirectory ? "folder.fill" : "doc.fill").foregroundStyle(.white.opacity(n.isHidden ? 0.5 : 0.9))
-                        Text(n.name).lineLimit(1).foregroundStyle(.white.opacity(n.isHidden ? 0.6 : 1))
+                        Image(systemName: n.isDirectory ? "folder.fill" : "doc.fill").foregroundStyle(.primary.opacity(n.isHidden ? 0.5 : 0.9))
+                        Text(n.name).lineLimit(1).foregroundStyle(.primary.opacity(n.isHidden ? 0.6 : 1))
                         if protection == .systemFolder {
                             Text("System folder").font(.caption2).foregroundStyle(.orange.opacity(0.9))
                                 .help("This folder is required for the system to operate. It’s not recommended to remove system folders.")
                         }
                         Spacer()
-                        Text(formatSize(n.size)).monospacedDigit().font(.callout).foregroundStyle(.white.opacity(0.75))
+                        Text(formatSize(n.size)).monospacedDigit().font(.callout).foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, 8).padding(.vertical, 5)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(.white.opacity(hovered == n.url ? 0.14 : 0)))
+                    .background(RoundedRectangle(cornerRadius: 8).fill(hovered == n.url ? DS.selection : Color.clear))
                     .contentShape(Rectangle())
                     .onHover { if $0 { hovered = n.url } }
                     .onTapGesture(count: 2) { if n.isDirectory { path.append(n.url) } }
@@ -127,7 +124,7 @@ struct SpaceLensScreen: View {
             }
         }
         .padding(8)
-        .background(RoundedRectangle(cornerRadius: 14).fill(.black.opacity(0.18)))
+        .background(RoundedRectangle(cornerRadius: 14).fill(DS.card))
     }
 
     var bubbles: some View {
@@ -157,7 +154,7 @@ struct SpaceLensScreen: View {
                         .onHover { if $0 { hovered = n.url } }
                         .onTapGesture(count: 2) { if n.isDirectory { path.append(n.url) } }
                         .onTapGesture { toggle(n) }
-                        .help("\(n.name) — \(formatSize(n.size))")
+                        .help("\(n.name) - \(formatSize(n.size))")
                 }
             }
             .animation(Motion.animation(.spring(duration: 0.5)), value: nodes.map(\.url))
