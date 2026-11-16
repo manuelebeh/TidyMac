@@ -10,7 +10,9 @@ struct TidyMacApp: App {
     init() { BundleMigration.run() }
 
     var body: some Scene {
-        WindowGroup("TidyMac", id: "main") {
+        // A single-instance `Window`, not a `WindowGroup`: openWindow(id:) from the menu bar panel or ⌘, would
+        // otherwise add another main window every time instead of bringing the existing one forward.
+        Window("TidyMac", id: "main") {
             RootView(app: app)
                 .frame(minWidth: 980, idealWidth: 1180, minHeight: 640, idealHeight: 740)
                 // A notification opens tidymac://open/<module>; reuse the open window instead of adding one.
