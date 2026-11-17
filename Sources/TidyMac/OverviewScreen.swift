@@ -36,19 +36,20 @@ struct OverviewScreen: View {
             }
             .headerPadding()
 
-            ScrollView {
+            GeometryReader { geo in ScrollView {
                 VStack(alignment: .leading, spacing: DS.Space.section) {
                     diskCard
                     systemSection
-                    HStack(alignment: .top, spacing: DS.Space.section) {
-                        consumersCard
-                        recommendationsCard
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: DS.Space.section) { consumersCard; recommendationsCard }
+                            .frame(minWidth: 760)
+                        VStack(spacing: DS.Space.section) { consumersCard; recommendationsCard }
                     }
-                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxHeight: .infinity)
                 }
                 .pagePadding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+                .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .topLeading)
+            } }
         }
         .onAppear { storage = SystemMonitor.storage() }
         .onReceive(refresh) { _ in
@@ -88,8 +89,11 @@ struct OverviewScreen: View {
                                 fraction: nil, warning: Metric.uptime(uptime).severity != .normal))
         return VStack(alignment: .leading, spacing: 8) {
             Text("System").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: DS.Space.section, alignment: .top)], spacing: DS.Space.section) {
-                ForEach(tiles) { StatusTileView(tile: $0) }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: DS.Space.section) { ForEach(tiles) { StatusTileView(tile: $0) } }
+                    .fixedSize(horizontal: false, vertical: true)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: DS.Space.section, alignment: .top), GridItem(.flexible(), alignment: .top)],
+                          spacing: DS.Space.section) { ForEach(tiles) { StatusTileView(tile: $0) } }
             }
         }
     }
@@ -97,7 +101,7 @@ struct OverviewScreen: View {
     private var consumersCard: some View {
         VStack(alignment: .leading, spacing: DS.Space.item) {
             Text("Top Consumers").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
-            ForEach(consumers.sorted { $0.memory > $1.memory }.prefix(5)) { c in
+            ForEach(consumers.sorted { $0.memory > $1.memory }.prefix(8)) { c in
                 HStack(spacing: 10) {
                     if let pid = c.pid, let image = NSRunningApplication(processIdentifier: pid)?.icon {
                         Image(nsImage: image).resizable().interpolation(.high).frame(width: 22, height: 22)
@@ -122,7 +126,7 @@ struct OverviewScreen: View {
             if recommendations.isEmpty {
                 Text("There are no recommendations for today.").font(.system(size: 12)).foregroundStyle(.secondary)
             } else {
-                ForEach(recommendations.prefix(3)) { r in
+                ForEach(recommendations.prefix(4)) { r in
                     HStack(alignment: .top, spacing: 10) {
                         IconChip(symbol: r.severe ? "exclamationmark.triangle.fill" : "sparkles", tint: r.severe ? DS.caution : DS.accent, size: 26)
                         VStack(alignment: .leading, spacing: 2) {
@@ -307,6 +311,7 @@ struct StatusTileView: View {
                 .frame(maxWidth: .infinity, minHeight: 30, alignment: .topLeading)
         }
         .padding(DS.Space.card)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .card()
         .help(tile.detail)
     }
