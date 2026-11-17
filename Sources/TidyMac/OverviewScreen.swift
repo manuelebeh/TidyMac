@@ -137,7 +137,8 @@ struct StorageBar: View {
 
     var body: some View {
         GeometryReader { geo in
-            let slices = layout(geo.size.width)
+            let width = geo.size.width
+            let slices = layout(width)
             ZStack(alignment: .topLeading) {
                 Rectangle().fill(DS.track)
                 ForEach(slices, id: \.segment.id) { item in
@@ -156,18 +157,19 @@ struct StorageBar: View {
             }
             .overlay(alignment: .topLeading) {
                 if let h = hovered, let item = slices.first(where: { $0.segment.id == h }) {
-                    VStack(spacing: 1) {
+                    // One line, so the bubble always fits between the top of the card and the bar (the page scroll clips what overflows).
+                    HStack(spacing: 6) {
                         Text(item.segment.title).font(.system(size: 12, weight: .semibold))
-                        Text(FileSize.format(item.segment.bytes)).font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
+                        Text(FileSize.format(item.segment.bytes)).font(.system(size: 12)).foregroundStyle(.secondary).monospacedDigit()
                     }
-                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
                     .fixedSize()
                     .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(DS.window))
                     .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(DS.border))
                     .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
                     // A zero-size anchor on the slice's centre, 8pt above the bar: the bubble is centred on it, bottom edge on it.
                     .frame(width: 0, height: 0, alignment: .bottom)
-                    .offset(x: item.x + item.w / 2, y: -8)
+                    .offset(x: min(max(item.x + item.w / 2, 90), max(width - 90, 90)) , y: -6)
                     .allowsHitTesting(false)
                     .transition(.opacity)
                 }
