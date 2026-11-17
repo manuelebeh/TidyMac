@@ -40,9 +40,9 @@ struct MyToolsScreen: View {
                 .padding(.horizontal, 12).padding(.vertical, 8).frame(width: 260)
                 .background(RoundedRectangle(cornerRadius: 10).fill(DS.selection))
             }
-            .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 18)
+            .headerPadding()
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: DS.Space.section) {
                     if shown.isEmpty {
                         Text("No tools match your search.\nTry a different keyword.")
                             .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.top, 80)
@@ -53,14 +53,14 @@ struct MyToolsScreen: View {
                         section(pinned.isEmpty ? "" : String(localized: "Other Tools"), others)
                     }
                 }
-                .padding(.horizontal, 32).padding(.bottom, 30)
+                .pagePadding()
             }
         }
     }
 
     @ViewBuilder func section(_ title: String, _ tools: [Tool]) -> some View {
-        if !title.isEmpty { Text(title).font(.headline).foregroundStyle(.primary.opacity(0.85)).padding(.top, 6) }
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: 16)], spacing: 16) {
+        if !title.isEmpty { Text(title).font(.headline).foregroundStyle(.primary.opacity(0.85))}
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: DS.Space.section)], spacing: DS.Space.section) {
             ForEach(tools) { t in
                 ToolCard(tool: t, favorite: favorites.contains(t.id), toggleFavorite: { toggleFavorite(t) }) { open(t) }
             }
@@ -100,7 +100,7 @@ struct ToolRunView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: back) { Label("Toolkit", systemImage: "chevron.left") }
-                .buttonStyle(SecondaryButtonStyle()).padding(.leading, 32).padding(.top, 30)
+                .buttonStyle(SecondaryButtonStyle()).padding(.leading, DS.Space.page).padding(.top, DS.Space.headerTop)
             // Back at the intro means the tool is closing: skip the module's own intro screen.
             if controller.phase != .intro { ModuleScreen(controller: controller) }
             Spacer(minLength: 0)
@@ -148,7 +148,7 @@ struct ToolCard: View {
                 Spacer()
                 if hover || favorite {
                     Button(action: toggleFavorite) {
-                        Image(systemName: favorite ? "star.fill" : "star").foregroundStyle(favorite ? .yellow : .secondary)
+                        Image(systemName: favorite ? "star.fill" : "star").foregroundStyle(favorite ? Color.primary : Color.secondary)
                     }
                     .buttonStyle(.plain).help(favorite ? String(localized: "Saved") : String(localized: "Save"))
                 }
@@ -163,10 +163,9 @@ struct ToolCard: View {
                 Button(buttonTitle, action: open).buttonStyle(SecondaryButtonStyle())
             }
         }
-        .padding(16)
+        .padding(DS.Space.card)
         .frame(height: 200, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(hover ? DS.cardHover : DS.card))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(DS.border))
+        .card(hovering: hover)
         .onHover { hover = $0 }
     }
 }

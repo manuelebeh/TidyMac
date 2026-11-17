@@ -321,7 +321,7 @@ struct TrayView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header.padding(.horizontal, 21).padding(.top, 18).padding(.bottom, 16)
+            header.padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 16)
             // Scrolls only when the cards and recommendations no longer fit on screen.
             Group {
                 if scrolls {
@@ -358,10 +358,10 @@ struct TrayView: View {
     }
 
     var content: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: DS.Space.item) {
             protectionCard
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 11, alignment: .top), GridItem(.flexible(), spacing: 11, alignment: .top)],
-                      alignment: .leading, spacing: 11) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: DS.Space.item, alignment: .top), GridItem(.flexible(), spacing: DS.Space.item, alignment: .top)],
+                      alignment: .leading, spacing: DS.Space.item) {
                 storageCard
                 memoryCard
                 if let b = monitor.battery { batteryCard(b) }
@@ -373,7 +373,7 @@ struct TrayView: View {
             if !monitor.visibleIssues.isEmpty { recommendations.transition(.opacity.combined(with: .offset(y: 8))) }
         }
         .padding(.horizontal, 10)
-        .padding(.bottom, 12)
+        .padding(.bottom, DS.Space.item)
     }
 
     // MARK: Header
@@ -407,9 +407,7 @@ struct TrayView: View {
         let shield: Color = last == nil ? .secondary : threats > 0 ? TrayStyle.warning : DS.safe
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: threats > 0 ? "exclamationmark.shield.fill" : "checkmark.shield.fill")
-                    .symbolRenderingMode(.palette).foregroundStyle(.white, shield)
-                    .font(.system(size: 19))
+                IconChip(symbol: threats > 0 ? "exclamationmark.shield.fill" : "checkmark.shield.fill", tint: last == nil ? Module.protection.tint : shield, size: 26)
                 Text("Protection").font(.system(size: 15, weight: .semibold))
                 Spacer()
                 if last == nil {
@@ -424,7 +422,7 @@ struct TrayView: View {
             Text(last.map { String(localized: "Last scan: \(RelativeDateTimeFormatter().localizedString(for: $0.date, relativeTo: Date()))") } ?? String(localized: "No scan yet"))
                 .font(.system(size: 11)).foregroundStyle(.secondary).padding(.top, 4)
         }
-        .padding(14)
+        .padding(DS.Space.rowH)
         .frame(maxWidth: .infinity, alignment: .leading)
         .trayCard(radius: 12)
         .contentShape(Rectangle())
@@ -492,7 +490,7 @@ struct TrayView: View {
         let value = b.isEmpty ? String(localized: "No devices connected")
             : b.count == 1 ? "\(b[0].name)\(b[0].lowest.map { " · \($0)%" } ?? "")" : String(localized: "\(b.count) connected")
         let low = b.contains { ($0.lowest ?? 100) <= HealthAlerts.bluetoothLowLevel }
-        return TrayTile(title: String(localized: "Connected Devices"), symbol: nil, subtitle: value, subtitleColor: low ? TrayStyle.warning : .secondary,
+        return TrayTile(title: String(localized: "Connected Devices"), symbol: "headphones", subtitle: value, subtitleColor: low ? TrayStyle.warning : .secondary,
                         selected: detail == .devices, hint: String(localized: "Click for Connected Devices details")) { toggle(.devices) }
     }
 
@@ -635,6 +633,19 @@ enum TrayStyle {
         }
     }
 
+    /// Badge colour of a monitor tile, as the icons in System Settings: one hue per kind of reading.
+    static func tint(for symbol: String) -> Color {
+        switch symbol {
+        case "internaldrive.fill": Module.smartCare.tint
+        case "memorychip": Module.spaceLens.tint
+        case "cpu": Module.performance.tint
+        case "wifi", "cable.connector": Module.applications.tint
+        case "headphones": Module.clutter.tint
+        case let s where s.hasPrefix("battery"): Module.cleanup.tint
+        default: DS.glyph
+        }
+    }
+
     /// Icon and text closer together than the system label.
     struct TightLabel: LabelStyle {
         func makeBody(configuration: Configuration) -> some View {
@@ -682,8 +693,7 @@ struct TrayTile<Extra: View>: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             if let symbol {
-                Image(systemName: symbol).font(.system(size: 15, weight: .medium)).foregroundStyle(.primary.opacity(0.9))
-                    .frame(width: 22, height: 17)
+                IconChip(symbol: symbol, tint: TrayStyle.tint(for: symbol), size: 26)
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -706,7 +716,7 @@ struct TrayTile<Extra: View>: View {
                 }
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 13)
+        .padding(.horizontal, DS.Space.rowH).padding(.vertical, DS.Space.item)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .trayCard(selected: selected, hover: hover)
         .contentShape(Rectangle())

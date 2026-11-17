@@ -9,9 +9,9 @@ struct SettingsForm<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) { content }
+            VStack(alignment: .leading, spacing: DS.Space.section + 8) { content }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 32).padding(.top, 8).padding(.bottom, 32)
+                .padding(.horizontal, DS.Space.page).padding(.top, DS.Space.tight).padding(.bottom, DS.Space.pageBottom)
         }
     }
 }
@@ -25,10 +25,10 @@ struct SettingsSection<Content: View, Header: View, Footer: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header.font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
-            VStack(alignment: .leading, spacing: 14) { content }
-                .padding(16)
+            VStack(alignment: .leading, spacing: DS.Space.item) { content }
+                .padding(DS.Space.card)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .card(radius: 12)
+                .card()
             footer.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
         }
     }

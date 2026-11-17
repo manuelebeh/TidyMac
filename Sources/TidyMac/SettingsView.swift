@@ -33,7 +33,7 @@ struct SettingsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScreenHeader(title: String(localized: "Settings")) { EmptyView() }
-                .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 14)
+                .padding(.horizontal, DS.Space.page).padding(.top, DS.Space.headerTop).padding(.bottom, DS.Space.item)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(Tab.allCases) { t in
@@ -48,9 +48,9 @@ struct SettingsPage: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, DS.Space.page)
             }
-            .padding(.bottom, 8)
+            .padding(.bottom, DS.Space.tight)
             Group {
                 switch tab {
                 case .general: GeneralSettingsView(app: app)
@@ -90,7 +90,7 @@ struct UpdateSettingsView: View {
                     Spacer()
                     Button("Check Now") { Task { await check() } }.disabled(status == .checking)
                 }
-                if let installError { Text(installError).font(.caption).foregroundStyle(.red) }
+                if let installError { Text(installError).font(.caption).foregroundStyle(DS.danger) }
                 Toggle("Check for new versions once a day", isOn: $checksDaily)
                 Toggle("Install new versions automatically", isOn: $installsAutomatically).disabled(!checksDaily)
             } header: {
@@ -439,7 +439,7 @@ struct GeneralSettingsView: View {
                     do { try HealthMonitor.setOpensAtLogin(on); loginError = nil } catch { loginError = error.localizedDescription }
                     openAtLogin = HealthMonitor.opensAtLogin
                 }))
-                if let loginError { Text(loginError).font(.caption).foregroundStyle(.red) }
+                if let loginError { Text(loginError).font(.caption).foregroundStyle(DS.danger) }
                 Toggle("Show TidyMac in the menu bar", isOn: $showInMenuBar)
                     .onChange(of: showInMenuBar) { _ in TrayController.updateVisibility(); AppDelegate.updateDockIcon() }
                 Toggle("Keep icon in Dock when TidyMac is not open", isOn: $keepInDock)
@@ -567,7 +567,7 @@ struct ApplicationSettingsView: View {
                 ForEach(folders, id: \.self) { folderRow(Paths.abbreviate(URL(fileURLWithPath: $0)), path: $0, removable: true) }
                 HStack {
                     Button("Add Folder...") { addFolder() }
-                    if refused { Text("TidyMac only looks in your home folder and on drives.").font(.caption).foregroundStyle(.red) }
+                    if refused { Text("TidyMac only looks in your home folder and on drives.").font(.caption).foregroundStyle(DS.danger) }
                 }
             } header: {
                 Text("Where TidyMac looks for apps")

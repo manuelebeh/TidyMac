@@ -58,15 +58,15 @@ enum Module: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .smartCare: "desktopcomputer"
-        case .cleanup: "circle.circle.fill"
-        case .protection: "hand.raised.fill"
-        case .performance: "bolt.fill"
-        case .applications: "xmark"
-        case .clutter: "folder.fill"
-        case .spaceLens: "circle.dashed"
-        case .myTools: "square.grid.2x2.fill"
-        case .activity: "chart.xyaxis.line"
+        case .smartCare: "house.fill"
+        case .cleanup: "trash.fill"
+        case .protection: "shield.lefthalf.filled"
+        case .performance: "speedometer"
+        case .applications: "macwindow"
+        case .clutter: "tray.full.fill"
+        case .spaceLens: "circle.hexagongrid.fill"
+        case .myTools: "wrench.and.screwdriver.fill"
+        case .activity: "clock.arrow.circlepath"
         }
     }
 
