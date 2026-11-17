@@ -140,11 +140,11 @@ struct OverviewScreen: View {
         VStack(alignment: .leading, spacing: DS.Space.item) {
             Text("Top Consumers").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
             ForEach(consumers.sorted { $0.memory > $1.memory }.prefix(8)) { c in
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     if let pid = c.pid, let image = NSRunningApplication(processIdentifier: pid)?.icon {
-                        Image(nsImage: image).resizable().interpolation(.high).frame(width: 22, height: 22)
+                        Image(nsImage: image).resizable().interpolation(.high).frame(width: 32, height: 32)
                     } else {
-                        Image(systemName: "gearshape.fill").font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 22, height: 22)
+                        IconChip(symbol: "gearshape.fill", tint: DS.glyph, size: 32)
                     }
                     Text(c.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
                     Spacer(minLength: 8)
@@ -165,8 +165,8 @@ struct OverviewScreen: View {
                 Text("There are no recommendations for today.").font(.system(size: 12)).foregroundStyle(.secondary)
             } else {
                 ForEach(recommendations.prefix(4)) { r in
-                    HStack(alignment: .top, spacing: 10) {
-                        IconChip(symbol: r.severe ? "exclamationmark.triangle.fill" : "sparkles", tint: r.severe ? DS.caution : DS.accent, size: 26)
+                    HStack(alignment: .top, spacing: 12) {
+                        IconChip(symbol: r.severe ? "exclamationmark.triangle.fill" : "sparkles", tint: r.severe ? DS.caution : DS.accent, size: 32)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(r.title).font(.system(size: 13, weight: .semibold)).lineLimit(2)
                             Text(r.detail).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)

@@ -240,11 +240,13 @@ struct ActivityScreen: View {
                 recommendationRow(recs[0])
                     .padding(DS.Space.item)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(DS.window))
                     .card(radius: 12)
                     .background(alignment: .top) {
                         ZStack(alignment: .top) {
                             ForEach(Array((1...max(layers, 1)).reversed()), id: \.self) { i in
-                                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(DS.cardHover)
+                                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(DS.window)
+                                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(DS.card))
                                     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(DS.border))
                                     .padding(.horizontal, CGFloat(i) * 10)
                                     .offset(y: CGFloat(i) * 8)
@@ -277,6 +279,7 @@ struct ActivityScreen: View {
                 .padding(.top, 6)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var recentCard: some View {
