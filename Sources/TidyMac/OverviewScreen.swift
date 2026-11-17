@@ -1,7 +1,8 @@
+import Combine
 import SwiftUI
 import TidyCore
 
-/// Home: how full the disk is, and one row per area of the app with what its last scan found.
+/// Home: how full the disk is, and live readings of the Mac (memory, processor, battery, uptime).
 /// Starting the Full Scan hands the window over to the regular module screens until it is dismissed.
 struct OverviewScreen: View {
     @ObservedObject var app: AppState
@@ -10,7 +11,10 @@ struct OverviewScreen: View {
     @State private var parts: [StorageBreakdown.Part] = []
     @State private var hoveredSlice: String?
 
-    private let areas: [Module] = [.cleanup, .clutter, .applications, .protection, .performance, .spaceLens]
+    @State private var memory = SystemMonitor.memory()
+    @State private var cpu = SystemMonitor.cpu()
+    @State private var battery = SystemMonitor.battery()
+    private let refresh = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
     var body: some View {
         if controller.phase == .intro {
@@ -33,20 +37,46 @@ struct OverviewScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Space.section) {
                     diskCard
-                    VStack(spacing: 0) {
-                        ForEach(Array(areas.enumerated()), id: \.element) { i, m in
-                            AreaRow(module: m, app: app)
-                            if i < areas.count - 1 { Divider().padding(.leading, 64) }
-                        }
-                    }
-                    .card()
+                    systemSection
                 }
                 .pagePadding()
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .onAppear { storage = SystemMonitor.storage() }
+        .onReceive(refresh) { _ in
+            memory = SystemMonitor.memory(); cpu = SystemMonitor.cpu(); battery = SystemMonitor.battery()
+        }
         .task { for await measured in StorageBreakdown.measure() { parts = measured } }
+    }
+
+    // MARK: System
+
+    private var systemSection: some View {
+        let uptime = SystemMonitor.uptime()
+        var tiles: [StatusTile] = [
+            StatusTile(id: "memory", symbol: "memorychip", tint: Module.spaceLens.tint, title: String(localized: "Memory"),
+                       value: formatSize(memory.used), detail: String(localized: "\(formatSize(memory.used)) of \(formatSize(memory.total)) used"),
+                       fraction: memory.total > 0 ? Double(memory.used) / Double(memory.total) : 0,
+                       warning: memory.pressureLevel >= 2),
+            StatusTile(id: "cpu", symbol: "cpu", tint: Module.performance.tint, title: String(localized: "Processor"),
+                       value: "\(Int(cpu.load * 100))%", detail: String(localized: "Load"), fraction: cpu.load, warning: cpu.load > 0.8),
+        ]
+        if let battery {
+            tiles.append(StatusTile(id: "battery", symbol: battery.isCharging ? "battery.100.bolt" : "battery.75", tint: Module.cleanup.tint,
+                                    title: String(localized: "Battery"), value: "\(battery.percent)%", detail: battery.status,
+                                    fraction: Double(battery.percent) / 100, warning: !battery.isPluggedIn && battery.percent <= 20))
+        }
+        tiles.append(StatusTile(id: "uptime", symbol: "clock.fill", tint: Module.smartCare.tint, title: String(localized: "Uptime"),
+                                value: Metric.formatUptime(uptime), detail: Metric.uptime(uptime).severity == .normal
+                                    ? String(localized: "Your Mac was restarted less than a week ago.") : String(localized: "It’s been over a week now. Restart your Mac once in a while."),
+                                fraction: nil, warning: Metric.uptime(uptime).severity != .normal))
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("System").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: DS.Space.section, alignment: .top)], spacing: DS.Space.section) {
+                ForEach(tiles) { StatusTileView(tile: $0) }
+            }
+        }
     }
 
     // MARK: Storage
@@ -180,42 +210,42 @@ struct StorageBar: View {
     }
 }
 
-/// An area of the app: icon, name, one line about it, and either the size a scan found or a chevron.
-struct AreaRow: View {
-    let module: Module
-    @ObservedObject var app: AppState
-    @ObservedObject private var controller: ModuleController
-    @State private var hover = false
-
-    init(module: Module, app: AppState) {
-        self.module = module
-        self.app = app
-        _controller = ObservedObject(wrappedValue: app.controllers[module]!)
+struct StatusTile: Identifiable {
+    let id: String, symbol: String, title: String, value: String, detail: String
+    let tint: Color, fraction: Double?, warning: Bool
+    init(id: String, symbol: String, tint: Color, title: String, value: String, detail: String, fraction: Double?, warning: Bool) {
+        self.id = id; self.symbol = symbol; self.tint = tint; self.title = title; self.value = value
+        self.detail = detail; self.fraction = fraction; self.warning = warning
     }
+}
 
-    private var found: String? {
-        guard controller.phase == .results, controller.totalSize > 0 else { return nil }
-        return formatSize(controller.totalSize)
-    }
+/// A live reading of the Mac: badge, name, the value, a short line and (when it has a scale) a thin gauge.
+struct StatusTileView: View {
+    let tile: StatusTile
 
     var body: some View {
-        Button { app.module = module } label: {
-            HStack(spacing: DS.Space.item) {
-                IconChip(symbol: module.symbol, tint: module.tint, size: 36)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(module.name).font(.system(size: 14, weight: .semibold))
-                    Text(module.tagline).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Spacer(minLength: 12)
-                if let found { Text(found).font(.system(size: 14, weight: .semibold)).monospacedDigit() }
-                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: DS.Space.tight) {
+            HStack(spacing: 10) {
+                IconChip(symbol: tile.symbol, tint: tile.tint, size: 28)
+                Text(tile.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, DS.Space.rowH).padding(.vertical, DS.Space.item)
-            .background(hover ? DS.selection.opacity(0.5) : Color.clear)
-            .contentShape(Rectangle())
+            Text(tile.value).font(.system(size: 24, weight: .semibold)).monospacedDigit()
+                .foregroundStyle(tile.warning ? DS.caution : .primary).lineLimit(1)
+            if let f = tile.fraction {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(DS.track)
+                        Capsule().fill(tile.warning ? DS.caution : tile.tint).frame(width: max(4, geo.size.width * min(max(f, 0), 1)))
+                    }
+                }
+                .frame(height: 5)
+            }
+            Text(tile.detail).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
+                .frame(maxWidth: .infinity, minHeight: 30, alignment: .topLeading)
         }
-        .buttonStyle(.plain)
-        .help(module.tagline)
-        .onHover { hover = $0 }
+        .padding(DS.Space.card)
+        .card()
+        .help(tile.detail)
     }
 }
