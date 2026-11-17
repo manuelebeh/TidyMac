@@ -345,6 +345,10 @@
 "Leftovers Removed" = "Résidus supprimés";
 "Limit" = "Limite";
 "Load" = "Charge";
+"Processor" = "Processeur";
+"Recommendations" = "Recommandations";
+"Quick Actions" = "Actions rapides";
+"Purgeable Space" = "Espace purgeable";
 "Load: %lld%%" = "Charge : %lld %%";
 "Local Models" = "Modèles locaux";
 "Local Storage Cleaned" = "Stockage local nettoyé";

@@ -142,7 +142,7 @@ struct ToolCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
                 IconChip(symbol: tool.symbol, tint: module.tint, size: 38)
                 Spacer()

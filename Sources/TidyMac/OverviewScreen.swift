@@ -1,7 +1,8 @@
+import Combine
 import SwiftUI
 import TidyCore
 
-/// Home: how full the disk is, and one row per area of the app with what its last scan found.
+/// Home: how full the disk is, and live readings of the Mac (memory, processor, battery, uptime).
 /// Starting the Full Scan hands the window over to the regular module screens until it is dismissed.
 struct OverviewScreen: View {
     @ObservedObject var app: AppState
@@ -10,7 +11,15 @@ struct OverviewScreen: View {
     @State private var parts: [StorageBreakdown.Part] = []
     @State private var hoveredSlice: String?
 
-    private let areas: [Module] = [.cleanup, .clutter, .applications, .protection, .performance, .spaceLens]
+    @State private var memory = SystemMonitor.memory()
+    @State private var cpu = SystemMonitor.cpu()
+    @State private var battery = SystemMonitor.battery()
+    @State private var freeingMemory = false
+    @State private var trash = SystemMonitor.trash()
+    @State private var purgeable = SpaceLens.purgeableSpace()
+    @State private var consumers: [SystemMonitor.Consumer] = []
+    @State private var recommendations: [MacHealth.Recommendation] = []
+    private let refresh = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
     var body: some View {
         if controller.phase == .intro {
@@ -33,20 +42,145 @@ struct OverviewScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Space.section) {
                     diskCard
-                    VStack(spacing: 0) {
-                        ForEach(Array(areas.enumerated()), id: \.element) { i, m in
-                            AreaRow(module: m, app: app)
-                            if i < areas.count - 1 { Divider().padding(.leading, 64) }
-                        }
+                    systemSection
+                    actionsSection
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: DS.Space.section) { consumersCard; recommendationsCard }
+                            .fixedSize(horizontal: false, vertical: true).frame(minWidth: 760)
+                        VStack(spacing: DS.Space.section) { consumersCard; recommendationsCard }
                     }
-                    .card()
                 }
                 .pagePadding()
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
         .onAppear { storage = SystemMonitor.storage() }
+        .onReceive(refresh) { _ in
+            memory = SystemMonitor.memory(); cpu = SystemMonitor.cpu(); battery = SystemMonitor.battery()
+            trash = SystemMonitor.trash()
+            Task { consumers = await Task.detached { SystemMonitor.consumers() }.value }
+        }
+        .task {
+            let due = ScreenCleaningSession.reminderDue, fda = Permissions.hasFullDiskAccess
+            recommendations = await Task.detached {
+                MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: due, driveHealth: SystemMonitor.driveHealth()).recommendations
+            }.value
+        }
+        .task { consumers = await Task.detached { SystemMonitor.consumers() }.value }
         .task { for await measured in StorageBreakdown.measure() { parts = measured } }
+    }
+
+    // MARK: System
+
+    private var systemSection: some View {
+        let uptime = SystemMonitor.uptime()
+        var tiles: [StatusTile] = [
+            StatusTile(id: "memory", symbol: "memorychip", tint: Module.spaceLens.tint, title: String(localized: "Memory"),
+                       value: formatSize(memory.used), detail: String(localized: "\(formatSize(memory.used)) of \(formatSize(memory.total)) used"),
+                       fraction: memory.total > 0 ? Double(memory.used) / Double(memory.total) : 0,
+                       warning: memory.pressureLevel >= 2),
+            StatusTile(id: "cpu", symbol: "cpu", tint: Module.performance.tint, title: String(localized: "Processor"),
+                       value: "\(Int(cpu.load * 100))%", detail: String(localized: "Load"), fraction: cpu.load, warning: cpu.load > 0.8),
+        ]
+        if let battery {
+            tiles.append(StatusTile(id: "battery", symbol: battery.isCharging ? "battery.100.bolt" : "battery.75", tint: Module.cleanup.tint,
+                                    title: String(localized: "Battery"), value: "\(battery.percent)%", detail: battery.status,
+                                    fraction: Double(battery.percent) / 100, warning: !battery.isPluggedIn && battery.percent <= 20))
+        }
+        tiles.append(StatusTile(id: "uptime", symbol: "clock.fill", tint: Module.smartCare.tint, title: String(localized: "Uptime"),
+                                value: Metric.formatUptime(uptime), detail: Metric.uptime(uptime).severity == .normal
+                                    ? String(localized: "Your Mac was restarted less than a week ago.") : String(localized: "It’s been over a week now. Restart your Mac once in a while."),
+                                fraction: nil, warning: Metric.uptime(uptime).severity != .normal))
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("System").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: DS.Space.section) { ForEach(tiles) { StatusTileView(tile: $0) } }
+                    .fixedSize(horizontal: false, vertical: true)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: DS.Space.section, alignment: .top), GridItem(.flexible(), alignment: .top)],
+                          spacing: DS.Space.section) { ForEach(tiles) { StatusTileView(tile: $0) } }
+            }
+        }
+    }
+
+    // MARK: Quick actions
+
+    private var actionsSection: some View {
+        let actions: [QuickAction] = [
+            QuickAction(id: "ram", symbol: "memorychip", tint: Module.spaceLens.tint, title: String(localized: "Free Up RAM"),
+                        detail: String(localized: "Flushes inactive memory so apps get room to work."),
+                        button: String(localized: "Free Up"), busy: freeingMemory) { freeUpMemory() },
+            QuickAction(id: "trash", symbol: "trash.fill", tint: Module.cleanup.tint, title: String(localized: "Trash"),
+                        detail: trash.map { formatSize($0.size) } ?? "–", button: String(localized: "Review"), busy: false) { app.module = .cleanup },
+            QuickAction(id: "purgeable", symbol: "externaldrive.fill", tint: Module.performance.tint, title: String(localized: "Purgeable Space"),
+                        detail: purgeable.map { formatSize($0) } ?? "–", button: String(localized: "Review"), busy: false) { app.module = .performance },
+        ]
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Quick Actions").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: DS.Space.section) { ForEach(actions) { QuickActionView(action: $0) } }
+                    .fixedSize(horizontal: false, vertical: true).frame(minWidth: 600)
+                VStack(spacing: DS.Space.section) { ForEach(actions) { QuickActionView(action: $0) } }
+            }
+        }
+    }
+
+    /// `purge` needs root, so macOS asks for the password.
+    private func freeUpMemory() {
+        freeingMemory = true
+        Task {
+            var item = ResultItem(title: String(localized: "Free Up RAM"), action: .run(Command("/usr/sbin/purge"), admin: true))
+            item.category = "maintenance"
+            _ = await Task.detached { [item] in await Executor.run([item]) }.value
+            freeingMemory = false
+            memory = SystemMonitor.memory()
+        }
+    }
+
+    private var consumersCard: some View {
+        VStack(alignment: .leading, spacing: DS.Space.item) {
+            Text("Top Consumers").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+            ForEach(consumers.sorted { $0.memory > $1.memory }.prefix(8)) { c in
+                HStack(spacing: 12) {
+                    if let pid = c.pid, let image = NSRunningApplication(processIdentifier: pid)?.icon {
+                        Image(nsImage: image).resizable().interpolation(.high).frame(width: 32, height: 32)
+                    } else {
+                        IconChip(symbol: "gearshape.fill", tint: DS.glyph, size: 32)
+                    }
+                    Text(c.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(FileSize.format(c.memory)).font(.system(size: 13)).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(DS.Space.card)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .card()
+    }
+
+    private var recommendationsCard: some View {
+        VStack(alignment: .leading, spacing: DS.Space.item) {
+            Text("Recommendations").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+            if recommendations.isEmpty {
+                Text("There are no recommendations for today.").font(.system(size: 12)).foregroundStyle(.secondary)
+            } else {
+                ForEach(recommendations.prefix(4)) { r in
+                    HStack(alignment: .top, spacing: 12) {
+                        IconChip(symbol: r.severe ? "exclamationmark.triangle.fill" : "sparkles", tint: r.severe ? DS.caution : DS.accent, size: 32)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(r.title).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+                            Text(r.detail).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+            Button(String(localized: "History")) { app.module = .activity }.buttonStyle(.plain)
+                .font(.system(size: 12.5)).foregroundStyle(DS.accent)
+        }
+        .padding(DS.Space.card)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .card()
     }
 
     // MARK: Storage
@@ -180,42 +314,73 @@ struct StorageBar: View {
     }
 }
 
-/// An area of the app: icon, name, one line about it, and either the size a scan found or a chevron.
-struct AreaRow: View {
-    let module: Module
-    @ObservedObject var app: AppState
-    @ObservedObject private var controller: ModuleController
-    @State private var hover = false
-
-    init(module: Module, app: AppState) {
-        self.module = module
-        self.app = app
-        _controller = ObservedObject(wrappedValue: app.controllers[module]!)
+struct StatusTile: Identifiable {
+    let id: String, symbol: String, title: String, value: String, detail: String
+    let tint: Color, fraction: Double?, warning: Bool
+    init(id: String, symbol: String, tint: Color, title: String, value: String, detail: String, fraction: Double?, warning: Bool) {
+        self.id = id; self.symbol = symbol; self.tint = tint; self.title = title; self.value = value
+        self.detail = detail; self.fraction = fraction; self.warning = warning
     }
+}
 
-    private var found: String? {
-        guard controller.phase == .results, controller.totalSize > 0 else { return nil }
-        return formatSize(controller.totalSize)
-    }
+/// A live reading of the Mac: badge, name, the value, a short line and (when it has a scale) a thin gauge.
+struct StatusTileView: View {
+    let tile: StatusTile
 
     var body: some View {
-        Button { app.module = module } label: {
-            HStack(spacing: DS.Space.item) {
-                IconChip(symbol: module.symbol, tint: module.tint, size: 36)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(module.name).font(.system(size: 14, weight: .semibold))
-                    Text(module.tagline).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Spacer(minLength: 12)
-                if let found { Text(found).font(.system(size: 14, weight: .semibold)).monospacedDigit() }
-                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: DS.Space.tight) {
+            HStack(spacing: 10) {
+                IconChip(symbol: tile.symbol, tint: tile.tint, size: 28)
+                Text(tile.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, DS.Space.rowH).padding(.vertical, DS.Space.item)
-            .background(hover ? DS.selection.opacity(0.5) : Color.clear)
-            .contentShape(Rectangle())
+            Text(tile.value).font(.system(size: 24, weight: .semibold)).monospacedDigit()
+                .foregroundStyle(tile.warning ? DS.caution : .primary).lineLimit(1)
+            if let f = tile.fraction {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(DS.track)
+                        Capsule().fill(tile.warning ? DS.caution : tile.tint).frame(width: max(4, geo.size.width * min(max(f, 0), 1)))
+                    }
+                }
+                .frame(height: 5)
+            }
+            Text(tile.detail).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
+                .frame(maxWidth: .infinity, minHeight: 30, alignment: .topLeading)
         }
-        .buttonStyle(.plain)
-        .help(module.tagline)
-        .onHover { hover = $0 }
+        .padding(DS.Space.card)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .card()
+        .help(tile.detail)
+    }
+}
+
+struct QuickAction: Identifiable {
+    let id: String, symbol: String, title: String, detail: String, button: String
+    let tint: Color, busy: Bool, run: () -> Void
+    init(id: String, symbol: String, tint: Color, title: String, detail: String, button: String, busy: Bool, run: @escaping () -> Void) {
+        self.id = id; self.symbol = symbol; self.tint = tint; self.title = title; self.detail = detail
+        self.button = button; self.busy = busy; self.run = run
+    }
+}
+
+/// One thing to do right now: badge, name, what it concerns, and the button.
+struct QuickActionView: View {
+    let action: QuickAction
+
+    var body: some View {
+        HStack(alignment: .center, spacing: DS.Space.item) {
+            IconChip(symbol: action.symbol, tint: action.tint, size: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(action.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                Text(action.detail).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            if action.busy { ProgressView().controlSize(.small) }
+            else { Button(action.button, action: action.run).buttonStyle(SecondaryButtonStyle()) }
+        }
+        .padding(DS.Space.card)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .card()
     }
 }

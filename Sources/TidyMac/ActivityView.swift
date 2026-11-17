@@ -233,18 +233,26 @@ struct ActivityScreen: View {
                 VStack(spacing: 0) {
                     ForEach(Array(recs.enumerated()), id: \.element.id) { i, r in
                         recommendationRow(r)
-                        if i < recs.count - 1 { Divider().padding(.vertical, 10) }
+                        if i < recs.count - 1 { Divider().padding(.vertical, 14) }
                     }
                 }
             } else {
                 recommendationRow(recs[0])
                     .padding(DS.Space.item)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .card(radius: 12)
+                    .background {
+                        // Solid, one step lighter than the card it sits in, so it reads as the top of the stack.
+                        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        shape.fill(DS.window).overlay(shape.fill(DS.card)).overlay(shape.fill(DS.card))
+                            .overlay(shape.strokeBorder(DS.border))
+                            .shadow(color: .black.opacity(0.12), radius: 4, y: 1)
+                    }
                     .background(alignment: .top) {
                         ZStack(alignment: .top) {
                             ForEach(Array((1...max(layers, 1)).reversed()), id: \.self) { i in
-                                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(DS.cardHover)
+                                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(DS.window)
+                                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(DS.card))
+                                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.black.opacity(0.14)))
                                     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(DS.border))
                                     .padding(.horizontal, CGFloat(i) * 10)
                                     .offset(y: CGFloat(i) * 8)
@@ -277,6 +285,7 @@ struct ActivityScreen: View {
                 .padding(.top, 6)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var recentCard: some View {
@@ -289,7 +298,7 @@ struct ActivityScreen: View {
                 VStack(spacing: 0) {
                     ForEach(Array(recent.enumerated()), id: \.offset) { i, e in
                         entryRow(e)
-                        if i < recent.count - 1 { Divider().padding(.vertical, 9) }
+                        if i < recent.count - 1 { Divider().padding(.vertical, 13) }
                     }
                 }
             }
