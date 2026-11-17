@@ -109,7 +109,8 @@ public enum Uninstaller {
             + extraFolders.filter { canSearch($0, home: home) }
             + (drives ?? driveFolders(volumes: system.appendingPathComponent("Volumes"), fm: fm))
         // Suites such as Adobe's install their apps one folder down.
-        var bundles = Array(Set(dirs.map(\.standardizedFileURL))).flatMap { d in
+        // The startup disk is also listed under /Volumes as a link to "/": resolve links so its apps are not listed twice.
+        var bundles = Array(Set(dirs.map { $0.resolvingSymlinksInPath().standardizedFileURL })).flatMap { d in
             kids(d).flatMap { k in k.pathExtension == "app" ? [k] : kids(k).filter { $0.pathExtension == "app" } }
         }
         bundles += kids(home.appendingPathComponent("Library/Application Support/Steam/steamapps/common"))
