@@ -165,8 +165,9 @@ struct StorageBar: View {
                     .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(DS.window))
                     .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(DS.border))
                     .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
-                    .alignmentGuide(.leading) { d in d.width / 2 - (item.x + item.w / 2) }
-                    .alignmentGuide(.top) { d in d.height + 8 }
+                    // A zero-size anchor on the slice's centre, 8pt above the bar: the bubble is centred on it, bottom edge on it.
+                    .frame(width: 0, height: 0, alignment: .bottom)
+                    .offset(x: item.x + item.w / 2, y: -8)
                     .allowsHitTesting(false)
                     .transition(.opacity)
                 }
