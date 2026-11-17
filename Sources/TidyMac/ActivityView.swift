@@ -11,6 +11,7 @@ struct ActivityScreen: View {
     @State private var machine = "Mac"
     @State private var showUnused = false
     @State private var confirmRestart = false
+    @State private var showAllRecommendations = false
     @AppStorage(GeneralSettings.assistantKey) private var showsAssistant = true
 
     var body: some View {
@@ -215,14 +216,50 @@ struct ActivityScreen: View {
                     CardEmpty(symbol: "checkmark.seal.fill", tint: DS.safe, title: String(localized: "You’re all good!"),
                               message: String(localized: "There are no recommendations for today."))
                 }
+            } else if recs.count == 1 {
+                recommendationRow(recs[0])
             } else {
+                recommendationStack(recs)
+            }
+        }
+    }
+
+    /// Several recommendations as a stack of cards: the first one in full, the next ones peeking out behind it.
+    /// Skipping or acting on the first brings the next one forward; "Show more" spreads the whole stack out.
+    private func recommendationStack(_ recs: [MacHealth.Recommendation]) -> some View {
+        let layers = min(recs.count, 3) - 1
+        return VStack(alignment: .leading, spacing: DS.Space.item) {
+            if showAllRecommendations {
                 VStack(spacing: 0) {
                     ForEach(Array(recs.enumerated()), id: \.element.id) { i, r in
                         recommendationRow(r)
                         if i < recs.count - 1 { Divider().padding(.vertical, 10) }
                     }
                 }
+            } else {
+                recommendationRow(recs[0])
+                    .padding(DS.Space.item)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .card(radius: 12)
+                    .background(alignment: .top) {
+                        ZStack(alignment: .top) {
+                            ForEach(Array((1...max(layers, 1)).reversed()), id: \.self) { i in
+                                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(DS.cardHover)
+                                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(DS.border))
+                                    .padding(.horizontal, CGFloat(i) * 10)
+                                    .offset(y: CGFloat(i) * 8)
+                                    .opacity(i <= layers ? 1 : 0)
+                            }
+                        }
+                    }
+                    .padding(.bottom, CGFloat(layers) * 8)
+                    .contentShape(Rectangle())
+                    .transition(.opacity)
             }
+            Button(showAllRecommendations ? String(localized: "Show less") : String(localized: "Show \(recs.count - 1) more")) {
+                withAnimation(Motion.animation(.easeInOut(duration: 0.2))) { showAllRecommendations.toggle() }
+            }
+            .buttonStyle(.plain).font(.system(size: 12.5)).foregroundStyle(DS.accent)
         }
     }
 
