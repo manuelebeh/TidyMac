@@ -23,7 +23,7 @@ struct SpaceLensScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             if path.isEmpty {
                 ScreenHeader(title: module.headline) { EmptyView() }
-                    .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 16)
+                    .headerPadding()
                 Spacer(minLength: 0)
                 EmptyState(symbol: module.symbol, tint: module.tint, title: module.headline, message: module.tagline,
                            actionTitle: String(localized: "Scan")) { selected = [:]; message = nil; path = [Paths.home] } extra: {
@@ -49,9 +49,9 @@ struct SpaceLensScreen: View {
     }
 
     var map: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DS.Space.item) {
             HStack(spacing: 6) {
-                Button { path.removeLast() } label: { Image(systemName: "chevron.left") }.buttonStyle(SecondaryButtonStyle())
+                Button { path.removeLast() } label: { Image(systemName: "chevron.left") }.buttonStyle(SecondaryButtonStyle()).help(String(localized: "Back"))
                 ForEach(Array(path.enumerated()), id: \.offset) { i, u in
                     Button(i == 0 ? String(localized: "Home") : u.lastPathComponent) { path = Array(path.prefix(i + 1)) }
                         .buttonStyle(.plain).foregroundStyle(.primary.opacity(i == path.count - 1 ? 1 : 0.6))
@@ -62,7 +62,7 @@ struct SpaceLensScreen: View {
                 if let purgeable, purgeable > 0 { purgeableChip(purgeable) }
                 Text(formatSize(nodes.reduce(0) { $0 + $1.size })).foregroundStyle(.primary.opacity(0.8))
             }
-            HStack(spacing: 20) {
+            HStack(spacing: DS.Space.section) {
                 list.frame(width: 320)
                 bubbles
             }
@@ -76,7 +76,7 @@ struct SpaceLensScreen: View {
                     .help("This includes items from all selected folders.")
             }
         }
-        .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 20)
+        .padding(.horizontal, DS.Space.page).padding(.top, DS.Space.headerTop).padding(.bottom, DS.Space.pageBottom)
     }
 
     func purgeableChip(_ size: Int64) -> some View {
@@ -109,7 +109,7 @@ struct SpaceLensScreen: View {
                         Image(systemName: n.isDirectory ? "folder.fill" : "doc.fill").foregroundStyle(.primary.opacity(n.isHidden ? 0.5 : 0.9))
                         Text(n.name).lineLimit(1).foregroundStyle(.primary.opacity(n.isHidden ? 0.6 : 1))
                         if protection == .systemFolder {
-                            Text("System folder").font(.caption2).foregroundStyle(.orange.opacity(0.9))
+                            Text("System folder").font(.caption2).foregroundStyle(DS.caution)
                                 .help("This folder is required for the system to operate. It’s not recommended to remove system folders.")
                         }
                         Spacer()
@@ -124,7 +124,7 @@ struct SpaceLensScreen: View {
             }
         }
         .padding(8)
-        .background(RoundedRectangle(cornerRadius: 14).fill(DS.card))
+        .card()
     }
 
     var bubbles: some View {
@@ -137,9 +137,8 @@ struct SpaceLensScreen: View {
                     let (n, b) = pair
                     let isSel = selected[n.url] != nil, isHover = hovered == n.url
                     Circle()
-                        .fill(RadialGradient(colors: [module.accent.opacity(isHover ? 0.9 : 0.6), module.light.opacity(0.35)],
-                                             center: .topLeading, startRadius: 0, endRadius: b.r * 2))
-                        .overlay(Circle().stroke(.white.opacity(isSel ? 0.95 : 0.35), lineWidth: isSel ? 3 : 1))
+                        .fill(module.tint.opacity(isSel ? 0.85 : isHover ? 0.7 : 0.5))
+                        .overlay(Circle().stroke(isSel ? Color.white : Color.white.opacity(0.25), lineWidth: isSel ? 2.5 : 1))
                         .overlay {
                             if b.r > 34 {
                                 VStack(spacing: 2) {
@@ -208,7 +207,7 @@ struct SpaceLensReviewSheet: View {
                         Text(Paths.abbreviate(url.deletingLastPathComponent())).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         if SpaceLens.protection(of: url) == .systemFolder {
                             Label("This folder is required for the system to operate. It’s not recommended to remove system folders.",
-                                  systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange)
+                                  systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(DS.caution)
                         }
                     }
                     Spacer()
@@ -217,7 +216,7 @@ struct SpaceLensReviewSheet: View {
             }
             if chosen.contains(where: { SpaceLens.isInCloud($0.0) }) {
                 Label("Some selected files are stored in cloud storage. Removing them will permanently delete them from the cloud and all your connected devices.",
-                      systemImage: "icloud.fill").font(.callout).foregroundStyle(.orange)
+                      systemImage: "icloud.fill").font(.callout).foregroundStyle(DS.caution)
             }
             HStack {
                 Text("Items go to the Trash.").font(.caption).foregroundStyle(.secondary)
@@ -247,7 +246,7 @@ struct RemovalLogSheet: View {
                 List(entries) { e in
                     HStack {
                         Image(systemName: e.error == nil ? "checkmark.circle.fill" : "xmark.octagon.fill")
-                            .foregroundStyle(e.error == nil ? .green : .red)
+                            .foregroundStyle(e.error == nil ? DS.safe : DS.danger)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(Paths.abbreviate(URL(fileURLWithPath: e.path))).lineLimit(1).truncationMode(.middle)
                             Text(e.error ?? e.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)

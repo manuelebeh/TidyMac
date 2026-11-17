@@ -38,7 +38,31 @@ enum DS {
     static let ink = Color.adaptive(light: NSColor(hex: 0x2B2B2D), dark: NSColor(hex: 0xF2F2F4))
     static let inkText = Color.adaptive(light: NSColor(hex: 0xFFFFFF), dark: NSColor(hex: 0x1C1C1E))
 
+    /// Neutral tone for glyphs and icon chips: the interface stays grey, colour is kept for status (safe / caution / danger).
+    static let glyph = Color.adaptive(light: NSColor(hex: 0x5E5E63), dark: NSColor(hex: 0xB6B6BC))
+    static let danger = Color.adaptive(light: NSColor(hex: 0xC0392B), dark: NSColor(hex: 0xFF7A6B))
+
     static let radius: CGFloat = 14
+
+    /// One spacing scale for every screen, so pages line up with each other.
+    enum Space {
+        /// Left and right margin of every page.
+        static let page: CGFloat = 32
+        /// Gap above a screen header, and below it.
+        static let headerTop: CGFloat = 34
+        static let headerBottom: CGFloat = 18
+        /// Bottom margin of a scrolling page.
+        static let pageBottom: CGFloat = 32
+        /// Gap between the cards / blocks of a page.
+        static let section: CGFloat = 16
+        /// Inner padding of a card, and of one row inside a card.
+        static let card: CGFloat = 16
+        static let rowH: CGFloat = 14
+        static let rowV: CGFloat = 10
+        /// Small gaps between related items.
+        static let tight: CGFloat = 8
+        static let item: CGFloat = 12
+    }
 }
 
 // MARK: - Card
@@ -55,11 +79,34 @@ struct CardBackground: ViewModifier {
 }
 
 extension Module {
-    /// The module's colour for glyphs: a deeper shade on light surfaces, the bright one on dark.
-    var tint: Color { .adaptive(light: NSColor(light), dark: NSColor(accent)) }
+    /// The module's colour, as on a System Settings icon: one flat, saturated hue per area, used only on its icon badge.
+    var tint: Color {
+        func c(_ light: UInt32, _ dark: UInt32) -> Color { .adaptive(light: NSColor(hex: light), dark: NSColor(hex: dark)) }
+        switch self {
+        case .smartCare: return c(0x3478F6, 0x4C8DFF)
+        case .cleanup: return c(0x2FB457, 0x34C759)
+        case .clutter: return c(0x1FA2B8, 0x30B8D0)
+        case .applications: return c(0x5856D6, 0x6E6CE8)
+        case .protection: return c(0xE5484D, 0xF2555A)
+        case .performance: return c(0xF08A00, 0xFF9F0A)
+        case .spaceLens: return c(0x9B51D8, 0xB066E8)
+        case .myTools: return c(0x7C7C82, 0x8E8E93)
+        case .activity: return c(0xE0527E, 0xF0638F)
+        }
+    }
 }
 
 extension View {
+    /// Margins of a screen header: the same on every screen.
+    func headerPadding() -> some View {
+        padding(.horizontal, DS.Space.page).padding(.top, DS.Space.headerTop).padding(.bottom, DS.Space.headerBottom)
+    }
+
+    /// Margins of a screen's scrolling content: the same on every screen.
+    func pagePadding() -> some View {
+        padding(.horizontal, DS.Space.page).padding(.bottom, DS.Space.pageBottom)
+    }
+
     func card(radius: CGFloat = DS.radius, hovering: Bool = false) -> some View {
         modifier(CardBackground(radius: radius, hovering: hovering))
     }
@@ -120,19 +167,24 @@ struct ScreenHeader<Trailing: View>: View {
     }
 }
 
-/// A rounded square holding a symbol, tinted by the module it belongs to.
+/// A coloured rounded square with a white symbol, like the icons in System Settings. Used to mark where something lives
+/// (sidebar, areas, tools, groups): never to decorate plain data rows.
 struct IconChip: View {
     let symbol: String
-    var tint: Color = DS.accent
+    var tint: Color = DS.glyph
     var size: CGFloat = 36
     var dimmed = false
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: size * 0.46, weight: .semibold))
-            .foregroundStyle(tint)
+            .font(.system(size: size * 0.5, weight: .medium))
+            .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: size * 0.3, style: .continuous).fill(tint.opacity(0.14)))
+            .background(
+                RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+                    .fill(LinearGradient(colors: [tint, tint.opacity(0.86)], startPoint: .top, endPoint: .bottom))
+            )
+            .overlay(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).strokeBorder(.black.opacity(0.08), lineWidth: 0.5))
             .opacity(dimmed ? 0.5 : 1)
     }
 }
@@ -241,7 +293,7 @@ struct InfoBanner: View {
             Spacer(minLength: 8)
             Button(actionTitle, action: action).buttonStyle(SecondaryButtonStyle())
         }
-        .padding(12)
+        .padding(DS.Space.item)
         .card()
     }
 }
@@ -249,7 +301,7 @@ struct InfoBanner: View {
 /// Centred empty state: an icon on a soft halo, a title, a sentence, the one action, and room for extra content below.
 struct EmptyState<Extra: View>: View {
     let symbol: String
-    var tint: Color = DS.accent
+    var tint: Color = DS.glyph
     let title: String
     var message: String? = nil
     var actionTitle: String? = nil
@@ -259,12 +311,7 @@ struct EmptyState<Extra: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ZStack {
-                Circle().fill(tint.opacity(0.07)).frame(width: 132, height: 132)
-                Circle().strokeBorder(tint.opacity(0.14), lineWidth: 1).frame(width: 104, height: 104)
-                IconChip(symbol: symbol, tint: tint, size: 64)
-            }
-            .padding(.bottom, 18)
+            IconChip(symbol: symbol, tint: tint, size: 56).padding(.bottom, 16)
             Text(title).font(.system(size: 19, weight: .semibold)).multilineTextAlignment(.center)
             if let message {
                 Text(message).font(.system(size: 13.5)).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -287,7 +334,7 @@ struct EmptyState<Extra: View>: View {
 }
 
 extension EmptyState where Extra == EmptyView {
-    init(symbol: String, tint: Color = DS.accent, title: String, message: String? = nil, actionTitle: String? = nil,
+    init(symbol: String, tint: Color = DS.glyph, title: String, message: String? = nil, actionTitle: String? = nil,
          primary: Bool = true, action: @escaping () -> Void = {}) {
         self.init(symbol: symbol, tint: tint, title: title, message: message, actionTitle: actionTitle, primary: primary, action: action) { EmptyView() }
     }
@@ -296,7 +343,7 @@ extension EmptyState where Extra == EmptyView {
 /// What a module looks at, as small pills under an empty state.
 struct FeaturePills: View {
     let features: [(String, String)]
-    var tint: Color = DS.accent
+    var tint: Color = DS.glyph
 
     var body: some View {
         HStack(spacing: 8) {

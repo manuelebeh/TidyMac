@@ -124,8 +124,7 @@ struct ModuleScreen: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
-                .padding(.horizontal, 32).padding(.top, 34).padding(.bottom, 16)
+            header.headerPadding()
             Group {
                 switch controller.phase {
                 case .intro: IntroView(controller: controller)
@@ -182,7 +181,6 @@ struct IntroView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !access.granted { FullDiskAccessBanner().padding(.horizontal, 32) }
             Spacer(minLength: 0)
             EmptyState(symbol: module.symbol, tint: module.tint, title: module.headline, message: module.tagline,
                        actionTitle: String(localized: "Scan")) { controller.scan() } extra: {
@@ -217,7 +215,7 @@ struct ProgressScreen: View {
     @ObservedObject var controller: ModuleController
     var body: some View {
         VStack(spacing: 18) {
-            IconChip(symbol: controller.module.symbol, tint: controller.module.tint, size: 64)
+            IconChip(symbol: controller.module.symbol, tint: controller.module.tint, size: 56)
             ProgressView().progressViewStyle(.linear).frame(width: 320).tint(DS.accent)
             Text(controller.phase == .running ? String(localized: "Working on it...") : controller.progressTitle)
                 .font(.system(size: 15, weight: .medium))
@@ -260,9 +258,9 @@ struct ResultsView: View {
             if allItems.isEmpty {
                 emptyState
             } else {
-                toolbar.padding(.horizontal, 32).padding(.bottom, 10)
+                toolbar.padding(.horizontal, DS.Space.page).padding(.bottom, DS.Space.tight)
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 18) {
+                    LazyVStack(alignment: .leading, spacing: DS.Space.section) {
                         if controller.scannedWithoutAccess {
                             if access.granted {
                                 FullDiskAccessBanner(message: String(localized: "Full Disk Access is on. Scan again to include protected folders."),
@@ -276,7 +274,7 @@ struct ResultsView: View {
                             if !items.isEmpty { GroupCard(group: g, items: items, controller: controller) }
                         }
                     }
-                    .padding(.horizontal, 32).padding(.bottom, 24)
+                    .pagePadding()
                 }
                 footer
             }
@@ -309,7 +307,7 @@ struct ResultsView: View {
                 Label(sort == .size ? String(localized: "Largest") : String(localized: "Name"), systemImage: "arrow.up.arrow.down")
                     .font(.system(size: 12.5))
             }
-            .menuStyle(.borderlessButton).fixedSize()
+            .menuStyle(.borderlessButton).fixedSize().help(String(localized: "Sort"))
         }
     }
 
@@ -322,12 +320,11 @@ struct ResultsView: View {
                 if controller.selectedSize > 0 { Text("·").foregroundStyle(.tertiary); Text(formatSize(controller.selectedSize)).monospacedDigit() }
             }
             Spacer()
-            Button("Start Over") { controller.phase = .intro }.buttonStyle(SecondaryButtonStyle())
             Button(module.actionTitle) { controller.run() }
                 .buttonStyle(PrimaryButtonStyle()).disabled(controller.selected.isEmpty)
         }
         .font(.system(size: 13))
-        .padding(.horizontal, 32).padding(.vertical, 14)
+        .padding(.horizontal, DS.Space.page).padding(.vertical, DS.Space.rowH)
         .background(DS.sidebar.opacity(0.9))
         .overlay(alignment: .top) { Rectangle().fill(DS.border).frame(height: 1) }
     }
@@ -362,11 +359,11 @@ struct GroupCard: View {
                 Text(group.totalSize > 0 ? formatSize(items.reduce(0) { $0 + ($1.size ?? 0) }) : "\(items.count)")
                     .font(.system(size: 13, weight: .semibold)).monospacedDigit()
             }
-            .padding(14)
+            .padding(DS.Space.rowH)
             Divider()
             ForEach(items) { item in
                 ItemRow(item: item, controller: controller)
-                if item.id != items.last?.id { Divider().padding(.leading, 44) }
+                if item.id != items.last?.id { Divider().padding(.leading, 46) }
             }
         }
         .card()
@@ -398,7 +395,7 @@ struct ItemRow: View {
                 StatusBadge(kind: item.selectedByDefault ? .safe : .check)
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
+        .padding(.horizontal, DS.Space.rowH).padding(.vertical, DS.Space.rowV)
         .background(hover ? DS.selection.opacity(0.5) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture { controller.toggle(item) }
@@ -417,8 +414,8 @@ struct DoneView: View {
         let r = controller.report ?? ActionReport()
         let ok = r.failed.isEmpty
         ScrollView {
-            VStack(spacing: 14) {
-                IconChip(symbol: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", tint: ok ? DS.safe : DS.caution, size: 64)
+            VStack(spacing: DS.Space.item) {
+                IconChip(symbol: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", tint: ok ? DS.safe : DS.caution, size: 56)
                     .appear(scale: 0.8)
                 Text(ok ? String(localized: "Well done!") : String(localized: "Some items were not processed"))
                     .font(.system(size: 20, weight: .semibold))
@@ -434,10 +431,10 @@ struct DoneView: View {
                             Text("\(f.0.title): \(f.1)").font(.system(size: 12)).foregroundStyle(.secondary)
                         }
                     }
-                    .padding(14).frame(maxWidth: 560, alignment: .leading).card()
+                    .padding(DS.Space.rowH).frame(maxWidth: 560, alignment: .leading).card()
                 }
             }
-            .frame(maxWidth: .infinity).padding(.top, 50).padding(.horizontal, 32)
+            .frame(maxWidth: .infinity).padding(.top, 50).padding(.horizontal, DS.Space.page)
         }
     }
 }

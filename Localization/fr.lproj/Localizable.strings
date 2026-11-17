@@ -472,6 +472,9 @@
 "Personal Files" = "Fichiers personnels";
 "Photos that look nearly the same, such as bursts and edits. The largest one is kept." = "Photos presque identiques, comme les rafales et les retouches. La plus grande est conservée.";
 "Photos" = "Photos";
+"Media" = "Médias";
+"Documents" = "Documents";
+"System Data" = "Données système";
 "Play sounds for main TidyMac actions" = "Émettre des sons pour les principales actions de TidyMac";
 "Please quit the following applications to clean all of their related items:" = "Quittez les applications suivantes pour nettoyer tous leurs éléments associés :";
 "Plugins" = "Modules";
@@ -560,6 +563,7 @@
 "Safari" = "Safari";
 "Same file as the copy to keep" = "Même fichier que la copie à conserver";
 "Save your work first. Apps with unsaved changes may ask before they quit." = "Enregistrez d’abord votre travail. Les apps avec des modifications non enregistrées peuvent demander une confirmation avant de quitter.";
+"Back" = "Retour";
 "Save" = "Enregistrer";
 "Saved by Activity" = "Gains par activité";
 "Saved" = "Enregistré";
@@ -827,7 +831,7 @@
 "Scan Everything" = "Tout analyser";
 "Select Recommended" = "Sélectionner les recommandés";
 "Sort" = "Trier";
-"used of %@" = "utilisés sur %@";
+"%@ of %@ used" = "%@ sur %@ utilisés";
 "Appearance" = "Apparence";
 "Dark" = "Sombre";
 "Light" = "Clair";

@@ -297,7 +297,7 @@ struct Sidebar: View {
         (nil, [.smartCare]),
         (String(localized: "Clean"), [.cleanup, .clutter, .applications]),
         (String(localized: "Protect"), [.protection, .performance]),
-        (String(localized: "Analyze"), [.spaceLens, .activity]),
+        (String(localized: "Analyze"), [.spaceLens, .myTools, .activity]),
     ]
 
     var body: some View {
@@ -309,7 +309,7 @@ struct Sidebar: View {
             .padding(.leading, 18).padding(.top, 38).padding(.bottom, 18)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: DS.Space.section) {
                     ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
                         VStack(alignment: .leading, spacing: 2) {
                             if let title = section.title {
@@ -325,12 +325,11 @@ struct Sidebar: View {
 
             VStack(spacing: 6) {
                 accessCard
-                SidebarRow(module: .myTools, app: app)
                 Button { app.showSettings = true } label: {
-                    SidebarLabel(symbol: "gearshape", title: String(localized: "Settings"), badge: nil, selected: app.showSettings)
+                    SidebarLabel(symbol: "gearshape.fill", tint: DS.glyph, title: String(localized: "Settings"), badge: nil, selected: app.showSettings)
                 }.buttonStyle(.plain)
             }
-            .padding(.horizontal, 10).padding(.bottom, 12)
+            .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 12)
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .background(DS.sidebar)
@@ -339,9 +338,7 @@ struct Sidebar: View {
     private var accessCard: some View {
         Button { if !access.granted { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) } } label: {
             HStack(spacing: 10) {
-                Image(systemName: access.granted ? "checkmark.shield.fill" : "lock.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(access.granted ? DS.safe : DS.caution)
+                IconChip(symbol: access.granted ? "checkmark.shield.fill" : "lock.fill", tint: access.granted ? DS.safe : DS.caution, size: 26)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(access.granted ? String(localized: "Full scan") : String(localized: "Limited scan"))
                         .font(.system(size: 12.5, weight: .semibold))
@@ -356,7 +353,7 @@ struct Sidebar: View {
             .card()
         }
         .buttonStyle(.plain)
-        .padding(.bottom, 6)
+        .help(access.granted ? String(localized: "Protected folders included") : String(localized: "Let TidyMac look deeper"))
     }
 }
 
@@ -379,29 +376,28 @@ struct SidebarRow: View {
 
     var body: some View {
         Button { app.module = module } label: {
-            SidebarLabel(symbol: module.symbol, title: module == .smartCare ? String(localized: "Overview") : module.name,
+            SidebarLabel(symbol: module.symbol, tint: module.tint, title: module == .smartCare ? String(localized: "Overview") : module.name,
                          badge: badge, selected: app.module == module && !app.showSettings)
         }
         .buttonStyle(.plain)
+        .help(module.tagline)
     }
 }
 
 struct SidebarLabel: View {
-    let symbol: String, title: String
+    let symbol: String, tint: Color, title: String
     let badge: String?
     let selected: Bool
     @State private var hover = false
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: symbol).font(.system(size: 13.5, weight: .medium))
-                .foregroundStyle(selected ? DS.accent : Color.secondary)
-                .frame(width: 20)
+            IconChip(symbol: symbol, tint: tint, size: 22)
             Text(title).font(.system(size: 13.5, weight: selected ? .semibold : .regular)).lineLimit(1)
             Spacer(minLength: 4)
             if let badge { Text(badge).font(.system(size: 11.5)).foregroundStyle(.secondary).monospacedDigit() }
         }
-        .padding(.horizontal, 10).frame(height: 32)
+        .padding(.horizontal, 8).frame(height: 34)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(selected ? DS.selection : hover ? DS.selection.opacity(0.5) : Color.clear))
         .contentShape(Rectangle())
         .onHover { hover = $0 }
