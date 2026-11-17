@@ -14,6 +14,8 @@ struct OverviewScreen: View {
     @State private var memory = SystemMonitor.memory()
     @State private var cpu = SystemMonitor.cpu()
     @State private var battery = SystemMonitor.battery()
+    @State private var consumers: [SystemMonitor.Consumer] = []
+    @State private var recommendations: [MacHealth.Recommendation] = []
     private let refresh = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -38,6 +40,11 @@ struct OverviewScreen: View {
                 VStack(alignment: .leading, spacing: DS.Space.section) {
                     diskCard
                     systemSection
+                    HStack(alignment: .top, spacing: DS.Space.section) {
+                        consumersCard
+                        recommendationsCard
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .pagePadding()
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -46,7 +53,15 @@ struct OverviewScreen: View {
         .onAppear { storage = SystemMonitor.storage() }
         .onReceive(refresh) { _ in
             memory = SystemMonitor.memory(); cpu = SystemMonitor.cpu(); battery = SystemMonitor.battery()
+            Task { consumers = await Task.detached { SystemMonitor.consumers() }.value }
         }
+        .task {
+            let due = ScreenCleaningSession.reminderDue, fda = Permissions.hasFullDiskAccess
+            recommendations = await Task.detached {
+                MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: due, driveHealth: SystemMonitor.driveHealth()).recommendations
+            }.value
+        }
+        .task { consumers = await Task.detached { SystemMonitor.consumers() }.value }
         .task { for await measured in StorageBreakdown.measure() { parts = measured } }
     }
 
@@ -73,10 +88,57 @@ struct OverviewScreen: View {
                                 fraction: nil, warning: Metric.uptime(uptime).severity != .normal))
         return VStack(alignment: .leading, spacing: 8) {
             Text("System").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: DS.Space.section, alignment: .top)], spacing: DS.Space.section) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: DS.Space.section, alignment: .top)], spacing: DS.Space.section) {
                 ForEach(tiles) { StatusTileView(tile: $0) }
             }
         }
+    }
+
+    private var consumersCard: some View {
+        VStack(alignment: .leading, spacing: DS.Space.item) {
+            Text("Top Consumers").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+            ForEach(consumers.sorted { $0.memory > $1.memory }.prefix(5)) { c in
+                HStack(spacing: 10) {
+                    if let pid = c.pid, let image = NSRunningApplication(processIdentifier: pid)?.icon {
+                        Image(nsImage: image).resizable().interpolation(.high).frame(width: 22, height: 22)
+                    } else {
+                        Image(systemName: "gearshape.fill").font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 22, height: 22)
+                    }
+                    Text(c.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(FileSize.format(c.memory)).font(.system(size: 13)).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(DS.Space.card)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .card()
+    }
+
+    private var recommendationsCard: some View {
+        VStack(alignment: .leading, spacing: DS.Space.item) {
+            Text("Recommendations").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+            if recommendations.isEmpty {
+                Text("There are no recommendations for today.").font(.system(size: 12)).foregroundStyle(.secondary)
+            } else {
+                ForEach(recommendations.prefix(3)) { r in
+                    HStack(alignment: .top, spacing: 10) {
+                        IconChip(symbol: r.severe ? "exclamationmark.triangle.fill" : "sparkles", tint: r.severe ? DS.caution : DS.accent, size: 26)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(r.title).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+                            Text(r.detail).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+            Button(String(localized: "History")) { app.module = .activity }.buttonStyle(.plain)
+                .font(.system(size: 12.5)).foregroundStyle(DS.accent)
+        }
+        .padding(DS.Space.card)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .card()
     }
 
     // MARK: Storage

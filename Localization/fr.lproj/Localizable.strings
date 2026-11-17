@@ -346,6 +346,7 @@
 "Limit" = "Limite";
 "Load" = "Charge";
 "Processor" = "Processeur";
+"Recommendations" = "Recommandations";
 "Load: %lld%%" = "Charge : %lld %%";
 "Local Models" = "Modèles locaux";
 "Local Storage Cleaned" = "Stockage local nettoyé";
