@@ -8,6 +8,7 @@ struct OverviewScreen: View {
     @ObservedObject var controller: ModuleController
     @State private var storage = SystemMonitor.storage()
     @State private var parts: [StorageBreakdown.Part] = []
+    @State private var hoveredSlice: String?
 
     private let areas: [Module] = [.cleanup, .clutter, .applications, .protection, .performance, .spaceLens]
 
@@ -92,14 +93,16 @@ struct OverviewScreen: View {
                 Text(String(localized: "\(formatSize(used)) of \(formatSize(storage.total)) used"))
                     .font(.system(size: 13)).foregroundStyle(.secondary).monospacedDigit()
             }
-            StorageBar(segments: slices.map { ($0.bytes, $0.color) }, total: storage.total)
+            StorageBar(segments: slices.map { .init(id: $0.id, title: $0.title, bytes: $0.bytes, color: $0.color) },
+                       total: storage.total, hovered: $hoveredSlice)
             HStack(spacing: 14) {
                 ForEach(slices) { slice in
                     HStack(spacing: 6) {
                         Circle().fill(slice.color).frame(width: 8, height: 8)
-                        Text(slice.title).font(.system(size: 12)).foregroundStyle(.secondary)
-                            .help(formatSize(slice.bytes))
+                        Text(slice.title).font(.system(size: 12)).foregroundStyle(hoveredSlice == slice.id ? .primary : .secondary)
                     }
+                    .contentShape(Rectangle())
+                    .onHover { hoveredSlice = $0 ? slice.id : nil }
                 }
                 Spacer(minLength: 0)
                 Text(String(localized: "Available: \(formatSize(storage.available))"))
@@ -114,25 +117,63 @@ struct OverviewScreen: View {
 }
 
 /// The storage bar of System Settings: one rounded bar, a slice per group with a hairline gap, free space as the track.
+/// Hovering a slice (or its legend entry) lifts it and shows its name and size in a bubble above it.
 struct StorageBar: View {
-    let segments: [(bytes: Int64, color: Color)]
+    struct Segment: Identifiable { let id: String; let title: String; let bytes: Int64; let color: Color }
+    let segments: [Segment]
     let total: Int64
+    @Binding var hovered: String?
+
+    private func layout(_ width: CGFloat) -> [(segment: Segment, x: CGFloat, w: CGFloat)] {
+        let visible = segments.filter { $0.bytes > 0 }
+        let usable = width - CGFloat(max(visible.count - 1, 0))
+        var x: CGFloat = 0
+        return visible.map { s in
+            let w = max(2, usable * CGFloat(Double(s.bytes) / Double(max(total, 1))))
+            defer { x += w + 1 }
+            return (s, x, w)
+        }
+    }
 
     var body: some View {
         GeometryReader { geo in
-            let visible = segments.filter { $0.bytes > 0 }
-            let usable = geo.size.width - CGFloat(max(visible.count - 1, 0)) * 1
-            HStack(spacing: 1) {
-                ForEach(Array(visible.enumerated()), id: \.offset) { _, s in
-                    Rectangle().fill(s.color)
-                        .frame(width: max(2, usable * CGFloat(Double(s.bytes) / Double(max(total, 1)))))
+            let slices = layout(geo.size.width)
+            ZStack(alignment: .topLeading) {
+                Rectangle().fill(DS.track)
+                ForEach(slices, id: \.segment.id) { item in
+                    Rectangle().fill(item.segment.color)
+                        .opacity(hovered == nil || hovered == item.segment.id ? 1 : 0.45)
+                        .frame(width: item.w).offset(x: item.x)
                 }
-                Spacer(minLength: 0)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let p): hovered = slices.first { p.x >= $0.x && p.x <= $0.x + $0.w + 1 }?.segment.id
+                case .ended: hovered = nil
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if let h = hovered, let item = slices.first(where: { $0.segment.id == h }) {
+                    VStack(spacing: 1) {
+                        Text(item.segment.title).font(.system(size: 12, weight: .semibold))
+                        Text(FileSize.format(item.segment.bytes)).font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .fixedSize()
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(DS.window))
+                    .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(DS.border))
+                    .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+                    .alignmentGuide(.leading) { d in d.width / 2 - (item.x + item.w / 2) }
+                    .alignmentGuide(.top) { d in d.height + 8 }
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                }
             }
         }
         .frame(height: 14)
-        .background(DS.track)
-        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        .animation(Motion.animation(.easeOut(duration: 0.12)), value: hovered)
     }
 }
 
