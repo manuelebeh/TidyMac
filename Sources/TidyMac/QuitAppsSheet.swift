@@ -50,7 +50,7 @@ struct QuitAppsSheet: View {
                         }
                     }
                     .padding(.vertical, 6)
-                    if app != apps.last { Divider() }
+                    if app != apps.last { Divider().padding(.vertical, 4) }
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 4)

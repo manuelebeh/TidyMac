@@ -233,7 +233,7 @@ struct ActivityScreen: View {
                 VStack(spacing: 0) {
                     ForEach(Array(recs.enumerated()), id: \.element.id) { i, r in
                         recommendationRow(r)
-                        if i < recs.count - 1 { Divider().padding(.vertical, 10) }
+                        if i < recs.count - 1 { Divider().padding(.vertical, 14) }
                     }
                 }
             } else {
@@ -298,7 +298,7 @@ struct ActivityScreen: View {
                 VStack(spacing: 0) {
                     ForEach(Array(recent.enumerated()), id: \.offset) { i, e in
                         entryRow(e)
-                        if i < recent.count - 1 { Divider().padding(.vertical, 9) }
+                        if i < recent.count - 1 { Divider().padding(.vertical, 13) }
                     }
                 }
             }

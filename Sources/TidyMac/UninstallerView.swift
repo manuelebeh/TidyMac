@@ -151,7 +151,7 @@ struct UninstallerSheet: View {
 
     @ViewBuilder private var detail: some View {
         if let a = selected {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: a.url.path)).resizable().frame(width: 48, height: 48)
                     VStack(alignment: .leading) {

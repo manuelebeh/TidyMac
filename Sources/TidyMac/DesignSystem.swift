@@ -50,18 +50,18 @@ enum DS {
         static let page: CGFloat = 32
         /// Gap above a screen header, and below it.
         static let headerTop: CGFloat = 34
-        static let headerBottom: CGFloat = 18
+        static let headerBottom: CGFloat = 22
         /// Bottom margin of a scrolling page.
         static let pageBottom: CGFloat = 32
         /// Gap between the cards / blocks of a page.
-        static let section: CGFloat = 16
+        static let section: CGFloat = 20
         /// Inner padding of a card, and of one row inside a card.
-        static let card: CGFloat = 16
-        static let rowH: CGFloat = 14
-        static let rowV: CGFloat = 10
+        static let card: CGFloat = 20
+        static let rowH: CGFloat = 16
+        static let rowV: CGFloat = 13
         /// Small gaps between related items.
-        static let tight: CGFloat = 8
-        static let item: CGFloat = 12
+        static let tight: CGFloat = 10
+        static let item: CGFloat = 14
     }
 }
 

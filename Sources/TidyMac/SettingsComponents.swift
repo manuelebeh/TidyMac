@@ -23,7 +23,7 @@ struct SettingsSection<Content: View, Header: View, Footer: View>: View {
     @ViewBuilder var footer: Footer
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             header.font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
             VStack(alignment: .leading, spacing: DS.Space.item) { content }
                 .padding(DS.Space.card)

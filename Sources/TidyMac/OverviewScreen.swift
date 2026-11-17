@@ -91,7 +91,7 @@ struct OverviewScreen: View {
                                 value: Metric.formatUptime(uptime), detail: Metric.uptime(uptime).severity == .normal
                                     ? String(localized: "Your Mac was restarted less than a week ago.") : String(localized: "It’s been over a week now. Restart your Mac once in a while."),
                                 fraction: nil, warning: Metric.uptime(uptime).severity != .normal))
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 10) {
             Text("System").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: DS.Space.section) { ForEach(tiles) { StatusTileView(tile: $0) } }
@@ -114,7 +114,7 @@ struct OverviewScreen: View {
             QuickAction(id: "purgeable", symbol: "externaldrive.fill", tint: Module.performance.tint, title: String(localized: "Purgeable Space"),
                         detail: purgeable.map { formatSize($0) } ?? "–", button: String(localized: "Review"), busy: false) { app.module = .performance },
         ]
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 10) {
             Text("Quick Actions").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: DS.Space.section) { ForEach(actions) { QuickActionView(action: $0) } }

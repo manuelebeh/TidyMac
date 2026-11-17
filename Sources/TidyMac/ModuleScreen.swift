@@ -363,7 +363,7 @@ struct GroupCard: View {
             Divider()
             ForEach(items) { item in
                 ItemRow(item: item, controller: controller)
-                if item.id != items.last?.id { Divider().padding(.leading, 46) }
+                if item.id != items.last?.id { Divider().padding(.leading, 48) }
             }
         }
         .card()
