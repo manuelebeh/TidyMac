@@ -14,6 +14,9 @@ struct OverviewScreen: View {
     @State private var memory = SystemMonitor.memory()
     @State private var cpu = SystemMonitor.cpu()
     @State private var battery = SystemMonitor.battery()
+    @State private var freeingMemory = false
+    @State private var trash = SystemMonitor.trash()
+    @State private var purgeable = SpaceLens.purgeableSpace()
     @State private var consumers: [SystemMonitor.Consumer] = []
     @State private var recommendations: [MacHealth.Recommendation] = []
     private let refresh = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
@@ -36,24 +39,25 @@ struct OverviewScreen: View {
             }
             .headerPadding()
 
-            GeometryReader { geo in ScrollView {
+            ScrollView {
                 VStack(alignment: .leading, spacing: DS.Space.section) {
                     diskCard
                     systemSection
+                    actionsSection
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .top, spacing: DS.Space.section) { consumersCard; recommendationsCard }
-                            .frame(minWidth: 760)
+                            .fixedSize(horizontal: false, vertical: true).frame(minWidth: 760)
                         VStack(spacing: DS.Space.section) { consumersCard; recommendationsCard }
                     }
-                    .frame(maxHeight: .infinity)
                 }
                 .pagePadding()
-                .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .topLeading)
-            } }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
         }
         .onAppear { storage = SystemMonitor.storage() }
         .onReceive(refresh) { _ in
             memory = SystemMonitor.memory(); cpu = SystemMonitor.cpu(); battery = SystemMonitor.battery()
+            trash = SystemMonitor.trash()
             Task { consumers = await Task.detached { SystemMonitor.consumers() }.value }
         }
         .task {
@@ -95,6 +99,40 @@ struct OverviewScreen: View {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: DS.Space.section, alignment: .top), GridItem(.flexible(), alignment: .top)],
                           spacing: DS.Space.section) { ForEach(tiles) { StatusTileView(tile: $0) } }
             }
+        }
+    }
+
+    // MARK: Quick actions
+
+    private var actionsSection: some View {
+        let actions: [QuickAction] = [
+            QuickAction(id: "ram", symbol: "memorychip", tint: Module.spaceLens.tint, title: String(localized: "Free Up RAM"),
+                        detail: String(localized: "Flushes inactive memory so apps get room to work."),
+                        button: String(localized: "Free Up"), busy: freeingMemory) { freeUpMemory() },
+            QuickAction(id: "trash", symbol: "trash.fill", tint: Module.cleanup.tint, title: String(localized: "Trash"),
+                        detail: trash.map { formatSize($0.size) } ?? "–", button: String(localized: "Review"), busy: false) { app.module = .cleanup },
+            QuickAction(id: "purgeable", symbol: "externaldrive.fill", tint: Module.performance.tint, title: String(localized: "Purgeable Space"),
+                        detail: purgeable.map { formatSize($0) } ?? "–", button: String(localized: "Review"), busy: false) { app.module = .performance },
+        ]
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Quick Actions").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: DS.Space.section) { ForEach(actions) { QuickActionView(action: $0) } }
+                    .fixedSize(horizontal: false, vertical: true).frame(minWidth: 600)
+                VStack(spacing: DS.Space.section) { ForEach(actions) { QuickActionView(action: $0) } }
+            }
+        }
+    }
+
+    /// `purge` needs root, so macOS asks for the password.
+    private func freeUpMemory() {
+        freeingMemory = true
+        Task {
+            var item = ResultItem(title: String(localized: "Free Up RAM"), action: .run(Command("/usr/sbin/purge"), admin: true))
+            item.category = "maintenance"
+            _ = await Task.detached { [item] in await Executor.run([item]) }.value
+            freeingMemory = false
+            memory = SystemMonitor.memory()
         }
     }
 
@@ -314,5 +352,35 @@ struct StatusTileView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .card()
         .help(tile.detail)
+    }
+}
+
+struct QuickAction: Identifiable {
+    let id: String, symbol: String, title: String, detail: String, button: String
+    let tint: Color, busy: Bool, run: () -> Void
+    init(id: String, symbol: String, tint: Color, title: String, detail: String, button: String, busy: Bool, run: @escaping () -> Void) {
+        self.id = id; self.symbol = symbol; self.tint = tint; self.title = title; self.detail = detail
+        self.button = button; self.busy = busy; self.run = run
+    }
+}
+
+/// One thing to do right now: badge, name, what it concerns, and the button.
+struct QuickActionView: View {
+    let action: QuickAction
+
+    var body: some View {
+        HStack(alignment: .center, spacing: DS.Space.item) {
+            IconChip(symbol: action.symbol, tint: action.tint, size: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(action.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                Text(action.detail).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            if action.busy { ProgressView().controlSize(.small) }
+            else { Button(action.button, action: action.run).buttonStyle(SecondaryButtonStyle()) }
+        }
+        .padding(DS.Space.card)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .card()
     }
 }
