@@ -413,6 +413,8 @@ struct DoneView: View {
     var body: some View {
         let r = controller.report ?? ActionReport()
         let ok = r.failed.isEmpty
+        // Centred like the intro and the empty results; scrolls only when a long list of failures needs the room.
+        GeometryReader { geo in
         ScrollView {
             VStack(spacing: DS.Space.item) {
                 IconChip(symbol: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", tint: ok ? DS.safe : DS.caution, size: 56)
@@ -434,7 +436,8 @@ struct DoneView: View {
                     .padding(DS.Space.rowH).frame(maxWidth: 560, alignment: .leading).card()
                 }
             }
-            .frame(maxWidth: .infinity).padding(.top, 50).padding(.horizontal, DS.Space.page)
+            .frame(maxWidth: .infinity, minHeight: geo.size.height).padding(.bottom, 60).padding(.horizontal, DS.Space.page)
+        }
         }
     }
 }
