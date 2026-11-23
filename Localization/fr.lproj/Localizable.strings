@@ -855,6 +855,8 @@
 
 /* Hidden in System Data (Overview) */
 "Hidden in System Data" = "Caché dans les données système";
+"What macOS counts as System Data that you can check or free." = "Ce que macOS compte dans les données système et que vous pouvez vérifier ou libérer.";
+"See what’s in System Data" = "Voir ce que contiennent les données système";
 "Time Machine snapshots" = "Instantanés Time Machine";
 "None on this Mac right now" = "Aucun sur ce Mac pour l’instant";
 "While your backup drive is away, Time Machine keeps snapshots on this disk. macOS removes them when space runs low. Removing them does not touch your backups." = "Quand votre disque de sauvegarde n’est pas branché, Time Machine garde des instantanés sur ce disque. macOS les supprime quand l’espace manque. Les supprimer ne touche pas à vos sauvegardes.";
