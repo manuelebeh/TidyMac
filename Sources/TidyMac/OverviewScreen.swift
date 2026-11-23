@@ -10,6 +10,8 @@ struct OverviewScreen: View {
     @State private var storage = SystemMonitor.storage()
     @State private var parts: [StorageBreakdown.Part] = []
     @State private var hoveredSlice: String?
+    /// The "Hidden in System Data" panel, opened from the System Data legend or its slice of the bar.
+    @State private var showsSystemData = false
 
     @State private var memory = SystemMonitor.memory()
     @State private var cpu = SystemMonitor.cpu()
@@ -236,14 +238,34 @@ struct OverviewScreen: View {
             }
             StorageBar(segments: slices.map { .init(id: $0.id, title: $0.title, bytes: $0.bytes, color: $0.color) },
                        total: storage.total, hovered: $hoveredSlice)
+                .onTapGesture { if hoveredSlice == "system" { showsSystemData = true } }
             HStack(spacing: 14) {
                 ForEach(slices) { slice in
-                    HStack(spacing: 6) {
-                        Circle().fill(slice.color).frame(width: 8, height: 8)
-                        Text(slice.title).font(.system(size: 12)).foregroundStyle(hoveredSlice == slice.id ? .primary : .secondary)
+                    if slice.id == "system" {
+                        // The one group that says nothing by itself: a click shows what it holds.
+                        Button { showsSystemData = true } label: {
+                            HStack(spacing: 6) {
+                                Circle().fill(slice.color).frame(width: 8, height: 8)
+                                Text(slice.title).font(.system(size: 12))
+                                Image(systemName: "chevron.down.circle").font(.system(size: 11))
+                            }
+                            .foregroundStyle(hoveredSlice == slice.id || showsSystemData ? .primary : .secondary)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(String(localized: "See what’s in System Data"))
+                        .onHover { hoveredSlice = $0 ? slice.id : nil }
+                        .popover(isPresented: $showsSystemData, arrowEdge: .bottom) {
+                            SystemDataPanel(app: app) { showsSystemData = false }
+                        }
+                    } else {
+                        HStack(spacing: 6) {
+                            Circle().fill(slice.color).frame(width: 8, height: 8)
+                            Text(slice.title).font(.system(size: 12)).foregroundStyle(hoveredSlice == slice.id ? .primary : .secondary)
+                        }
+                        .contentShape(Rectangle())
+                        .onHover { hoveredSlice = $0 ? slice.id : nil }
                     }
-                    .contentShape(Rectangle())
-                    .onHover { hoveredSlice = $0 ? slice.id : nil }
                 }
                 Spacer(minLength: 0)
                 Text(String(localized: "Available: \(formatSize(storage.available))"))

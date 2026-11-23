@@ -22,6 +22,7 @@ public struct CleanupEngine: ScanEngine {
         Category(id: "sim-runtimes", title: String(localized: "Simulator Runtimes"), build: simulatorRuntimes),
         Category(id: "docker", title: String(localized: "Docker"), build: docker),
         Category(id: "ios-backups", title: String(localized: "iOS Device Backups"), build: iosBackups),
+        Category(id: "ios-updates", title: String(localized: "iOS Software Updates"), build: { iosUpdates() }),
         Category(id: "broken-prefs", title: String(localized: "Broken Preferences"), build: brokenPreferences),
         Category(id: "broken-login", title: String(localized: "Broken Login Items"), build: brokenLoginItems),
         Category(id: "deleted-users", title: String(localized: "Deleted Users"), build: deletedUsers),
@@ -231,6 +232,17 @@ public struct CleanupEngine: ScanEngine {
                               selectedByDefault: false, badge: latest.contains(b) ? String(localized: "Latest") : nil)
         }
         return group("ios-backups", String(localized: "iOS Device Backups"), String(localized: "Local backups of your iPhone and iPad."), "iphone", items)
+    }
+
+    /// Software the Mac downloaded to update or restore an iPhone or iPad. The device does not need it afterwards,
+    /// and the Mac downloads it again if it is ever needed.
+    static func iosUpdates(home: URL = Paths.home) -> ResultGroup {
+        let items = SystemData.updateFolders(home: home).flatMap { folder in
+            Paths.children(folder).map { ResultItem.file($0, subtitle: folder.lastPathComponent) }
+        }
+        return group("ios-updates", String(localized: "iOS Software Updates"),
+                     String(localized: "Update files your Mac downloaded for an iPhone or iPad. They are downloaded again if needed."),
+                     "arrow.down.app", items)
     }
 
     @Sendable static func brokenPreferences() -> ResultGroup {
