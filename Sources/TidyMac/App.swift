@@ -226,6 +226,8 @@ final class AppState: ObservableObject {
     @Published var uninstallTarget: URL?
     /// Which half of the Applications page shows: the app list, or the scan for updates and leftovers.
     @Published var applicationsTab: ApplicationsTab = .apps
+    /// A folder Storage Map should open on (Home, then each folder down to it); it takes it when it appears.
+    @Published var storageMapPath: [URL]?
     let screenCleaning = ScreenCleaningSession()
     /// Opens (or brings back) the main window; set once it has appeared.
     var openMain: (() -> Void)?
@@ -250,6 +252,14 @@ final class AppState: ObservableObject {
             if c.phase != .scanning && c.phase != .running { c.scan(only: t) }
         }
     }
+    /// Shows Storage Map on a folder inside the home folder.
+    func openStorageMap(at folder: URL) {
+        let home = Paths.home.standardizedFileURL.pathComponents, parts = folder.standardizedFileURL.pathComponents
+        guard parts.starts(with: home) else { return }
+        storageMapPath = (home.count...parts.count).map { n in URL(fileURLWithPath: NSString.path(withComponents: Array(parts.prefix(n)))) }
+        module = .spaceLens
+    }
+
     /// Shows the Applications page on one tab. The updates tab starts its scan if it has nothing to show yet.
     func openApplications(_ tab: ApplicationsTab) {
         applicationsTab = tab

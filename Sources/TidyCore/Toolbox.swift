@@ -97,6 +97,11 @@ public enum Toolbox {
                  await groups([CleanupEngine.xcodeJunk, { CleanupEngine.devToolCaches() }, CleanupEngine.simulatorRuntimes, CleanupEngine.docker])()
                      + [ClutterEngine.projectArtifacts(root: Paths.home)]
              })),
+        Tool(id: "deviceFiles", title: String(localized: "iPhone and iPad Files"),
+             description: String(localized: "Remove old iPhone and iPad backups and the update files your Mac downloaded for them."),
+             symbol: "iphone", module: "cleanup", scanTitle: String(localized: "Looking for iPhone and iPad files..."),
+             keywords: keywords("iphone,ipad,ios,backups,device backups,iphone backups,ipad backups,mobilesync,ipsw,software updates,firmware,finder sync"),
+             kind: .scan(groups([CleanupEngine.iosBackups, { CleanupEngine.iosUpdates() }]))),
         Tool(id: "duplicateFinder", title: String(localized: "Duplicate Finder"),
              description: String(localized: "Remove duplicate files stored in different locations on your Mac."),
              symbol: "doc.on.doc.fill", module: "clutter", scanTitle: String(localized: "Looking for duplicate files..."),

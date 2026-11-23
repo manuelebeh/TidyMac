@@ -852,3 +852,31 @@
 "Or check just one thing" = "Ou vérifiez un seul point";
 "Scan only %@" = "Analyser uniquement : %@";
 "The folder Declutter looks in" = "Le dossier que Désencombrer analyse";
+
+/* Hidden in System Data (Overview) */
+"Hidden in System Data" = "Caché dans les données système";
+"Time Machine snapshots" = "Instantanés Time Machine";
+"None on this Mac right now" = "Aucun sur ce Mac pour l’instant";
+"While your backup drive is away, Time Machine keeps snapshots on this disk. macOS removes them when space runs low. Removing them does not touch your backups." = "Quand votre disque de sauvegarde n’est pas branché, Time Machine garde des instantanés sur ce disque. macOS les supprime quand l’espace manque. Les supprimer ne touche pas à vos sauvegardes.";
+"Apple Intelligence models" = "Modèles Apple Intelligence";
+"Downloaded · about 7 GB, according to Apple" = "Téléchargés · environ 7 Go selon Apple";
+"The models behind Apple Intelligence. macOS protects them, so no app can measure or remove them. macOS takes the space back when Apple Intelligence is turned off in System Settings." = "Les modèles d’Apple Intelligence. macOS les protège : aucune app ne peut les mesurer ni les supprimer. macOS récupère cet espace quand Apple Intelligence est désactivé dans Réglages Système.";
+"Manage" = "Gérer";
+"Caches and logs" = "Caches et journaux";
+"Data apps keep to load faster, and the logs they write. Apps rebuild what they need." = "Les données que les apps gardent pour s’ouvrir plus vite, et les journaux qu’elles écrivent. Les apps recréent ce dont elles ont besoin.";
+"Developer files" = "Fichiers de développement";
+"Xcode build data, device support files, simulators and Docker's disk." = "Données de compilation d’Xcode, fichiers de prise en charge des appareils, simulateurs et disque de Docker.";
+"Downloaded AI models" = "Modèles d’IA téléchargés";
+"Models downloaded with Ollama, LM Studio or Hugging Face tools." = "Modèles téléchargés avec Ollama, LM Studio ou les outils Hugging Face.";
+"iPhone and iPad files" = "Fichiers d’iPhone et d’iPad";
+"Local backups of your iPhone and iPad, and the update files your Mac downloaded for them." = "Les sauvegardes locales de votre iPhone et de votre iPad, et les fichiers de mise à jour que votre Mac a téléchargés pour eux.";
+"Swap and sleep image" = "Swap et image de veille";
+"Memory macOS moved to disk when RAM ran short, and the copy of memory it keeps for sleep. macOS manages both. Restarting gives back the swap space." = "La mémoire que macOS a déplacée sur le disque quand la RAM manquait, et la copie de la mémoire qu’il garde pour la veille. macOS gère les deux. Un redémarrage libère l’espace du swap.";
+"Explore the rest of your Library in Storage Map" = "Explorer le reste de votre Bibliothèque dans la Carte du stockage";
+
+/* iPhone and iPad Files */
+"iPhone and iPad Files" = "Fichiers d’iPhone et d’iPad";
+"Remove old iPhone and iPad backups and the update files your Mac downloaded for them." = "Supprimez les anciennes sauvegardes d’iPhone et d’iPad et les fichiers de mise à jour que votre Mac a téléchargés pour eux.";
+"Looking for iPhone and iPad files..." = "Recherche des fichiers d’iPhone et d’iPad...";
+"iOS Software Updates" = "Mises à jour iOS";
+"Update files your Mac downloaded for an iPhone or iPad. They are downloaded again if needed." = "Fichiers de mise à jour que votre Mac a téléchargés pour un iPhone ou un iPad. Ils sont retéléchargés si besoin.";

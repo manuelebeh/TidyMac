@@ -45,6 +45,7 @@ struct OverviewScreen: View {
                 VStack(alignment: .leading, spacing: DS.Space.section) {
                     healthSection
                     diskCard
+                    SystemDataSection(app: app)
                     systemSection
                     actionsSection
                     consumersCard

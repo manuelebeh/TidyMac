@@ -35,6 +35,8 @@ struct SpaceLensScreen: View {
                 map
             }
         }
+        .onAppear(perform: takeRequestedPath)
+        .onChange(of: app.storageMapPath) { _ in takeRequestedPath() }
         .task(id: "\(path.last?.path ?? "")#\(refresh)") {
             guard let dir = path.last else { return }
             loading = true; nodes = []
@@ -46,6 +48,14 @@ struct SpaceLensScreen: View {
             SpaceLensReviewSheet(items: selected.map { ($0.key, $0.value) }.sorted { $0.1 > $1.1 }) { remove($0) }
         }
         .sheet(isPresented: $showLog) { RemovalLogSheet() }
+    }
+
+    /// A folder another page asked for (Overview's System Data card); the selection carries over.
+    private func takeRequestedPath() {
+        guard let requested = app.storageMapPath else { return }
+        app.storageMapPath = nil
+        message = nil
+        path = requested
     }
 
     var map: some View {
