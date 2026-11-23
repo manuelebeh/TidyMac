@@ -302,7 +302,7 @@ struct InfoBanner: View {
 struct EmptyState<Extra: View>: View {
     let symbol: String
     var tint: Color = DS.glyph
-    let title: String
+    let title: String?
     var message: String? = nil
     var actionTitle: String? = nil
     var primary = true
@@ -312,9 +312,9 @@ struct EmptyState<Extra: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             IconChip(symbol: symbol, tint: tint, size: 56).padding(.bottom, 16)
-            Text(title).font(.system(size: 19, weight: .semibold)).multilineTextAlignment(.center)
+            if let title { Text(title).font(.system(size: 19, weight: .semibold)).multilineTextAlignment(.center) }
             if let message {
-                Text(message).font(.system(size: 13.5)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Text(message).font(.system(size: title == nil ? 15 : 13.5)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     .lineSpacing(2).frame(maxWidth: 440).fixedSize(horizontal: false, vertical: true).padding(.top, 8)
             }
             if let actionTitle {
@@ -334,7 +334,7 @@ struct EmptyState<Extra: View>: View {
 }
 
 extension EmptyState where Extra == EmptyView {
-    init(symbol: String, tint: Color = DS.glyph, title: String, message: String? = nil, actionTitle: String? = nil,
+    init(symbol: String, tint: Color = DS.glyph, title: String?, message: String? = nil, actionTitle: String? = nil,
          primary: Bool = true, action: @escaping () -> Void = {}) {
         self.init(symbol: symbol, tint: tint, title: title, message: message, actionTitle: actionTitle, primary: primary, action: action) { EmptyView() }
     }

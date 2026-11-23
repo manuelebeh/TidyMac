@@ -39,8 +39,12 @@ enum UninstallerSort: String, CaseIterable {
     }
 }
 
+/// The list of installed apps and what each one leaves behind. Shown as the Applications page, or as a sheet
+/// (Finder's "Uninstall with TidyMac", Settings, the "unused apps" recommendation).
 struct UninstallerSheet: View {
     let module: Module
+    /// Part of the Applications page: the page header names it, and there is no sheet to close.
+    var embedded = false
     @Environment(\.dismiss) private var dismiss
     @State private var apps: [InstalledApp] = []
     @State private var selected: InstalledApp?
@@ -59,8 +63,9 @@ struct UninstallerSheet: View {
     private let target: URL?
 
     /// History's "Uninstall unused apps" opens the list already filtered.
-    init(module: Module, filter: UninstallerFilter = .all, select target: URL? = nil) {
+    init(module: Module, filter: UninstallerFilter = .all, select target: URL? = nil, embedded: Bool = false) {
         self.module = module
+        self.embedded = embedded
         self.target = target
         _filter = State(initialValue: filter)
     }
@@ -84,7 +89,7 @@ struct UninstallerSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Uninstaller").font(.title2.weight(.semibold))
+                if !embedded { Text("Uninstaller").font(.title2.weight(.semibold)) }
                 TextField("Search", text: $search).textFieldStyle(.roundedBorder).frame(width: 180)
                 Picker("Show", selection: $filter) {
                     ForEach(filters, id: \.self) { section in
@@ -99,9 +104,9 @@ struct UninstallerSheet: View {
                 .fixedSize()
                 Spacer()
                 if let message { Text(message).foregroundStyle(.secondary).lineLimit(1) }
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+                if !embedded { Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
             }
-            .padding()
+            .padding(.horizontal, embedded ? DS.Space.page : 16).padding(.vertical, embedded ? 8 : 16)
             Divider()
             HSplitView {
                 List(shown, selection: Binding(get: { selected?.id }, set: { id in select(apps.first { $0.id == id }) })) { a in
@@ -122,7 +127,8 @@ struct UninstallerSheet: View {
                     .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
-        .frame(width: 960, height: 600)
+        .frame(width: embedded ? nil : 960, height: embedded ? nil : 600)
+        .frame(maxWidth: embedded ? .infinity : nil, maxHeight: embedded ? .infinity : nil)
         .sheet(isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } })) {
             if let p = pending {
                 QuitAppsSheet(apps: p.running, onContinue: { pending = nil; remove(p.app) }, onCancel: { pending = nil })

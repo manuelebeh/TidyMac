@@ -11,22 +11,23 @@ TidyMac is an independent project. It is not affiliated with or endorsed by any 
 TidyMac follows your Mac's light or dark appearance, or the one you pick in Settings.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png"><img src="docs/screenshots/overview-light.png" alt="The Overview screen with disk usage, live memory, processor, battery and uptime readings, and quick actions" width="49%"></picture>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/history-dark.png"><img src="docs/screenshots/history-light.png" alt="The History screen: Mac health, space cleaned, time saved, malware scans and recommendations" width="49%"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/history-dark.png"><img src="docs/screenshots/history-light.png" alt="The History screen: space cleaned, time saved, malware scans and the latest runs" width="49%"></picture>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/toolkit-dark.png"><img src="docs/screenshots/toolkit-light.png" alt="The Toolkit: a grid of single-purpose tools" width="49%"></picture>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-dark.png"><img src="docs/screenshots/settings-light.png" alt="The Settings page with appearance, menu bar and startup options" width="49%"></picture>
 
 ## Features
 
-- **Overview**: disk usage by kind, live readings of your Mac (memory, processor, battery, uptime), quick actions such as Free Up RAM, the apps using the most memory and today's recommendations, with one button to scan everything.
+- **Overview**: Mac health and today's recommendations, each with a button to act on it or skip it for the day; disk usage by kind, live readings of your Mac (memory, processor, battery, uptime), quick actions such as Free Up RAM, the apps using the most memory, and one button to scan everything. Recommendations also cover pending app updates, apps unused for six months, a restart after a week of uptime and a failing drive. Opening the Overview runs the update check at most once a day.
 - **Full Scan**: one scan across cleanup, protection, performance, applications and clutter, then one button to run it all.
 - **Cleanup**: system junk, developer tool caches (npm, pnpm, Bun, Cargo, Gradle, uv and more), simulator runtimes, unused Docker data, AI tool caches and logs, mail attachments, Trash bins.
 - **Protection**: suspicious launch agents and daemons, built-in protections that are turned off (Gatekeeper, FileVault, firewall, System Integrity Protection), browser privacy data, application permissions.
 - **Performance**: maintenance tasks, login items, background items, Time Machine snapshots.
-- **Applications**: uninstaller with leftovers, updates from Sparkle feeds, the App Store and Homebrew casks, unused installers. The update check sends the IDs of your App Store apps to Apple's public lookup API, and runs `brew update` when Homebrew is installed. Upgrading a cask runs `brew upgrade --cask` with analytics off.
+- **Applications**: opens on the list of installed apps, to uninstall one with its leftovers. A second tab scans for updates from Sparkle feeds, the App Store and Homebrew casks, leftovers of removed apps and unused installers. The update check sends the IDs of your App Store apps to Apple's public lookup API, and runs `brew update` when Homebrew is installed. Upgrading a cask runs `brew upgrade --cask` with analytics off.
 - **Declutter**: large and old files, duplicates, similar images, downloads, and project build folders (node_modules, target, .venv and similar) in the folder you choose. Only those of projects untouched for three months are preselected.
 - **Storage Map**: a bubble map of what takes up space on your disk. Selections carry across folders and are reviewed together before they go to the Trash; essential folders are locked, system folders come with a warning, purgeable space is shown, and every removal lands in a log.
-- **Toolkit**: single-purpose tools with search, favorites and last-scan dates.
-- **History**: Mac health with recommendations, space cleaned, time saved, malware scan history. Recommendations also cover pending app updates, apps unused for six months, a restart after a week of uptime and a failing drive; skip one for the day or hide them all. Opening History runs the update check at most once a day.
+- **Each area's page** says what its last scan found and lists its tools, to scan everything or just one part (System Junk, Login Items...).
+- **Toolkit**: every tool in one place, grouped by area, with search, favorites and last-scan dates. A tool opens in the area it belongs to.
+- **History**: space cleaned, time saved, malware scan history and the latest runs.
 - **Screen Cleaning Mode**: locks the keyboard and trackpad and blanks the screen so you can wipe it.
 - **Menu bar**: Mac Health at a glance, live storage, memory, battery, CPU and network with charts, Wi-Fi security, a speed test, top consumers, external drives with eject, connected Bluetooth devices, drive health, and recommendations you can act on or ignore for a while. The icon gets a dot when something needs attention.
 - **Background alerts**: notifications for low disk space, a full Trash, heavy memory use, critical battery health, new threats, overfilled external drives, low device batteries, hung apps (with Force Quit All), Chrome using too much memory, apps moved to the Trash, and a Full Scan reminder every 3, 7, 14 or 30 days. Thresholds are configurable in Settings › Notifications.

@@ -432,7 +432,7 @@ struct GeneralSettingsView: View {
                     }
                     .labelsHidden().fixedSize()
                 }
-                Toggle("Show Assistant recommendations", isOn: $assistant)
+                Toggle("Show recommendations", isOn: $assistant)
             }
             SettingsSection {
                 Toggle("Open at Login", isOn: Binding(get: { openAtLogin }, set: { on in

@@ -2,7 +2,7 @@ import Combine
 import SwiftUI
 import TidyCore
 
-/// Home: how full the disk is, and live readings of the Mac (memory, processor, battery, uptime).
+/// Home: how the Mac is doing and what to do about it, how full the disk is, and live readings (memory, processor, battery, uptime).
 /// Starting the Full Scan hands the window over to the regular module screens until it is dismissed.
 struct OverviewScreen: View {
     @ObservedObject var app: AppState
@@ -18,7 +18,9 @@ struct OverviewScreen: View {
     @State private var trash = SystemMonitor.trash()
     @State private var purgeable = SpaceLens.purgeableSpace()
     @State private var consumers: [SystemMonitor.Consumer] = []
-    @State private var recommendations: [MacHealth.Recommendation] = []
+    @State private var health: MacHealth?
+    @State private var machine = "Mac"
+    @AppStorage(GeneralSettings.assistantKey) private var showsRecommendations = true
     private let refresh = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -41,14 +43,11 @@ struct OverviewScreen: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Space.section) {
+                    healthSection
                     diskCard
                     systemSection
                     actionsSection
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .top, spacing: DS.Space.section) { consumersCard; recommendationsCard }
-                            .fixedSize(horizontal: false, vertical: true).frame(minWidth: 760)
-                        VStack(spacing: DS.Space.section) { consumersCard; recommendationsCard }
-                    }
+                    consumersCard
                 }
                 .pagePadding()
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -61,13 +60,42 @@ struct OverviewScreen: View {
             Task { consumers = await Task.detached { SystemMonitor.consumers() }.value }
         }
         .task {
-            let due = ScreenCleaningSession.reminderDue, fda = Permissions.hasFullDiskAccess
-            recommendations = await Task.detached {
-                MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: due, driveHealth: SystemMonitor.driveHealth()).recommendations
-            }.value
+            await loadHealth()
+            machine = await Task.detached { SystemMonitor.machineName() }.value
+            // The update check behind "Install application updates" runs at most once a day.
+            await AppFacts.refreshIfStale()
+            await loadHealth()
         }
         .task { consumers = await Task.detached { SystemMonitor.consumers() }.value }
         .task { for await measured in StorageBreakdown.measure() { parts = measured } }
+    }
+
+    private func loadHealth() async {
+        let due = ScreenCleaningSession.reminderDue, fda = Permissions.hasFullDiskAccess
+        health = await Task.detached {
+            MacHealth.current(hasFullDiskAccess: fda, screenCleaningDue: due, driveHealth: SystemMonitor.driveHealth())
+        }.value
+    }
+
+    // MARK: Health
+
+    /// Mac Health next to what to do about it; side by side when there is room.
+    @ViewBuilder private var healthSection: some View {
+        if showsRecommendations {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: DS.Space.section) {
+                    MacHealthCard(health: health, machine: machine).frame(maxWidth: 340)
+                    RecommendationsCard(app: app, health: $health)
+                }
+                .fixedSize(horizontal: false, vertical: true).frame(minWidth: 700)
+                VStack(spacing: DS.Space.section) {
+                    MacHealthCard(health: health, machine: machine)
+                    RecommendationsCard(app: app, health: $health)
+                }
+            }
+        } else {
+            MacHealthCard(health: health, machine: machine)
+        }
     }
 
     // MARK: System
@@ -110,16 +138,17 @@ struct OverviewScreen: View {
                         detail: String(localized: "Flushes inactive memory so apps get room to work."),
                         button: String(localized: "Free Up"), busy: freeingMemory) { freeUpMemory() },
             QuickAction(id: "trash", symbol: "trash.fill", tint: Module.cleanup.tint, title: String(localized: "Trash"),
-                        detail: trash.map { formatSize($0.size) } ?? "–", button: String(localized: "Review"), busy: false) { app.module = .cleanup },
+                        detail: trash.map { formatSize($0.size) } ?? String(localized: "Size needs Full Disk Access"),
+                        button: String(localized: "Review"), busy: false) { app.openTool("trashBin") },
+            // Local Time Machine snapshots are what macOS mostly counts as purgeable.
             QuickAction(id: "purgeable", symbol: "externaldrive.fill", tint: Module.performance.tint, title: String(localized: "Purgeable Space"),
-                        detail: purgeable.map { formatSize($0) } ?? "–", button: String(localized: "Review"), busy: false) { app.module = .performance },
+                        detail: purgeable.map { formatSize($0) } ?? "–", button: String(localized: "Review"), busy: false) { app.openTool("timeMachineSnapshot") },
         ]
         return VStack(alignment: .leading, spacing: 10) {
             Text("Quick Actions").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).padding(.leading, 4)
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: DS.Space.section) { ForEach(actions) { QuickActionView(action: $0) } }
-                    .fixedSize(horizontal: false, vertical: true).frame(minWidth: 600)
-                VStack(spacing: DS.Space.section) { ForEach(actions) { QuickActionView(action: $0) } }
+            // Columns by available width, not by how long the texts are: longer translations wrap instead of stacking the row.
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DS.Space.section, alignment: .top), count: 3), spacing: DS.Space.section) {
+                ForEach(actions) { QuickActionView(action: $0).frame(minHeight: 76) }
             }
         }
     }
@@ -136,50 +165,28 @@ struct OverviewScreen: View {
         }
     }
 
+    /// What uses the most memory right now, in two columns.
     private var consumersCard: some View {
         VStack(alignment: .leading, spacing: DS.Space.item) {
             Text("Top Consumers").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
-            ForEach(consumers.sorted { $0.memory > $1.memory }.prefix(8)) { c in
-                HStack(spacing: 12) {
-                    if let pid = c.pid, let image = NSRunningApplication(processIdentifier: pid)?.icon {
-                        Image(nsImage: image).resizable().interpolation(.high).frame(width: 32, height: 32)
-                    } else {
-                        IconChip(symbol: "gearshape.fill", tint: DS.glyph, size: 32)
-                    }
-                    Text(c.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
-                    Spacer(minLength: 8)
-                    Text(FileSize.format(c.memory)).font(.system(size: 13)).foregroundStyle(.secondary).monospacedDigit()
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(DS.Space.card)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .card()
-    }
-
-    private var recommendationsCard: some View {
-        VStack(alignment: .leading, spacing: DS.Space.item) {
-            Text("Recommendations").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
-            if recommendations.isEmpty {
-                Text("There are no recommendations for today.").font(.system(size: 12)).foregroundStyle(.secondary)
-            } else {
-                ForEach(recommendations.prefix(4)) { r in
-                    HStack(alignment: .top, spacing: 12) {
-                        IconChip(symbol: r.severe ? "exclamationmark.triangle.fill" : "sparkles", tint: r.severe ? DS.caution : DS.accent, size: 32)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(r.title).font(.system(size: 13, weight: .semibold)).lineLimit(2)
-                            Text(r.detail).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: DS.Space.section * 2), GridItem(.flexible())], alignment: .leading,
+                      spacing: DS.Space.item) {
+                ForEach(consumers.sorted { $0.memory > $1.memory }.prefix(8)) { c in
+                    HStack(spacing: 12) {
+                        if let pid = c.pid, let image = NSRunningApplication(processIdentifier: pid)?.icon {
+                            Image(nsImage: image).resizable().interpolation(.high).frame(width: 32, height: 32)
+                        } else {
+                            IconChip(symbol: "gearshape.fill", tint: DS.glyph, size: 32)
                         }
+                        Text(c.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                        Spacer(minLength: 8)
+                        Text(FileSize.format(c.memory)).font(.system(size: 13)).foregroundStyle(.secondary).monospacedDigit()
                     }
                 }
             }
-            Spacer(minLength: 0)
-            Button(String(localized: "History")) { app.module = .activity }.buttonStyle(.plain)
-                .font(.system(size: 12.5)).foregroundStyle(DS.accent)
         }
         .padding(DS.Space.card)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .card()
     }
 
@@ -372,12 +379,12 @@ struct QuickActionView: View {
         HStack(alignment: .center, spacing: DS.Space.item) {
             IconChip(symbol: action.symbol, tint: action.tint, size: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(action.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                Text(action.title).font(.system(size: 13, weight: .semibold)).lineLimit(2)
                 Text(action.detail).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
             }
             Spacer(minLength: 8)
             if action.busy { ProgressView().controlSize(.small) }
-            else { Button(action.button, action: action.run).buttonStyle(SecondaryButtonStyle()) }
+            else { Button(action.button, action: action.run).buttonStyle(SecondaryButtonStyle()).fixedSize() }
         }
         .padding(DS.Space.card)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)

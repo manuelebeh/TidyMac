@@ -26,34 +26,25 @@ enum Module: String, CaseIterable, Identifiable {
         }
     }
 
-    var headline: String { self == .cleanup ? String(localized: "Junk Cleanup") : name }
 
     var tagline: String {
         switch self {
         case .smartCare: String(localized: "Quick maintenance that takes care of the essentials.")
         case .cleanup: String(localized: "Clean your system to achieve maximum performance and reclaim more free space.")
-        case .protection: String(localized: "Check your Mac for all kind of threats and vulnerabilities.")
+        case .protection: String(localized: "Check your Mac for all kinds of threats and vulnerabilities.")
         case .performance: String(localized: "Keep your Mac in top shape with recommended maintenance.")
         case .applications: String(localized: "Take control of your applications. Uninstall, update or remove old application leftovers.")
         case .clutter: String(localized: "Sort through your files and reduce the mess in just a few clicks.")
         case .spaceLens: String(localized: "Visualize what's taking up the most disk space and clean up your storage quickly.")
         case .myTools: String(localized: "Quick tools for focused tasks - clean up, protect, and maintain your Mac in just a few clicks.")
-        case .activity: String(localized: "See how much space TidyMac has freed and how your disk is used.")
+        case .activity: String(localized: "See how much space and time TidyMac has saved you.")
         }
     }
 
+    /// What Storage Map shows, under its scan button. The other modules list their own tools on their intro instead.
     var features: [(String, String)] {
-        switch self {
-        case .smartCare: [("magnifyingglass", String(localized: "Quick Scan")), ("gearshape.fill", String(localized: "System Tune-up")), ("checkmark.shield.fill", String(localized: "Security Check"))]
-        case .cleanup: [("archivebox.fill", String(localized: "System Junk")), ("sparkles", String(localized: "AI Clutter")), ("paperclip", String(localized: "Mail Attachments")), ("trash.fill", String(localized: "Trash Bins"))]
-        case .protection: [("ladybug.fill", String(localized: "Malware Removal")), ("hand.raised.fill", String(localized: "Privacy Check")), ("lock.shield.fill", String(localized: "Application Permissions"))]
-        case .performance: [("wrench.and.screwdriver.fill", String(localized: "Maintenance Tasks")), ("person.badge.clock.fill", String(localized: "Login Items")), ("gearshape.2.fill", String(localized: "Background Items"))]
-        case .applications: [("xmark.app.fill", String(localized: "App Uninstaller")), ("arrow.up.circle.fill", String(localized: "App Updater")), ("shippingbox.fill", String(localized: "File Leftovers"))]
-        case .clutter: [("doc.fill", String(localized: "Large Files")), ("doc.on.doc.fill", String(localized: "Duplicates")), ("photo.on.rectangle", String(localized: "Similar Images")), ("arrow.down.circle.fill", String(localized: "Downloads"))]
-        case .spaceLens: [("circle.hexagongrid.fill", String(localized: "Visual Storage Map")), ("eye.fill", String(localized: "Hidden Files Uncovered")), ("folder.fill", String(localized: "Large Folders Overview"))]
-        case .myTools: []
-        case .activity: [("chart.bar.fill", String(localized: "Space Freed")), ("internaldrive.fill", String(localized: "Disk Usage"))]
-        }
+        guard self == .spaceLens else { return [] }
+        return [("circle.hexagongrid.fill", String(localized: "Visual Storage Map")), ("eye.fill", String(localized: "Hidden Files Uncovered")), ("folder.fill", String(localized: "Large Folders Overview"))]
     }
 
     var symbol: String {
