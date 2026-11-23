@@ -19,6 +19,7 @@ struct TidyMacApp: App {
                 .handlesExternalEvents(preferring: ["open", "uninstall"], allowing: ["*"])
                 .onOpenURL { url in
                     if url.host == "open", let m = Module(rawValue: url.lastPathComponent) { app.module = m }
+                    if url.host == "open", url.lastPathComponent == "settings" { app.openSettings() }
                     if let target = Uninstaller.appURL(fromUninstallURL: url) { app.module = .applications; app.uninstallTarget = target }
                 }
         }
@@ -327,11 +328,11 @@ struct Sidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 9) {
-                Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 24, height: 24)
-                Text("TidyMac").font(.system(size: 15, weight: .semibold))
+            HStack(spacing: 10) {
+                Image(nsImage: NSApp.applicationIconImage).resizable().interpolation(.high).frame(width: 34, height: 34)
+                Text("TidyMac").font(.system(size: 17, weight: .semibold))
             }
-            .padding(.leading, 18).padding(.top, 38).padding(.bottom, 18)
+            .padding(.leading, 14).padding(.top, 34).padding(.bottom, 16)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Space.section) {
