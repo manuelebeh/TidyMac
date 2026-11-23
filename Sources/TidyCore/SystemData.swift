@@ -10,18 +10,16 @@ public enum SystemData {
     public struct Entry: Identifiable, Sendable, Equatable {
         public var id: String { kind.rawValue }
         public let kind: Kind
-        /// nil when the size cannot be known: snapshots, Apple's models, or a folder that needs Full Disk Access.
+        /// nil when the size cannot be known: snapshots, or a folder that needs Full Disk Access.
         public let size: Int64?
         /// Snapshots: how many there are.
         public var count: Int = 0
+        /// Apple Intelligence: the size of each kind of model, Apple's figures.
+        public var models: [AppleModels.Part] = []
     }
 
     /// Below this a sized part is not worth a row.
     public static let minimumSize: Int64 = 100_000_000
-
-    /// Where macOS keeps the Apple Intelligence models. The models themselves cannot be read, even with Full Disk Access;
-    /// the list of downloaded ones can.
-    static let appleModelManifests = URL(fileURLWithPath: "/System/Library/AssetsV2/manifests/com_apple_MobileAsset_UAF_FM_GenerativeModels")
 
     static func cacheFolders(home: URL) -> [URL] { ["Library/Caches", "Library/Logs"].map { home.appendingPathComponent($0) } }
 
@@ -74,8 +72,9 @@ public enum SystemData {
             let out = Shell.run("/usr/bin/tmutil", ["listlocalsnapshots", "/"]).output
             return Entry(kind: kind, size: nil, count: snapshotCount(out))
         case .appleIntelligence:
-            let models = (try? FileManager.default.contentsOfDirectory(atPath: appleModelManifests.path)) ?? []
-            return models.isEmpty ? nil : Entry(kind: kind, size: nil, count: models.count)
+            let parts = AppleModels.measure()
+            let total = parts.reduce(0) { $0 + $1.bytes }
+            return total >= minimum ? Entry(kind: kind, size: total, models: parts) : nil
         case .caches:
             return sized(cacheFolders(home: home))
         case .developer:

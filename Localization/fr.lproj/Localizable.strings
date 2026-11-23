@@ -859,8 +859,15 @@
 "None on this Mac right now" = "Aucun sur ce Mac pour l’instant";
 "While your backup drive is away, Time Machine keeps snapshots on this disk. macOS removes them when space runs low. Removing them does not touch your backups." = "Quand votre disque de sauvegarde n’est pas branché, Time Machine garde des instantanés sur ce disque. macOS les supprime quand l’espace manque. Les supprimer ne touche pas à vos sauvegardes.";
 "Apple Intelligence models" = "Modèles Apple Intelligence";
-"Downloaded · about 7 GB, according to Apple" = "Téléchargés · environ 7 Go selon Apple";
-"The models behind Apple Intelligence. macOS protects them, so no app can measure or remove them. macOS takes the space back when Apple Intelligence is turned off in System Settings." = "Les modèles d’Apple Intelligence. macOS les protège : aucune app ne peut les mesurer ni les supprimer. macOS récupère cet espace quand Apple Intelligence est désactivé dans Réglages Système.";
+"About %@ (Apple's figure)" = "Environ %@ (chiffre d’Apple)";
+"The models behind Apple Intelligence, as macOS records them. macOS protects them, so no app can remove them directly, and you may get back less than this: macOS already counts part of it as free space. macOS takes the space back when Apple Intelligence is turned off in System Settings." = "Les modèles d’Apple Intelligence, tels que macOS les enregistre. macOS les protège : aucune app ne peut les supprimer directement, et vous récupérerez peut-être moins que ce chiffre, car macOS en compte déjà une partie comme espace libre. macOS récupère cet espace quand Apple Intelligence est désactivé dans Réglages Système.";
+"Core Apple Intelligence models" = "Modèles principaux d’Apple Intelligence";
+"Image generation models" = "Modèles de génération d’images";
+"Code completion models" = "Modèles de complétion de code";
+"Photos Clean Up models" = "Modèles de l’outil Nettoyer de Photos";
+"Spatial Photos models" = "Modèles de Photos spatiales";
+"None" = "Aucun";
+"Total" = "Total";
 "Manage" = "Gérer";
 "Caches and logs" = "Caches et journaux";
 "Data apps keep to load faster, and the logs they write. Apps rebuild what they need." = "Les données que les apps gardent pour s’ouvrir plus vite, et les journaux qu’elles écrivent. Les apps recréent ce dont elles ont besoin.";

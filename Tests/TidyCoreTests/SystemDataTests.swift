@@ -33,6 +33,38 @@ extension TidyCoreTests {
         XCTAssertTrue(SystemData.developerFolders(home: tmp, fullDiskAccess: true).contains(docker))
     }
 
+    /// A record shaped like macOS's: the model's description is a keyed archive inside the state file.
+    func appleModelRecord(bytes: Int64, onDisk: Bool) throws -> Data {
+        let descriptor: [String: Any] = ["downloadedFilesystemBytes": bytes, "isOnFilesystem": onDisk, "isPatch": false]
+        let archive = try PropertyListSerialization.data(fromPropertyList: ["$archiver": "NSKeyedArchiver", "$objects": ["$null", descriptor]],
+                                                         format: .binary, options: 0)
+        let state: [String: Any] = ["SUCorePersistedStateContentsType": "SoftwareUpdateCorePersistedStateFile",
+                                    "SUCorePersistedStatePolicySecureCodedObjectsFields": ["assetDescriptor": archive]]
+        return try PropertyListSerialization.data(fromPropertyList: state, format: .binary, options: 0)
+    }
+
+    func testAppleModelsAddUpWhatMacOSRecordsByKind() throws {
+        let records = tmp.appendingPathComponent("AutoAssetDescriptors")
+        try FileManager.default.createDirectory(at: records, withIntermediateDirectories: true)
+        func record(_ type: String, _ name: String, _ bytes: Int64, onDisk: Bool = true) throws {
+            try appleModelRecord(bytes: bytes, onDisk: onDisk)
+                .write(to: records.appendingPathComponent("AutoAssetDescriptors_Entry_com.apple.MobileAsset.UAF.\(type)_\(name)_1.0_0.state"))
+        }
+        try record("FM.GenerativeModels", "com.apple.fm.base", 6_000_000_000)
+        try record("FM.GenerativeModels", "com.apple.fm.adapter", 500_000_000)
+        try record("FM.GenerativeModels", "com.apple.fm.old", 9_000_000_000, onDisk: false)
+        try record("FM.CodeLM", "com.apple.code", 5_200_000_000)
+        try record("Siri.TextToSpeech", "com.apple.voice", 600_000_000)
+        try Data("not a plist".utf8).write(to: records.appendingPathComponent("AutoAssetDescriptors_Entry_com.apple.MobileAsset.UAF.FM.Visual_x_0.state"))
+
+        let parts = Dictionary(uniqueKeysWithValues: AppleModels.measure(records: records).map { ($0.kind, $0.bytes) })
+        XCTAssertEqual(parts[.core], 6_500_000_000)
+        XCTAssertEqual(parts[.code], 5_200_000_000)
+        XCTAssertEqual(parts[.image], 0)
+        XCTAssertEqual(parts.count, AppleModels.Kind.allCases.count)
+        XCTAssertTrue(AppleModels.measure(records: tmp.appendingPathComponent("nowhere")).isEmpty)
+    }
+
     func testDeviceFilesCountBackupsAndUpdates() throws {
         _ = try write("Library/Application Support/MobileSync/Backup/0000-1111/Manifest.db", 200_000)
         _ = try write("Library/iTunes/iPhone Software Updates/iPhone_27.2_Restore.ipsw", 300_000)

@@ -53,6 +53,16 @@ struct SystemDataSection: View {
         }
     }
 
+    private func modelTitle(_ kind: AppleModels.Kind) -> String {
+        switch kind {
+        case .core: String(localized: "Core Apple Intelligence models")
+        case .image: String(localized: "Image generation models")
+        case .code: String(localized: "Code completion models")
+        case .photosCleanUp: String(localized: "Photos Clean Up models")
+        case .spatialPhotos: String(localized: "Spatial Photos models")
+        }
+    }
+
     private func row(_ e: SystemData.Entry) -> SystemDataRow.Model {
         let review = String(localized: "Review")
         func size(_ text: String = String(localized: "Size needs Full Disk Access")) -> String { e.size.map { formatSize($0) } ?? text }
@@ -65,8 +75,10 @@ struct SystemDataSection: View {
         case .appleIntelligence:
             return .init(symbol: NSImage(systemSymbolName: "apple.intelligence", accessibilityDescription: nil) != nil ? "apple.intelligence" : "sparkles",
                          tint: Color(hex: 0x8E6CE0), title: String(localized: "Apple Intelligence models"),
-                         detail: String(localized: "Downloaded · about 7 GB, according to Apple"),
-                         info: String(localized: "The models behind Apple Intelligence. macOS protects them, so no app can measure or remove them. macOS takes the space back when Apple Intelligence is turned off in System Settings."),
+                         detail: String(localized: "About \(size()) (Apple's figure)"),
+                         info: String(localized: "The models behind Apple Intelligence, as macOS records them. macOS protects them, so no app can remove them directly, and you may get back less than this: macOS already counts part of it as free space. macOS takes the space back when Apple Intelligence is turned off in System Settings."),
+                         breakdown: e.models.map { (modelTitle($0.kind), $0.bytes > 0 ? formatSize($0.bytes) : String(localized: "None")) }
+                             + [(String(localized: "Total"), size())],
                          button: String(localized: "Manage")) { NSWorkspace.shared.open(Self.appleIntelligenceSettings) }
         case .caches:
             return .init(symbol: "archivebox.fill", tint: Module.cleanup.tint, title: String(localized: "Caches and logs"), detail: size(),
@@ -96,6 +108,8 @@ struct SystemDataSection: View {
 struct SystemDataRow: View {
     struct Model {
         let symbol: String, tint: Color, title: String, detail: String, info: String
+        /// Lines shown under the explanation, name and value; the last one reads as the total.
+        var breakdown: [(String, String)] = []
         let button: String?
         let action: () -> Void
     }
@@ -111,7 +125,7 @@ struct SystemDataRow: View {
                     Text(row.title).font(.system(size: 13.5, weight: .semibold))
                     Button { showInfo = true } label: { Image(systemName: "info.circle").foregroundStyle(.secondary) }
                         .buttonStyle(.plain).help(row.info)
-                        .popover(isPresented: $showInfo) { Text(row.info).fixedSize(horizontal: false, vertical: true).padding().frame(width: 300) }
+                        .popover(isPresented: $showInfo) { details }
                 }
                 Text(row.detail).font(.system(size: 12.5)).foregroundStyle(.secondary).monospacedDigit()
             }
@@ -121,5 +135,26 @@ struct SystemDataRow: View {
             }
         }
         .padding(.horizontal, DS.Space.card).padding(.vertical, 12)
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(row.info).fixedSize(horizontal: false, vertical: true)
+            if !row.breakdown.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(Array(row.breakdown.enumerated()), id: \.offset) { i, line in
+                        if i == row.breakdown.count - 1 { Divider() }
+                        HStack {
+                            Text(line.0)
+                            Spacer(minLength: 12)
+                            Text(line.1).foregroundStyle(i == row.breakdown.count - 1 ? .primary : .secondary).monospacedDigit()
+                        }
+                        .fontWeight(i == row.breakdown.count - 1 ? .semibold : .regular)
+                    }
+                }
+                .font(.system(size: 12.5))
+            }
+        }
+        .padding().frame(width: 320)
     }
 }
