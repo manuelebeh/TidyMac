@@ -6,9 +6,10 @@ final class ModuleController: ObservableObject {
     enum Phase { case intro, scanning, results, running, done }
 
     let module: Module
-    /// Set when the controller runs a single Toolkit scan instead of the whole module.
-    let tool: Tool?
-    @Published var phase: Phase = .intro
+    /// Set while the module shows one of its tools (System Junk, Login Items...) instead of the whole module.
+    /// Back at the intro the module is whole again.
+    @Published private(set) var tool: Tool?
+    @Published var phase: Phase = .intro { didSet { if phase == .intro { tool = nil } } }
     @Published var current = ""
     @Published var groups: [ResultGroup] = []
     @Published var selected: Set<String> = []
@@ -19,9 +20,10 @@ final class ModuleController: ObservableObject {
     /// These results were found without Full Disk Access, so protected folders are missing from them.
     @Published var scannedWithoutAccess = false
     private var task: Task<Void, Never>?
+    /// When the results on screen were found, for `ScanMemory`.
+    private var scannedAt = Date()
 
-    init(module: Module) { self.module = module; tool = nil }
-    init(tool: Tool) { module = Module(rawValue: tool.module) ?? .myTools; self.tool = tool }
+    init(module: Module) { self.module = module }
 
     var progressTitle: String { tool?.scanTitle ?? module.progressTitle }
 
@@ -29,10 +31,23 @@ final class ModuleController: ObservableObject {
     var selectedSize: Int64 { selectedItems.reduce(0) { $0 + ($1.size ?? 0) } }
     var totalSize: Int64 { groups.reduce(0) { $0 + $1.totalSize } }
 
+    /// Scans the whole module.
+    func scanAll() { tool = nil; scan() }
+
+    /// Scans just one of the module's tools, shown under that tool's name.
+    func scan(only t: Tool) {
+        ToolHistory.markScanned(t.id)
+        tool = t
+        scan()
+    }
+
+    /// Scans again what is on screen: the whole module, or the tool it shows.
     func scan() {
+        task?.cancel()
         phase = .scanning; current = ""; report = nil
         scannedWithoutAccess = !Permissions.hasFullDiskAccess
-        let engine: any ScanEngine = tool.map(ToolEngine.init) ?? module.engine(clutterRoot: clutterRoot)
+        let root = clutterRoot
+        let engine: any ScanEngine = tool.map { ToolEngine($0, root: root) } ?? module.engine(clutterRoot: root)
         task = Task {
             let result = await Task.detached(priority: .userInitiated) {
                 await engine.scan { p in Task { @MainActor in self.current = p } }
@@ -41,6 +56,8 @@ final class ModuleController: ObservableObject {
             groups = IgnoreList.apply(result)
             selected = Set(groups.flatMap(\.items).filter(\.selectedByDefault).map(\.id))
             recordMalwareScan(groups)
+            scannedAt = Date()
+            if tool == nil { ScanMemory.save(module, date: scannedAt, size: totalSize, items: groups.flatMap(\.items).count) }
             phase = .results
             Sounds.scanFinished()
         }
@@ -50,7 +67,7 @@ final class ModuleController: ObservableObject {
 
     /// Protection, Full Scan and the Malware Finder tool all check launch items; History counts those checks.
     private func recordMalwareScan(_ result: [ResultGroup]) {
-        let checksMalware = module == .protection || module == .smartCare || tool?.id == "malwareFinder"
+        let checksMalware = (module == .protection && (tool == nil || tool?.id == "malwareFinder")) || module == .smartCare
         guard checksMalware else { return }
         let threats = result.flatMap(\.items).filter { $0.category == "malware" }.count
         History.recordMalwareScan(scanned: LaunchItems.all().filter { !$0.label.hasPrefix("com.apple.") }.count, threats: threats)
@@ -77,9 +94,17 @@ final class ModuleController: ObservableObject {
             // With access already there, it cannot be what is missing.
             if Permissions.hasFullDiskAccess { r.needsAccess = [] }
             report = r
+            rememberWhatIsLeft(after: r)
             phase = .done
             Sounds.cleanupFinished()
         }
+    }
+
+    /// After a run the intro should not still show what has just been removed.
+    private func rememberWhatIsLeft(after r: ActionReport) {
+        guard tool == nil else { return }
+        let count = groups.flatMap(\.items).count
+        ScanMemory.save(module, date: scannedAt, size: max(totalSize - r.freed, 0), items: max(count - r.succeeded.count, 0))
     }
 
     /// Finishes what macOS blocked, once access is granted: the user already confirmed these items.
@@ -92,6 +117,7 @@ final class ModuleController: ObservableObject {
             let r = await Task.detached { await Executor.run(items) }.value
             PerformanceEngine.markRun(r.succeeded)
             report = first.merging(retry: r)
+            if let merged = report { rememberWhatIsLeft(after: merged) }
             phase = .done
             Sounds.cleanupFinished()
         }
@@ -119,11 +145,20 @@ final class ModuleController: ObservableObject {
 
 struct ModuleScreen: View {
     @ObservedObject var controller: ModuleController
+    /// Shown first among the header's buttons (the Applications page puts its tab switch there).
+    var accessory: AnyView? = nil
     @ObservedObject private var access = FullDiskAccessWatcher.shared
     var module: Module { controller.module }
+    @State private var confirmBack = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Results: the way back to the module's start page (or, for a tool shown on its own, to the whole module)
+            // without running anything. The done screen has its own Done button.
+            if controller.phase == .results {
+                Button(action: back) { Label(backTitle, systemImage: "chevron.left") }
+                    .buttonStyle(SecondaryButtonStyle()).padding(.leading, DS.Space.page).padding(.top, DS.Space.headerTop)
+            }
             header.headerPadding()
             Group {
                 switch controller.phase {
@@ -140,17 +175,31 @@ struct ModuleScreen: View {
         .animation(Motion.animation(.easeInOut(duration: 0.2)), value: controller.phase)
         .onChange(of: access.granted) { if $0 { controller.retryBlockedItems() } }
         .onAppear { if access.granted { controller.retryBlockedItems() } }
+        .alert(String(localized: "Go back to \(backTitle)?"), isPresented: $confirmBack) {
+            Button("Cancel", role: .cancel) {}
+            Button("OK") { controller.phase = .intro }
+        } message: { Text("Your scan results and selections won’t be saved.") }
         .sheet(isPresented: Binding(get: { !controller.appsToQuit.isEmpty }, set: { if !$0 { controller.appsToQuit = [] } })) {
             QuitAppsSheet(apps: controller.appsToQuit, onContinue: controller.continueAfterQuitting,
                           onCancel: { controller.appsToQuit = [] })
         }
     }
 
+    /// Where the back button leads: Full Scan's start page is the Overview.
+    private var backTitle: String { module == .smartCare ? String(localized: "Overview") : module.name }
+
+    private func back() {
+        if controller.phase == .results && !controller.groups.allSatisfy(\.isEmpty) { confirmBack = true } else { controller.phase = .intro }
+    }
+
     private var subtitle: String? {
         switch controller.phase {
         case .results:
             let items = controller.groups.flatMap(\.items)
-            if items.isEmpty { return String(localized: "Your Mac is in great shape!") }
+            if items.isEmpty {
+                return controller.scannedWithoutAccess ? String(localized: "Protected folders were skipped")
+                    : String(localized: "Your Mac is in great shape!")
+            }
             return controller.totalSize > 0 ? String(localized: "\(items.count) items · \(formatSize(controller.totalSize)) found") : String(localized: "\(items.count) items found")
         case .scanning: return controller.progressTitle
         case .running: return String(localized: "Working on it...")
@@ -159,48 +208,63 @@ struct ModuleScreen: View {
     }
 
     private var header: some View {
-        ScreenHeader(title: module.headline, subtitle: subtitle) {
+        ScreenHeader(title: controller.tool?.title ?? module.name, subtitle: subtitle) {
+            if let accessory { accessory }
             switch controller.phase {
             case .intro: EmptyView()
             case .scanning: Button("Stop") { controller.stop() }.buttonStyle(SecondaryButtonStyle())
             case .running: EmptyView()
             case .results:
-                Button("Scan") { controller.scan() }.buttonStyle(SecondaryButtonStyle())
+                Button("Scan Again") { controller.scan() }.buttonStyle(SecondaryButtonStyle())
             case .done: Button("Done") { controller.phase = .intro }.buttonStyle(PrimaryButtonStyle())
             }
         }
     }
 }
 
-/// Before a scan: one centred composition, with the scan as its action.
+/// Before a scan: what the module does and what its last scan found, the scan of everything, and below it
+/// each of its tools to run on its own.
 struct IntroView: View {
     @ObservedObject var controller: ModuleController
-    @ObservedObject private var access = FullDiskAccessWatcher.shared
     var module: Module { controller.module }
-    @State private var showUninstaller = false
+    private var tools: [Tool] { Toolbox.tools.filter { $0.module == module.rawValue && $0.isScan } }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            EmptyState(symbol: module.symbol, tint: module.tint, title: module.headline, message: module.tagline,
-                       actionTitle: String(localized: "Scan")) { controller.scan() } extra: {
-                VStack(spacing: 16) {
-                    FeaturePills(features: module.features, tint: module.tint)
-                    if module == .clutter {
-                        Button { pickFolder() } label: {
-                            Label(controller.clutterRoot.path.replacingOccurrences(of: Paths.home.path, with: "~"), systemImage: "folder.fill")
-                                .lineLimit(1).truncationMode(.middle)
-                        }.buttonStyle(SecondaryButtonStyle())
+        // Centred like the empty results and the done screen; scrolls when the window is too short for the tools.
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 36) {
+                    // The page header already names the module; the hero says what it does.
+                    EmptyState(symbol: module.symbol, tint: module.tint, title: nil, message: module.tagline,
+                               actionTitle: String(localized: "Scan")) { controller.scanAll() } extra: {
+                        VStack(spacing: 14) {
+                            if let last = ScanMemory.last(module) {
+                                Text(ScanMemory.summary(last)).font(.system(size: 12.5)).foregroundStyle(.secondary).monospacedDigit()
+                            }
+                            if module == .clutter {
+                                Button { pickFolder() } label: {
+                                    Label(Paths.abbreviate(controller.clutterRoot), systemImage: "folder.fill")
+                                        .lineLimit(1).truncationMode(.middle)
+                                }
+                                .buttonStyle(SecondaryButtonStyle())
+                                .help(String(localized: "The folder Declutter looks in"))
+                            }
+                        }
                     }
-                    if module == .applications {
-                        Button("Open Uninstaller") { showUninstaller = true }.buttonStyle(SecondaryButtonStyle())
+                    if !tools.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Or check just one thing").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: DS.Space.item)], spacing: DS.Space.item) {
+                                ForEach(tools) { t in ToolTile(tool: t, tint: module.tint) { controller.scan(only: t) } }
+                            }
+                        }
+                        .frame(maxWidth: 760)
                     }
                 }
+                .padding(.horizontal, DS.Space.page).padding(.bottom, 40)
+                .frame(maxWidth: .infinity, minHeight: geo.size.height)
             }
-            Spacer(minLength: 0)
-            Spacer(minLength: 0).frame(height: 40)
         }
-        .sheet(isPresented: $showUninstaller) { UninstallerSheet(module: module) }
     }
 
     func pickFolder() {
@@ -208,6 +272,36 @@ struct IntroView: View {
         p.canChooseDirectories = true; p.canChooseFiles = false
         p.directoryURL = controller.clutterRoot
         if p.runModal() == .OK, let u = p.url { controller.clutterRoot = u }
+    }
+}
+
+/// One of a module's tools on its intro: what it looks at, run on its own with a click.
+struct ToolTile: View {
+    let tool: Tool
+    let tint: Color
+    let run: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: run) {
+            HStack(alignment: .center, spacing: 12) {
+                IconChip(symbol: tool.symbol, tint: tint, size: 30)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tool.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(.primary).lineLimit(1)
+                    Text(tool.description).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+            .card(hovering: hover)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help(String(localized: "Scan only \(tool.title)"))
     }
 }
 
@@ -281,10 +375,23 @@ struct ResultsView: View {
         }
     }
 
-    private var emptyState: some View {
-        EmptyState(symbol: "checkmark.seal.fill", tint: DS.safe, title: String(localized: "Your Mac is in great shape!"),
-                   actionTitle: String(localized: "Start Over"), primary: false) { controller.phase = .intro }
-            .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.bottom, 60)
+    /// Nothing found. Without Full Disk Access that only covers the folders TidyMac could read, so it must not say all is well.
+    @ViewBuilder private var emptyState: some View {
+        Group {
+            if !controller.scannedWithoutAccess {
+                EmptyState(symbol: "checkmark.seal.fill", tint: DS.safe, title: String(localized: "Your Mac is in great shape!"),
+                           actionTitle: String(localized: "Start Over"), primary: false) { controller.phase = .intro }
+            } else if access.granted {
+                EmptyState(symbol: "checkmark.shield.fill", tint: DS.safe, title: String(localized: "Nothing found in the folders TidyMac could read"),
+                           message: String(localized: "Full Disk Access is on. Scan again to include protected folders."),
+                           actionTitle: String(localized: "Scan Again")) { controller.scan() }
+            } else {
+                EmptyState(symbol: "lock.shield.fill", tint: DS.caution, title: String(localized: "Nothing found in the folders TidyMac could read"),
+                           message: String(localized: "Protected folders were skipped. Grant Full Disk Access to include them."),
+                           actionTitle: String(localized: "Open Settings")) { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.bottom, 60)
     }
 
     private var toolbar: some View {

@@ -22,10 +22,10 @@ struct SpaceLensScreen: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if path.isEmpty {
-                ScreenHeader(title: module.headline) { EmptyView() }
+                ScreenHeader(title: module.name) { EmptyView() }
                     .headerPadding()
                 Spacer(minLength: 0)
-                EmptyState(symbol: module.symbol, tint: module.tint, title: module.headline, message: module.tagline,
+                EmptyState(symbol: module.symbol, tint: module.tint, title: nil, message: module.tagline,
                            actionTitle: String(localized: "Scan")) { selected = [:]; message = nil; path = [Paths.home] } extra: {
                     FeaturePills(features: module.features, tint: module.tint)
                 }

@@ -2,6 +2,8 @@ import Foundation
 
 /// Toolkit: single-purpose scans that run one part of a module on its own.
 public struct Tool: Identifiable, Sendable {
+    public var isScan: Bool { if case .scan = kind { true } else { false } }
+
     public enum Kind: Sendable { case scan(@Sendable () async -> [ResultGroup]), uninstaller, screenCleaning }
 
     public let id: String
@@ -24,15 +26,20 @@ public struct Tool: Identifiable, Sendable {
 /// Runs one tool's builder as a regular scan, so the module screens can display it.
 public struct ToolEngine: ScanEngine {
     let tool: Tool
-    public init(_ tool: Tool) { self.tool = tool }
+    let root: URL
+    /// `root` is the folder Declutter's file tools look in (the folder picked on Declutter, or the home folder).
+    public init(_ tool: Tool, root: URL = Paths.home) { self.tool = tool; self.root = root }
     public func scan(progress: @escaping @Sendable (String) -> Void) async -> [ResultGroup] {
         guard case .scan(let build) = tool.kind else { return [] }
         progress(tool.title)
-        return await build().filter { !$0.isEmpty }
+        return await Toolbox.$root.withValue(root) { await build() }.filter { !$0.isEmpty }
     }
 }
 
 public enum Toolbox {
+    /// The folder the running tool's file scans look in; see `ToolEngine`.
+    @TaskLocal static var root: URL = Paths.home
+
     static func keywords(_ s: String) -> [String] { s.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } }
 
     /// A group builder that may block on a privacy prompt gets the same deadline as in Cleanup.
@@ -49,7 +56,7 @@ public enum Toolbox {
     }
 
     static func clutter(_ pick: @escaping @Sendable ([ClutterEngine.FileInfo]) -> ResultGroup) -> @Sendable () async -> [ResultGroup] {
-        { [pick(ClutterEngine.index(Paths.home))] }
+        { [pick(ClutterEngine.index(root))] }
     }
 
     public static let tools: [Tool] = [
@@ -116,7 +123,7 @@ public enum Toolbox {
              keywords: keywords("mail attachments,email attachments,mail,apple mail,attachments,mail downloads,email files,mail cleanup"),
              kind: .scan(groups([CleanupEngine.mailAttachments]))),
         Tool(id: "maintenanceTasks", title: String(localized: "Maintenance Tasks"),
-             description: String(localized: "Run a set of recommended maintenance tasks to bring your Mac to its max."),
+             description: String(localized: "Run a set of recommended maintenance tasks to keep your Mac running smoothly."),
              symbol: "wrench.and.screwdriver.fill", module: "performance", scanTitle: String(localized: "Analyzing your Mac..."),
              keywords: keywords("maintenance,maintenance tasks,tune up,optimize,speed up mac,slow mac,reindex spotlight,flush dns,dns cache,free up ram,ram cleaner,repair permissions,speed up mail,periodic scripts,weekly maintenance"),
              kind: .scan(performance(["maintenance"]))),
@@ -145,7 +152,7 @@ public enum Toolbox {
              symbol: "archivebox.fill", module: "cleanup", scanTitle: String(localized: "Looking for system junk..."),
              keywords: keywords("system junk,junk,junk files,cache,caches,system cache,user cache,logs,system logs,user logs,temp files,temporary files,clean mac,free up space"),
              kind: .scan(groups([CleanupEngine.userCache, CleanupEngine.systemCache, CleanupEngine.userLogs, CleanupEngine.systemLogs,
-                                 CleanupEngine.xcodeJunk, CleanupEngine.iosBackups, CleanupEngine.brokenPreferences,
+                                 CleanupEngine.iosBackups, CleanupEngine.brokenPreferences,
                                  CleanupEngine.brokenLoginItems, CleanupEngine.deletedUsers]))),
         Tool(id: "timeMachineSnapshot", title: String(localized: "Time Machine Snapshot"),
              description: String(localized: "Remove local Time Machine snapshots without affecting your backups."),

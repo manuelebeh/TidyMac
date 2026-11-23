@@ -11,7 +11,7 @@
 "%@ available of %@" = "%1$@ disponibles sur %2$@";
 "%@ available of %@. Click to show the drive in Finder." = "%1$@ disponibles sur %2$@. Cliquez pour afficher le disque dans le Finder.";
 "%@ could not be ejected." = "Impossible d’éjecter %@.";
-"%@ has %@ available. Open Storage Map to see what takes up space on it." = "Il reste %2$@ sur %1$@. Ouvrez Storage Map pour voir ce qui prend de la place.";
+"%@ has %@ available. Open Storage Map to see what takes up space on it." = "Il reste %2$@ sur %1$@. Ouvrez la Carte du stockage pour voir ce qui prend de la place.";
 "%@ is in the Trash, but the files it created may still be on your Mac. Scan Applications to remove its leftovers." = "%@ est dans la Corbeille, mais les fichiers créés par cette app sont peut-être encore sur votre Mac. Analysez Applications pour supprimer ses résidus.";
 "%@ is not an application TidyMac can uninstall." = "%@ n’est pas une application que TidyMac peut désinstaller.";
 "%@ is not responding. Force quit it from TidyMac's menu, or wait until it responds." = "%@ ne répond pas. Forcez cette app à quitter depuis le menu de TidyMac ou attendez qu’elle réponde.";
@@ -76,7 +76,6 @@
 "Another user's files" = "Fichiers d’un autre utilisateur";
 "App Leftovers" = "Résidus d’apps";
 "App Permissions Revoked" = "Autorisations d’apps révoquées";
-"App Uninstaller" = "Désinstallation d’apps";
 "App Updater" = "Mise à jour des apps";
 "Application Permissions" = "Autorisations des applications";
 "Application permissions" = "Autorisations des applications";
@@ -137,7 +136,7 @@
 "Check Now" = "Vérifier";
 "Check for new versions once a day" = "Rechercher les nouvelles versions une fois par jour";
 "Check that Gatekeeper, FileVault, the firewall and System Integrity Protection are on." = "Vérifiez que Gatekeeper, FileVault, le coupe-feu et la protection de l’intégrité du système sont activés.";
-"Check your Mac for all kind of threats and vulnerabilities." = "Recherchez toutes sortes de menaces et de vulnérabilités sur votre Mac.";
+"Check your Mac for all kinds of threats and vulnerabilities." = "Recherchez toutes sortes de menaces et de vulnérabilités sur votre Mac.";
 "Check your internet connection and try again." = "Vérifiez votre connexion à Internet et réessayez.";
 "Checking for threats..." = "Recherche de menaces...";
 "Checking for updates" = "Recherche de mises à jour";
@@ -194,7 +193,7 @@
 "Dependencies and build output a project can recreate, such as node_modules, target and .venv. Those of projects untouched for three months are preselected. Getting them back takes a reinstall or a rebuild." = "Dépendances et fichiers de compilation qu’un projet peut recréer, comme node_modules, target et .venv. Ceux des projets inchangés depuis trois mois sont présélectionnés. Pour les récupérer, il faut réinstaller ou recompiler.";
 "Derived data, device support files and simulator caches. Xcode recreates what it needs." = "Données dérivées, fichiers de prise en charge d’appareils et caches de simulateur. Xcode recrée ce dont il a besoin.";
 "Desktop Folder" = "Dossier Bureau";
-"Developer Junk" = "Fichiers inutiles de développement";
+"Developer Junk" = "Déchets de développement";
 "Developer Tool Caches" = "Caches des outils de développement";
 "Developer" = "Développeur";
 "Development build" = "Version de développement";
@@ -202,7 +201,6 @@
 "Discharging" = "En décharge";
 "Disk Image" = "Image disque";
 "Disk Space" = "Espace disque";
-"Disk Usage" = "Utilisation du disque";
 "Do Not Move" = "Ne pas déplacer";
 "Docker" = "Docker";
 "Documents Folder" = "Dossier Documents";
@@ -237,7 +235,6 @@
 "External Drives" = "Disques externes";
 "Fair" = "Correct";
 "Favorites" = "Favoris";
-"File Leftovers" = "Fichiers résiduels";
 "Files downloaded more than a month ago." = "Fichiers téléchargés il y a plus d’un mois.";
 "Files over 50 MB, the biggest first. Files not opened for a year are marked Old." = "Fichiers de plus de 50 Mo, les plus gros d’abord. Ceux qui n’ont pas été ouverts depuis un an sont marqués Ancien.";
 "Files to remove" = "Fichiers à supprimer";
@@ -271,7 +268,6 @@
 "Fully charged" = "Charge complète";
 "Gatekeeper" = "Gatekeeper";
 "General" = "Général";
-"Go back to Toolkit?" = "Revenir à la boîte à outils ?";
 "Go to Toolkit" = "Aller à la boîte à outils";
 "Go to Protection" = "Aller à Protection";
 "Go to Full Scan" = "Aller à l’Analyse complète";
@@ -314,11 +310,10 @@
 "Items go to the Trash." = "Les éléments vont dans la Corbeille.";
 "Items in the Trash are deleted permanently. This cannot be undone." = "Les éléments de la Corbeille sont supprimés définitivement. Cette action est irréversible.";
 "Items you already deleted. They are removed for good." = "Éléments que vous avez déjà supprimés. Ils seront effacés définitivement.";
-"Items you remove with Storage Map are listed here." = "Les éléments que vous supprimez avec Storage Map sont listés ici.";
+"Items you remove with Storage Map are listed here." = "Les éléments que vous supprimez avec la Carte du stockage sont listés ici.";
 "It’s been over a week now. Restart your Mac once in a while." = "Cela fait plus d’une semaine. Redémarrez votre Mac de temps en temps.";
 "It’s time to care for your Mac!" = "Il est temps de prendre soin de votre Mac !";
 "It’s time to empty your Trash!" = "Il est temps de vider votre Corbeille !";
-"Junk Cleanup" = "Nettoyage des fichiers inutiles";
 "Junk files that are safe to remove." = "Fichiers inutiles que l’on peut supprimer sans risque.";
 "Keep an eye on the latest and most reliable versions of your applications." = "Gardez un œil sur les versions les plus récentes et les plus fiables de vos applications.";
 "Keep icon in Dock when TidyMac is not open" = "Garder l’icône dans le Dock lorsque TidyMac n’est pas ouvert";
@@ -326,9 +321,8 @@
 "Keep your Mac in top shape with recommended maintenance." = "Gardez votre Mac en pleine forme grâce à l’entretien recommandé.";
 "Large & Old Files" = "Fichiers volumineux et anciens";
 "Large Files Removed" = "Fichiers volumineux supprimés";
-"Large Files" = "Fichiers volumineux";
 "Large Folders Overview" = "Aperçu des dossiers volumineux";
-"Large and Old Files" = "Fichiers volumineux et anciens";
+"Large and Old Files" = "Gros fichiers anciens";
 "Large and old files" = "Fichiers volumineux et anciens";
 "Last Opened" = "Dernière ouverture";
 "Last Scan: %@" = "Dernière analyse : %@";
@@ -346,7 +340,6 @@
 "Limit" = "Limite";
 "Load" = "Charge";
 "Processor" = "Processeur";
-"Recommendations" = "Recommandations";
 "Quick Actions" = "Actions rapides";
 "Purgeable Space" = "Espace purgeable";
 "Load: %lld%%" = "Charge : %lld %%";
@@ -462,13 +455,11 @@
 "Open Protection" = "Ouvrir Protection";
 "Open Settings" = "Ouvrir les réglages";
 "Open System Settings" = "Ouvrir Réglages Système";
-"Open Uninstaller" = "Ouvrir le désinstallateur";
 "Open at Login keeps the menu and its alerts running after a restart." = "Ouvrir à la connexion garde le menu et ses alertes actifs après un redémarrage.";
 "Open at Login" = "Ouvrir à la connexion";
 "Open" = "Ouvrir";
 "Opened %@" = "Ouvert %@";
 "Opens when you log in" = "S’ouvre à l’ouverture de session";
-"Other Tools" = "Autres outils";
 "Other" = "Autre";
 "Outside home folder" = "En dehors du dossier de départ";
 "Packages and build files kept by npm, pnpm, Cargo, Gradle and similar tools. They are downloaded again when a project needs them." = "Paquets et fichiers de compilation conservés par npm, pnpm, Cargo, Gradle et d’autres outils similaires. Ils sont de nouveau téléchargés lorsqu’un projet en a besoin.";
@@ -487,7 +478,6 @@
 "Press ⌘ Esc to exit · ends on its own in %lld:%@" = "Appuyez sur ⌘ Échap pour quitter · fin automatique dans %1$lld:%2$@";
 "Pressure" = "Pression";
 "Pressure: %@" = "Pression : %@";
-"Privacy Check" = "Vérification de la confidentialité";
 "Privacy Items Removed" = "Éléments de confidentialité supprimés";
 "Privacy Items" = "Éléments de confidentialité";
 "Privacy" = "Confidentialité";
@@ -503,7 +493,6 @@
 "Provide Feedback..." = "Envoyer un commentaire...";
 "Purgeable Space: %@" = "Espace purgeable : %@";
 "Purgeable space includes files your macOS marks as safe to remove when storage runs low - like caches, temporary data, and redownloadable content. Clean it in the Performance module." = "L’espace purgeable regroupe les fichiers que macOS peut supprimer sans risque en cas de manque de stockage, comme les caches, les données temporaires et les contenus téléchargeables de nouveau. Nettoyez-le dans le module Performances.";
-"Quick Scan" = "Analyse rapide";
 "Quick maintenance that takes care of the essentials." = "Un entretien rapide qui s’occupe de l’essentiel.";
 "Quick tools for focused tasks - clean up, protect, and maintain your Mac in just a few clicks." = "Des outils rapides pour des tâches précises : nettoyez, protégez et entretenez votre Mac en quelques clics.";
 "Quit All" = "Tout quitter";
@@ -558,7 +547,7 @@
 "Run Now" = "Exécuter";
 "Run Full Scan for the first time ever." = "Lancez l’Analyse complète pour la première fois.";
 "Run a deep Malware Scan to make sure you are fully safe and protected." = "Lancez une analyse approfondie des logiciels malveillants pour vous assurer que vous êtes bien protégé.";
-"Run a set of recommended maintenance tasks to bring your Mac to its max." = "Lancez une série de tâches d’entretien recommandées pour tirer le meilleur de votre Mac.";
+"Run a set of recommended maintenance tasks to keep your Mac running smoothly." = "Lancez une série de tâches d’entretien recommandées pour que votre Mac reste fluide.";
 "Run performance tasks to optimize your Mac." = "Lancez des tâches de performances pour optimiser votre Mac.";
 "Run" = "Lancer";
 "Running, about 20 seconds... TidyMac measures your download and upload speed with macOS’s networkQuality." = "En cours, environ 20 secondes... TidyMac mesure votre débit descendant et montant avec l’outil networkQuality de macOS.";
@@ -583,18 +572,16 @@
 "Screen Recording" = "Enregistrement de l’écran";
 "Search" = "Rechercher";
 "Search..." = "Rechercher...";
-"Security Check" = "Vérification de la sécurité";
 "Security Settings" = "Réglages de sécurité";
 "Security settings" = "Réglages de sécurité";
 "Security" = "Sécurité";
 "See All Devices" = "Voir tous les appareils";
-"See how much space TidyMac has freed and how your disk is used." = "Voyez l’espace libéré par TidyMac et l’utilisation de votre disque.";
 "Select an app to see everything it leaves on your Mac." = "Sélectionnez une app pour voir tout ce qu’elle laisse sur votre Mac.";
 "Select an application to uninstall." = "Sélectionnez une application à désinstaller.";
 "Settings" = "Réglages";
 "Settings..." = "Réglages...";
 "Show %lld more" = "Afficher %lld de plus";
-"Show Assistant recommendations" = "Afficher les recommandations de l’assistant";
+"Show recommendations" = "Afficher les recommandations";
 "Show TidyMac" = "Afficher TidyMac";
 "Show less" = "Afficher moins";
 "Show" = "Afficher";
@@ -617,9 +604,8 @@
 "Sort by" = "Trier par";
 "Sort through your files and reduce the mess in just a few clicks." = "Triez vos fichiers et réduisez le désordre en quelques clics.";
 "Sorting through your files..." = "Tri de vos fichiers...";
-"Space Freed" = "Espace libéré";
-"Storage Map Used" = "Storage Map utilisé";
-"Storage Map" = "Storage Map";
+"Storage Map Used" = "Carte du stockage utilisée";
+"Storage Map" = "Carte du stockage";
 "Speech Recognition" = "Reconnaissance vocale";
 "Speed Up Mail" = "Accélérer Mail";
 "Stale" = "Inactif";
@@ -641,7 +627,6 @@
 "System Junk Cleaned" = "Fichiers système inutiles nettoyés";
 "System Junk" = "Fichiers système inutiles";
 "System Log Files" = "Fichiers journaux système";
-"System Tune-up" = "Optimisation du système";
 "System daemon" = "Daemon système";
 "System files are not protected. It can only be turned back on from Recovery, with `csrutil enable`." = "Les fichiers système ne sont pas protégés. Cette protection ne peut être réactivée que depuis la récupération, avec `csrutil enable`.";
 "System folder" = "Dossier système";
@@ -822,15 +807,11 @@
 "⚠️ A suspicious '%@' has been found on your Mac. Review it in Protection." = "⚠️ Un élément suspect, « %@ », a été trouvé sur votre Mac. Examinez-le dans Protection.";
 
 "All" = "Tout";
-"Analyze" = "Analyser";
 "Check First" = "À vérifier";
-"Full scan" = "Analyse complète";
 "Largest" = "Plus volumineux";
 "Let TidyMac look deeper" = "Laissez TidyMac aller plus loin";
 "Limited scan" = "Analyse limitée";
 "Overview" = "Vue d’ensemble";
-"Protect" = "Protéger";
-"Protected folders included" = "Dossiers protégés inclus";
 "Recommended" = "Recommandé";
 "Scan Everything" = "Tout analyser";
 "Select Recommended" = "Sélectionner les recommandés";
@@ -857,3 +838,17 @@
 "Where TidyMac looks for apps" = "Où TidyMac cherche les apps";
 "Items you excluded from scan results." = "Éléments exclus des résultats de scan.";
 "Manage..." = "Gérer...";
+"Size needs Full Disk Access" = "Taille visible avec l’accès complet au disque";
+"Nothing found in the folders TidyMac could read" = "Rien trouvé dans les dossiers que TidyMac a pu lire";
+"Protected folders were skipped" = "Les dossiers protégés ont été ignorés";
+"Apps" = "Apps";
+"Protect & Optimize" = "Protéger et optimiser";
+"Updates & Leftovers" = "Mises à jour et résidus";
+"See how much space and time TidyMac has saved you." = "Voyez combien d’espace et de temps TidyMac vous a fait gagner.";
+"%@ found" = "%@ trouvés";
+"Go back to %@?" = "Revenir à %@ ?";
+"More Tools" = "Autres outils";
+"Nothing left to do" = "Plus rien à faire";
+"Or check just one thing" = "Ou vérifiez un seul point";
+"Scan only %@" = "Analyser uniquement : %@";
+"The folder Declutter looks in" = "Le dossier que Désencombrer analyse";

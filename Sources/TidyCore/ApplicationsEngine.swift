@@ -179,7 +179,7 @@ public struct ApplicationsEngine: ScanEngine {
                 items.append(.file(u, subtitle: String(localized: "\(dir) · no matching app"), selected: false))
             }
         }
-        return ResultGroup(id: "leftovers", title: String(localized: "File Leftovers"),
+        return ResultGroup(id: "leftovers", title: String(localized: "App Leftovers"),
                            description: String(localized: "Support files of apps that are no longer installed."),
                            symbol: "shippingbox", items: items.filter { ($0.size ?? 0) > 0 }.sorted { ($0.size ?? 0) > ($1.size ?? 0) },
                            verb: String(localized: "to remove"))

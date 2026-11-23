@@ -223,6 +223,8 @@ final class AppState: ObservableObject {
     @Published var showSettings = false
     /// Set by a `tidymac://uninstall` link; shows the Uninstaller on that app.
     @Published var uninstallTarget: URL?
+    /// Which half of the Applications page shows: the app list, or the scan for updates and leftovers.
+    @Published var applicationsTab: ApplicationsTab = .apps
     let screenCleaning = ScreenCleaningSession()
     /// Opens (or brings back) the main window; set once it has appeared.
     var openMain: (() -> Void)?
@@ -232,6 +234,28 @@ final class AppState: ObservableObject {
         openMain?()
         NSApp.activate(ignoringOtherApps: true)
     }
+
+    /// Runs one tool inside the module it belongs to, so a shortcut (Toolkit, Overview) lands on that tool's results
+    /// with the sidebar showing where it lives. A module busy scanning or cleaning is shown as it is.
+    func openTool(_ id: String) {
+        guard let t = Toolbox.tools.first(where: { $0.id == id }) else { return }
+        switch t.kind {
+        case .screenCleaning: ToolHistory.markScanned(t.id); screenCleaning.start()
+        case .uninstaller: ToolHistory.markScanned(t.id); openApplications(.apps)
+        case .scan:
+            guard let m = Module(rawValue: t.module), let c = controllers[m] else { return }
+            if m == .applications { applicationsTab = .updates }
+            module = m
+            if c.phase != .scanning && c.phase != .running { c.scan(only: t) }
+        }
+    }
+    /// Shows the Applications page on one tab. The updates tab starts its scan if it has nothing to show yet.
+    func openApplications(_ tab: ApplicationsTab) {
+        applicationsTab = tab
+        module = .applications
+        if tab == .updates, let c = controllers[.applications], c.phase == .intro { c.scanAll() }
+    }
+
     let controllers: [Module: ModuleController] = Dictionary(uniqueKeysWithValues: Module.allCases.map { ($0, ModuleController(module: $0)) })
 }
 
@@ -280,8 +304,9 @@ struct RootView: View {
         switch app.module {
         case .spaceLens: SpaceLensScreen(app: app)
         case .activity: ActivityScreen(app: app)
-        case .myTools: MyToolsScreen(screenCleaning: app.screenCleaning)
+        case .myTools: MyToolsScreen(app: app)
         case .smartCare: OverviewScreen(app: app, controller: app.controllers[.smartCare]!)
+        case .applications: ApplicationsScreen(app: app, controller: app.controllers[.applications]!)
         default: ModuleScreen(controller: app.controllers[app.module]!)
         }
     }
@@ -293,11 +318,11 @@ struct Sidebar: View {
     @ObservedObject var app: AppState
     @ObservedObject private var access = FullDiskAccessWatcher.shared
 
+    /// What to act on. Toolkit and History are reference pages, so they sit at the bottom next to Settings.
     private let sections: [(title: String?, modules: [Module])] = [
         (nil, [.smartCare]),
-        (String(localized: "Clean"), [.cleanup, .clutter, .applications]),
-        (String(localized: "Protect"), [.protection, .performance]),
-        (String(localized: "Analyze"), [.spaceLens, .myTools, .activity]),
+        (String(localized: "Clean"), [.cleanup, .clutter, .spaceLens, .applications]),
+        (String(localized: "Protect & Optimize"), [.protection, .performance]),
     ]
 
     var body: some View {
@@ -323,8 +348,11 @@ struct Sidebar: View {
                 .padding(.horizontal, 10)
             }
 
-            VStack(spacing: 6) {
-                accessCard
+            VStack(spacing: 2) {
+                // Only while something is missing: once access is on there is nothing to do here.
+                if !access.granted { accessCard.padding(.bottom, 6) }
+                SidebarRow(module: .myTools, app: app)
+                SidebarRow(module: .activity, app: app)
                 Button { app.showSettings = true } label: {
                     SidebarLabel(symbol: "gearshape.fill", tint: DS.glyph, title: String(localized: "Settings"), badge: nil, selected: app.showSettings)
                 }.buttonStyle(.plain)
@@ -336,24 +364,23 @@ struct Sidebar: View {
     }
 
     private var accessCard: some View {
-        Button { if !access.granted { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) } } label: {
+        Button { NSWorkspace.shared.open(Permissions.fullDiskAccessSettings) } label: {
             HStack(spacing: 10) {
-                IconChip(symbol: access.granted ? "checkmark.shield.fill" : "lock.fill", tint: access.granted ? DS.safe : DS.caution, size: 26)
+                IconChip(symbol: "lock.fill", tint: DS.caution, size: 26)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(access.granted ? String(localized: "Full scan") : String(localized: "Limited scan"))
-                        .font(.system(size: 12.5, weight: .semibold))
-                    Text(access.granted ? String(localized: "Protected folders included") : String(localized: "Let TidyMac look deeper"))
+                    Text(String(localized: "Limited scan")).font(.system(size: 12.5, weight: .semibold))
+                    Text(String(localized: "Let TidyMac look deeper"))
                         .font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                if !access.granted { Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary) }
+                Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .card()
         }
         .buttonStyle(.plain)
-        .help(access.granted ? String(localized: "Protected folders included") : String(localized: "Let TidyMac look deeper"))
+        .help(String(localized: "Let TidyMac look deeper"))
     }
 }
 

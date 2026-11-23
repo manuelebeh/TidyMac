@@ -1,36 +1,23 @@
 import SwiftUI
 import TidyCore
 
-/// Toolkit: a searchable grid of single-purpose tools, with favorites pinned on top.
+/// Toolkit: every tool in one searchable place, grouped by the area it belongs to, with favorites pinned on top.
+/// A tool runs inside its module, so the sidebar shows where it lives and its results stay there.
 struct MyToolsScreen: View {
-    @ObservedObject var screenCleaning: ScreenCleaningSession
+    @ObservedObject var app: AppState
     @AppStorage("TidyMac.favoriteTools") private var favoritesRaw = ""
     @State private var query = ""
-    @State private var running: ModuleController?
-    @State private var confirmBack = false
-    @State private var showUninstaller = false
 
     var favorites: Set<String> { Set(favoritesRaw.split(separator: ",").map(String.init)) }
 
-    var body: some View {
-        ZStack {
-            if let running {
-                ToolRunView(controller: running, back: back) { self.running = nil }.transition(.opacity)
-            } else {
-                grid.transition(.opacity)
-            }
-        }
-        .animation(Motion.animation(.easeInOut(duration: 0.3)), value: running == nil)
-        .alert("Go back to Toolkit?", isPresented: $confirmBack) {
-            Button("Cancel", role: .cancel) {}
-            Button("OK") { running?.stop(); running = nil }
-        } message: { Text("Your scan results and selections won’t be saved.") }
-        .sheet(isPresented: $showUninstaller) { UninstallerSheet(module: .applications) }
-    }
+    /// The areas in sidebar order; Screen Cleaning belongs to none of them.
+    private static let areas: [Module] = [.cleanup, .clutter, .applications, .protection, .performance, .smartCare]
 
-    var grid: some View {
+    private func title(_ area: Module) -> String { area == .smartCare ? String(localized: "More Tools") : area.name }
+
+    var body: some View {
         let shown = Toolbox.tools.filter { $0.matches(query) }
-        let pinned = shown.filter { favorites.contains($0.id) }, others = shown.filter { !favorites.contains($0.id) }
+        let pinned = shown.filter { favorites.contains($0.id) }
         return VStack(alignment: .leading, spacing: 0) {
             ScreenHeader(title: String(localized: "Toolkit"), subtitle: Module.myTools.tagline) {
                 HStack {
@@ -50,7 +37,10 @@ struct MyToolsScreen: View {
                         section(String(localized: "\(shown.count) results found"), shown)
                     } else {
                         if !pinned.isEmpty { section(String(localized: "Favorites"), pinned) }
-                        section(pinned.isEmpty ? "" : String(localized: "Other Tools"), others)
+                        ForEach(Self.areas) { area in
+                            let tools = shown.filter { $0.module == area.rawValue && !favorites.contains($0.id) }
+                            if !tools.isEmpty { section(title(area), tools) }
+                        }
                     }
                 }
                 .pagePadding()
@@ -59,10 +49,10 @@ struct MyToolsScreen: View {
     }
 
     @ViewBuilder func section(_ title: String, _ tools: [Tool]) -> some View {
-        if !title.isEmpty { Text(title).font(.headline).foregroundStyle(.primary.opacity(0.85))}
+        Text(title).font(.headline).foregroundStyle(.primary.opacity(0.85)).padding(.top, 4)
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: DS.Space.section)], spacing: DS.Space.section) {
             ForEach(tools) { t in
-                ToolCard(tool: t, favorite: favorites.contains(t.id), toggleFavorite: { toggleFavorite(t) }) { open(t) }
+                ToolCard(tool: t, favorite: favorites.contains(t.id), toggleFavorite: { toggleFavorite(t) }) { app.openTool(t.id) }
             }
         }
     }
@@ -71,41 +61,6 @@ struct MyToolsScreen: View {
         var f = favorites
         if f.contains(t.id) { f.remove(t.id) } else { f.insert(t.id) }
         favoritesRaw = f.sorted().joined(separator: ",")
-    }
-
-    func open(_ t: Tool) {
-        ToolHistory.markScanned(t.id)
-        switch t.kind {
-        case .screenCleaning: screenCleaning.start()
-        case .uninstaller: showUninstaller = true
-        case .scan:
-            let c = ModuleController(tool: t)
-            running = c
-            c.scan()
-        }
-    }
-
-    func back() {
-        guard let running else { return }
-        if running.phase == .results && !running.groups.allSatisfy(\.isEmpty) { confirmBack = true } else { running.stop(); self.running = nil }
-    }
-}
-
-/// One tool's scan, shown with the regular module screens; returning to the intro closes it.
-struct ToolRunView: View {
-    @ObservedObject var controller: ModuleController
-    let back: () -> Void
-    let close: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: back) { Label("Toolkit", systemImage: "chevron.left") }
-                .buttonStyle(SecondaryButtonStyle()).padding(.leading, DS.Space.page).padding(.top, DS.Space.headerTop)
-            // Back at the intro means the tool is closing: skip the module's own intro screen.
-            if controller.phase != .intro { ModuleScreen(controller: controller) }
-            Spacer(minLength: 0)
-        }
-        .onChange(of: controller.phase) { if $0 == .intro { close() } }
     }
 }
 
@@ -146,16 +101,17 @@ struct ToolCard: View {
             HStack(alignment: .top) {
                 IconChip(symbol: tool.symbol, tint: module.tint, size: 38)
                 Spacer()
-                if hover || favorite {
-                    Button(action: toggleFavorite) {
-                        Image(systemName: favorite ? "star.fill" : "star").foregroundStyle(favorite ? Color.primary : Color.secondary)
-                    }
-                    .buttonStyle(.plain).help(favorite ? String(localized: "Saved") : String(localized: "Save"))
+                // Always there, so favorites can be found; faint until the card is hovered.
+                Button(action: toggleFavorite) {
+                    Image(systemName: favorite ? "star.fill" : "star").foregroundStyle(favorite ? Color.primary : Color.secondary)
+                        .opacity(favorite || hover ? 1 : 0.35)
                 }
+                .buttonStyle(.plain).help(favorite ? String(localized: "Saved") : String(localized: "Save"))
             }
+            // The title wraps rather than truncates (long translations); the description gives up the room it needs.
             Text(tool.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary).padding(.top, 6)
-            Text(tool.description).font(.system(size: 12.5)).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true).lineLimit(3)
+                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            Text(tool.description).font(.system(size: 12.5)).foregroundStyle(.secondary).lineLimit(4)
             Spacer(minLength: 0)
             HStack {
                 if let lastScan { Text(lastScan).font(.caption).foregroundStyle(.secondary) }
@@ -164,7 +120,7 @@ struct ToolCard: View {
             }
         }
         .padding(DS.Space.card)
-        .frame(height: 200, alignment: .topLeading)
+        .frame(height: 240, alignment: .topLeading)
         .card(hovering: hover)
         .onHover { hover = $0 }
     }
