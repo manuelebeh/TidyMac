@@ -147,10 +147,10 @@ struct UninstallerSheet: View {
                     message = String(localized: "\(target.lastPathComponent) is not an application TidyMac can uninstall.")
                 }
             }
-            for i in apps.indices {
-                let app = apps[i]
+            // Iterate over a snapshot: `apps` shrinks when an app is uninstalled while sizes are still loading.
+            for app in apps {
                 let s = await Task.detached { Uninstaller.size(of: app) }.value
-                if i < apps.count, apps[i].id == app.id { apps[i].size = s }
+                if let i = apps.firstIndex(where: { $0.id == app.id }) { apps[i].size = s }
             }
         }
     }
